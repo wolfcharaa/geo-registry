@@ -1,0 +1,101 @@
+name: geo-registry
+
+services:
+  app:
+    build:
+      context: ../../..
+      dockerfile: docker/php/Dockerfile
+    init: true
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    working_dir: /app
+    command: ["php", "bin/server.php"]
+    environment:
+      APP_LISTEN: "${APP_LISTEN:-0.0.0.0:8080}"
+      APP_USER_AGENT: "${APP_USER_AGENT:-geo-registry/0.1}"
+      COMPOSER_HOME: /tmp/composer
+      DATABASE_DSN: "${DATABASE_DSN:-host=postgres port=5432 user=app password=local-app-only db=app application_name=geo-registry}"
+      DATABASE_POOL_SIZE: "${DATABASE_POOL_SIZE:-10}"
+      HTTP_TIMEOUT_SECONDS: "${HTTP_TIMEOUT_SECONDS:-10}"
+      NOMINATIM_LANGUAGE: "${NOMINATIM_LANGUAGE:-ru}"
+      NOMINATIM_URL: "${NOMINATIM_URL:-http://nominatim:8080}"
+      OPENSEARCH_INDEX: "${OPENSEARCH_INDEX:-places}"
+      OPENSEARCH_PASSWORD: "${OPENSEARCH_PASSWORD:-}"
+      OPENSEARCH_URL: "${OPENSEARCH_URL:-http://opensearch:9200}"
+      OPENSEARCH_USERNAME: "${OPENSEARCH_USERNAME:-}"
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    volumes:
+      - ../../../app:/app
+    depends_on:
+      - nominatim
+      - opensearch
+      - postgres
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health/live"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-app}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-local-app-only}"
+      POSTGRES_USER: "${POSTGRES_USER:-app}"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  opensearch:
+    image: opensearchproject/opensearch:3.9.0
+    environment:
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_JAVA_OPTS: "${OPENSEARCH_JAVA_OPTS:--Xms512m -Xmx512m}"
+      discovery.type: single-node
+    ports:
+      - "${OPENSEARCH_PORT:-9200}:9200"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent 'http://localhost:9200/_cluster/health?wait_for_status=yellow' >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  nominatim:
+    image: mediagis/nominatim:5.3
+    shm_size: 1gb
+    environment:
+      IMPORT_STYLE: "${NOMINATIM_IMPORT_STYLE:-address}"
+      NOMINATIM_PASSWORD: "${NOMINATIM_PASSWORD:-local-nominatim-only}"
+      PBF_URL: "${NOMINATIM_PBF_URL:-https://download.geofabrik.de/europe/monaco-latest.osm.pbf}"
+      POSTGRES_AUTOVACUUM_WORK_MEM: 128MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
+      POSTGRES_MAINTENANCE_WORK_MEM: 512MB
+      POSTGRES_SHARED_BUFFERS: 512MB
+      POSTGRES_WORK_MEM: 16MB
+      REPLICATION_URL: "${NOMINATIM_REPLICATION_URL:-https://download.geofabrik.de/europe/monaco-updates/}"
+      THREADS: "${NOMINATIM_THREADS:-2}"
+      UPDATE_MODE: "${NOMINATIM_UPDATE_MODE:-none}"
+    ports:
+      - "${NOMINATIM_PORT:-8081}:8080"
+    volumes:
+      - nominatim-data:/var/lib/postgresql/16/main
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/status"]
+      interval: 15s
+      timeout: 5s
+      retries: 120
+      start_period: 30s
+
+volumes:
+  nominatim-data:
+  opensearch-data:
+  postgres-data:

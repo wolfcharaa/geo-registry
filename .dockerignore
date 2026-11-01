@@ -1,0 +1,9 @@
+.git
+.github
+.idea
+.agents
+config/.env
+docker/data
+app/.php-cs-fixer.cache
+app/vendor
+app/var

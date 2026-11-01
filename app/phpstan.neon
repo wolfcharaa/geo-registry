@@ -1,0 +1,21 @@
+includes:
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+    - vendor/phpstan/phpstan/conf/bleedingEdge.neon
+
+parameters:
+    level: max
+    phpVersion: 80400
+    paths:
+        - bin
+        - src
+        - tests
+        - testo.php
+    checkBenevolentUnionTypes: true
+    checkMissingCallableSignature: true
+    checkUninitializedProperties: true
+    rememberPossiblyImpureFunctionValues: false
+    reportIgnoresWithoutComments: true
+    reportPossiblyNonexistentConstantArrayOffset: true
+    reportPossiblyNonexistentGeneralArrayOffset: true
+    reportUnsafeArrayStringKeyCasting: detect
+    tmpDir: var/phpstan

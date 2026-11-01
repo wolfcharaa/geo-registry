@@ -1,0 +1,10 @@
+/.env
+/config/.env
+/app/.env
+/app/vendor/
+/app/var/
+/app/.php-cs-fixer.cache
+/.agents/
+/.idea/
+/compose.override.yaml
+/docker/data/
