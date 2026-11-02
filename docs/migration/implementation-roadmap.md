@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; MessageBus worker transitions ready, idempotency next`
-- Версия документа: `0.27.0`
+- Статус: `Active; MessageBus idempotency/replay ready, outbox seam next`
+- Версия документа: `0.28.0`
 - Обновлено: `2026-11-02`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -645,7 +645,7 @@ fixtures версии N читаются текущим codec, а application se
 - [x] Определить общую queue schema, state machine и at-least-once semantics.
 - [x] Реализовать AMPHP-safe PostgreSQL producer/status/cancel API.
 - [x] Добавить claim/lease/ack/retry/reject contracts и stale recovery fixtures.
-- [ ] Проверить idempotency/replay policy и отсутствие blocking PDO в producer.
+- [x] Проверить idempotency/replay policy и отсутствие blocking PDO в producer.
 - [ ] Оставить transactional outbox вне `0.1.0`, сохранив extension seam.
 
 Готовность: HTTP fiber неблокирующе публикует durable message, producer и status
@@ -670,8 +670,8 @@ API integration-tested на real PostgreSQL, schema совместима с work
 - Fast gate: PHPUnit `93 tests / 365 assertions`, PHPStan level max и
   `composer validate --strict`. Real PostgreSQL 17 gate: `1 test / 8
   assertions`, включая apply-from-zero, enqueue/status/list/cancel и batch.
-- Следующий slice: публичные worker transition contracts и stale recovery
-  fixtures, затем deterministic enqueue idempotency/replay policy.
+- Следующий slice закрыт в L3.R2/L3.R3: worker transitions и handler-level
+  idempotency/replay перенесены без producer-side auto-retry или PDO.
 
 #### L3.R2 — Worker Transitions И Stale Recovery
 
@@ -695,8 +695,33 @@ API integration-tested на real PostgreSQL, schema совместима с work
   `composer validate --strict --no-check-lock`. Real PostgreSQL 17 gate:
   `1 test / 25 assertions` для claim, heartbeat, cancellation flag,
   ack/retry/reject/cancel, lease loss и stale recovery.
-- Следующий slice: deterministic enqueue idempotency/replay policy в core;
-  runner/job scope и graceful process lifecycle остаются L4.
+- Следующий slice закрыт в L3.R3: v6 handler-level idempotency/replay policy
+  перенесена без нового deterministic enqueue contract; runner/job scope и
+  graceful process lifecycle остаются L4.
+
+#### L3.R3 — Handler Idempotency И Replay Policy
+
+- State: idempotency/replay slice закрыт `2026-11-02` в core package.
+- Проверка v6.2.3 подтвердила, что проверенный механизм — handler interceptor,
+  policy registry, normalized key, intent fingerprint и atomic store decisions,
+  а не producer-side `ON CONFLICT` dedup.
+- `RequiresIdempotencyKey` использует binding-aware envelope и сохраняет четыре
+  v6 решения: claimed выполняется и complete-ится, completed-same становится
+  no-op, in-progress классифицируется retryable, conflict — non-retryable.
+- Failure handler-а не complete-ит claim; `createdAt` сохраняется в durable
+  envelope, поэтому replay видит время исходного сообщения.
+- Flow contract требует stable binding ID, owner metadata, policy того же owner,
+  command/event kind и transaction boundary снаружи idempotency guard.
+- В handler attributes возвращены v6 `ownerKind`, `ownerId` и `source*` поля;
+  отдельный middleware runtime contract не добавлен.
+- Core PostgreSQL producer использует только `amphp/postgres`; blocking PDO и
+  автоматический retry неоднозначного enqueue отсутствуют.
+- Deterministic enqueue key остаётся отдельным transport enhancement: старая v6
+  библиотека его не реализовывала, поэтому скрытый dedup contract не введён.
+- Fast core gate: PHPUnit `102 tests / 414 assertions`, PHPStan level max и
+  `composer validate --strict`.
+- Следующий slice: явно оставить transactional outbox вне `0.1.0`, сохранив
+  extension seam без реализации недоказанного dual-write scenario.
 
 ### L4 — Worker Extension `0.1.0`
 
@@ -964,14 +989,28 @@ parallel scope isolation и optional PSR-11/Thesis DIC adapters, а L2.R11 за�
 применимый v6 behavioral fixture set. L3.R1 добавил общую PostgreSQL schema,
 state machine и AMP producer/status/cancel gateway с real PostgreSQL 17 gate.
 L3.R2 добавил в optional worker package claim/lease/ack/retry/reject/cancel,
-heartbeat и transactional stale recovery на общей schema. Следующий
-implementation slice закрывает deterministic enqueue idempotency/replay policy
-и explicit outbox seam в core. Затем L4 добавляет runner, message scope и
-graceful process lifecycle. Вопросы с вариантами открываются только для реально
-отсутствующего в v6 и dependency baseline поведения. G0 и G1 остаются gates
-только для application source.
+heartbeat и transactional stale recovery на общей schema. L3.R3 перенёс
+проверенную v6 handler-idempotency interceptor модель и зафиксировал, что
+deterministic producer enqueue dedup в baseline отсутствовал. Следующий
+implementation slice документирует outbox extension seam без включения outbox в
+`0.1.0`. Затем L4 добавляет runner, message scope и graceful process lifecycle.
+Вопросы с вариантами открываются только для реально отсутствующего в v6 и
+dependency baseline поведения. G0 и G1 остаются gates только для application
+source.
 
 ## История Документа
+
+### 0.28.0 — 2026-11-02
+
+- durable envelope получил исходный `createdAt`, а handler context — stable
+  binding ID;
+- перенесена v6 idempotency interceptor/policy/store decision model;
+- completed replay проверен как no-op, handler failure не complete-ит claim;
+- in-progress и conflict сохранили retryable/non-retryable классификацию;
+- flow contract проверяет роль, порядок transaction boundary, stable identity,
+  handler kind, owner и policy ownership;
+- подтверждено отсутствие PDO и producer auto-retry/dedup контракта;
+- итог — 102 fast tests / 414 assertions и зелёный PHPStan level max.
 
 ### 0.27.0 — 2026-11-02
 
