@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; v6 flow context/strategy parity remains`
-- Версия документа: `0.17.0`
+- Статус: `Active; v6 queue producer strategy parity remains`
+- Версия документа: `0.19.0`
 - Обновлено: `2026-11-02`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -357,9 +357,12 @@ Library, application foundation и database fixture tracks можно вести
 - [x] Перенести actual v6 early-exit compiler graph и partial graph-context
   fixtures без facade stage mapping.
 - [x] Перенести registration owner/source metadata v6.
-- [ ] Перенести custom flow context/factory и execution strategy contracts:
-  producer `QueueExecutionStrategy` остаётся в core, а consumption/process
-  control — в worker package.
+- [x] Перенести custom flow context/factory contract с AMPHP cancellation вместо
+  worker runtime dependency.
+- [x] Перенести local execution request/result contracts и
+  `SequentialExecutionStrategy` с neutral service resolution.
+- [ ] Перенести producer `QueueExecutionStrategy` в core; consumption/process
+  control остаётся в worker package.
 - [x] Восстановить `MessageRegistryDefinition`, VarExporter dumper, atomic writer,
   compiled registry hydration и runtime loader lifecycle v6.
 - [ ] Прогнать полный перенесённый v6 registry/compiler fixture set.
@@ -397,6 +400,35 @@ Library, application foundation и database fixture tracks можно вести
 - Verified: PHPUnit `8 tests / 64 assertions` и PHPStan level max по
   `src + tests`; PHPStan `2.3.4` закреплён как package-owned dev dependency и
   запускается воспроизводимо через `composer analyse`.
+
+### L2.R4 — Custom Flow Context И Factory
+
+- State: реализовано и проверено `2026-11-02`.
+- `FlowDefinition` снова хранит `contextInterface` и `contextFactory`, включая
+  v6 inference default factory и deterministic artifact round-trip.
+- `MessageContextFactoryInterface` сохраняет v6 extension point, но вместо
+  worker runtime control получает AMPHP `Cancellation`; heartbeat/process
+  control не попали в core.
+- `DefaultMessageContext` остаётся read-only nested facade и объединяет parent и
+  nested cancellation через `CompositeCancellation`.
+- Compiler проверяет context/factory contracts и flow-specific context handler
+  signature на `CoreValidated` stage.
+- Verified: PHPUnit `11 tests / 81 assertions` и PHPStan level max по
+  `src + tests`.
+
+### L2.R5 — Local Sequential Execution Strategy
+
+- State: реализовано и проверено `2026-11-02`.
+- Возвращены v6 `ExecutionRequest`, `HandlerExecutionStrategyInterface`,
+  per-binding result contracts и lookup по binding ID/action class.
+- `SequentialExecutionStrategy` сохраняет descending priority, flow-before-
+  binding interceptor ordering и `failFast=false` failure collection.
+- Accepted adaptation: старый PSR-11-aware invoker заменён container-neutral
+  `CallableInvokerInterface` и typed `ServiceResolverInterface`; runtime
+  reflection discovery не возвращён.
+- AMPHP cancellation проверяется перед выполнением каждого binding.
+- Verified: PHPUnit `14 tests / 93 assertions` и PHPStan level max по
+  `src + tests`.
 
 ## Общий Definition Of Done Для Slice
 
@@ -757,18 +789,36 @@ Functional failures не скрываются автоматическими ret
 
 G4 и L1.1–L1.8 остаются принятыми modernisation deltas. L2.R1 восстановил flow,
 identity, delivery и cardinality, L2.R2 — diagnostic contracts, validation
-rules, registration metadata и definition/artifact lifecycle, а L2.R3 — actual
-early-exit compiler graph. Следующий шаг — перенести custom flow context/factory
-и execution strategy contracts. Проверенный producer `QueueExecutionStrategy`
-остаётся в core, а optional worker package получает только consumption,
-heartbeat, recovery и process control; затем прогоняется полный
-registry/compiler fixture set.
+rules, registration metadata и definition/artifact lifecycle, L2.R3 — actual
+early-exit compiler graph, L2.R4 — custom flow context/factory с AMPHP
+cancellation, а L2.R5 — local sequential execution strategy. Следующий шаг —
+перенести producer `QueueExecutionStrategy` в core. Optional worker package
+получает только consumption, heartbeat, recovery и process control; затем
+прогоняется полный registry/compiler fixture set.
 После полного registry parity без нового design round реализуется уже принятый
 Decision 15.2 — explicit versioned JSON codecs/upcasters. Вопросы с вариантами
 открываются только для реально отсутствующего в v6 и dependency baseline
 поведения. G0 и G1 остаются gates только для application source.
 
 ## История Документа
+
+### 0.19.0 — 2026-11-02
+
+- возвращены execution request/result contracts и lookup semantics v6;
+- реализован priority-ordered `SequentialExecutionStrategy` с interceptor
+  pipeline и configurable fail-fast;
+- PSR-11 invoker адаптирован к neutral typed service resolver;
+- добавлены behavioral fixtures; итог — 14 тестов и 93 assertions.
+
+### 0.18.0 — 2026-11-02
+
+- возвращены `FlowDefinition::context()`, context interface/factory metadata и
+  artifact round-trip;
+- добавлены `MessageContextFactoryInterface`, `DefaultMessageContextFactory` и
+  read-only `DefaultMessageContext`;
+- worker runtime control заменён AMPHP cancellation, включая nested composite;
+- compiler проверяет custom context/factory и flow-specific handler signature;
+- добавлены behavioral fixtures; итог — 11 тестов и 81 assertion.
 
 ### 0.17.0 — 2026-11-02
 
