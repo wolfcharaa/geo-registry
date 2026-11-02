@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; MessageBus L1/L2 parity closed, PostgreSQL producer next`
-- Версия документа: `0.25.0`
+- Статус: `Active; MessageBus PostgreSQL producer ready, worker transitions next`
+- Версия документа: `0.26.0`
 - Обновлено: `2026-11-02`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -642,14 +642,36 @@ fixtures версии N читаются текущим codec, а application se
 
 ### L3 — Async Producer И PostgreSQL Contracts
 
-- [ ] Определить общую queue schema, state machine и at-least-once semantics.
-- [ ] Реализовать AMPHP-safe PostgreSQL producer/status/cancel API.
+- [x] Определить общую queue schema, state machine и at-least-once semantics.
+- [x] Реализовать AMPHP-safe PostgreSQL producer/status/cancel API.
 - [ ] Добавить claim/lease/ack/retry/reject contracts и stale recovery fixtures.
 - [ ] Проверить idempotency/replay policy и отсутствие blocking PDO в producer.
 - [ ] Оставить transactional outbox вне `0.1.0`, сохранив extension seam.
 
 Готовность: HTTP fiber неблокирующе публикует durable message, producer и status
 API integration-tested на real PostgreSQL, schema совместима с worker package.
+
+#### L3.R1 — Shared Schema И AMP Producer Gateway
+
+- State: producer/status/cancel slice закрыт `2026-11-02`.
+- Общая v6-compatible schema сохраняет routing, retry snapshot, lease,
+  heartbeat, cancellation, error и serialized-envelope columns и индексы для
+  pending/running/interrupted jobs.
+- `QueueJobState` фиксирует проверенную матрицу переходов; `interrupted` остаётся
+  recoverable technical status без преждевременно придуманного recovery API.
+- `PostgresQueueGateway` реализует single/atomic batch enqueue, status lookup,
+  pending cancel и cooperative running cancellation через `amphp/postgres`
+  `2.2.1`; PDO в package отсутствует.
+- Stable message alias вынесен в `SerializedEnvelope` и проверяется против alias
+  JSON payload до восстановления сообщения.
+- Cancellation проверяется до write, между batch writes и до commit. Уже
+  начатый SQL не бросается через cancelled await, чтобы insert не получил
+  неоднозначный committed/unknown outcome.
+- Fast gate: PHPUnit `93 tests / 365 assertions`, PHPStan level max и
+  `composer validate --strict`. Real PostgreSQL 17 gate: `1 test / 8
+  assertions`, включая apply-from-zero, enqueue/status/list/cancel и batch.
+- Следующий slice: публичные worker transition contracts и stale recovery
+  fixtures, затем deterministic enqueue idempotency/replay policy.
 
 ### L4 — Worker Extension `0.1.0`
 
@@ -914,14 +936,27 @@ cancellation, L2.R5 — local sequential execution strategy, L2.R6 — producer
 typed diagnostic targets, L2.R8 — принятые explicit versioned JSON codecs и
 upcasters, L2.R9 — composite runtime с root/nested scope lifecycle, L2.R10 —
 parallel scope isolation и optional PSR-11/Thesis DIC adapters, а L2.R11 закрыл
-применимый v6 behavioral fixture set. Следующий implementation slice — L3:
-общая PostgreSQL queue schema/state machine и producer status/cancel contracts,
-после чего AMPHP-safe adapter. Optional worker package получает только
-consumption, heartbeat, recovery и process control. Вопросы с вариантами
-открываются только для реально отсутствующего в v6 и dependency baseline
-поведения. G0 и G1 остаются gates только для application source.
+применимый v6 behavioral fixture set. L3.R1 добавил общую PostgreSQL schema,
+state machine и AMP producer/status/cancel gateway с real PostgreSQL 17 gate.
+Следующий implementation slice — L3 worker-facing claim/lease/ack/retry/reject
+contracts и stale recovery fixtures; их consumer implementation остаётся в L4.
+После этого L3 закрывает deterministic enqueue idempotency/replay policy и
+explicit outbox seam. Вопросы с вариантами открываются только для реально
+отсутствующего в v6 и dependency baseline поведения. G0 и G1 остаются gates
+только для application source.
 
 ## История Документа
+
+### 0.26.0 — 2026-11-02
+
+- зафиксирована общая v6-compatible PostgreSQL queue schema и state machine;
+- добавлен AMP producer/status/cancel gateway без PDO;
+- atomic batch и safe-boundary cancellation проверены unit fixtures;
+- schema и gateway проверены apply-from-zero на PostgreSQL 17;
+- добавлен точный reference по at-least-once, state transitions и ограничениям
+  producer retry;
+- итог — 93 fast tests / 365 assertions, 1 PostgreSQL test / 8 assertions и
+  зелёный PHPStan level max.
 
 ### 0.25.0 — 2026-11-02
 
