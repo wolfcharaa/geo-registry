@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
 - Статус: `Active; v6 flow context/strategy parity remains`
-- Версия документа: `0.16.0`
+- Версия документа: `0.17.0`
 - Обновлено: `2026-11-02`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -354,8 +354,8 @@ Library, application foundation и database fixture tracks можно вести
 
 - [x] Восстановить v6 flow, sync/async identity, delivery и cardinality.
 - [x] Перенести diagnostic model, stage values и project validation rules v6.
-- [ ] Перенести actual v6 early-exit compiler graph и partial graph-context
-  fixtures; временный facade stage mapping не считается полным parity.
+- [x] Перенести actual v6 early-exit compiler graph и partial graph-context
+  fixtures без facade stage mapping.
 - [x] Перенести registration owner/source metadata v6.
 - [ ] Перенести custom flow context/factory и execution strategy contracts:
   producer `QueueExecutionStrategy` остаётся в core, а consumption/process
@@ -381,6 +381,22 @@ Library, application foundation и database fixture tracks можно вести
   `ServiceReference`; owner/source metadata проходит binding round-trip.
 - Verified: Composer validation, PHPUnit `7 tests / 50 assertions`, PHP syntax и
   PHPStan level max по `src + tests`.
+
+### L2.R3 — Actual Compiler Stage Graph
+
+- State: реализовано и проверено `2026-11-02`.
+- Compiler выполняет отдельные early-exit stages `HandlersDiscovered`,
+  `AliasesHydrated`, `BindingsNormalized` и `CoreValidated`; facade больше не
+  выводит stage из diagnostic code.
+- `RegistryCompilationGraphContext` сохраняет partial
+  `HandlerBindingDefinition` graph, aliases, reverse names и flows на точке
+  остановки.
+- `MessageRegistryDefinition` хранит нормализованные compile-time bindings, а
+  runtime `CompiledRegistry` получает typed `ServiceReference` только после
+  успешной core validation.
+- Verified: PHPUnit `8 tests / 64 assertions` и PHPStan level max по
+  `src + tests`; PHPStan `2.3.4` закреплён как package-owned dev dependency и
+  запускается воспроизводимо через `composer analyse`.
 
 ## Общий Definition Of Done Для Slice
 
@@ -740,19 +756,28 @@ Functional failures не скрываются автоматическими ret
 ## Текущий Фокус
 
 G4 и L1.1–L1.8 остаются принятыми modernisation deltas. L2.R1 восстановил flow,
-identity, delivery и cardinality, а L2.R2 — diagnostic contracts, validation
-rules, registration metadata и definition/artifact lifecycle. Следующий шаг —
-заменить временный facade stage mapping actual v6 early-exit compiler graph и
-перенести custom flow context/factory и execution strategy contracts. Проверенный
-producer `QueueExecutionStrategy` остаётся в core, а optional worker package
-получает только consumption, heartbeat, recovery и process control; затем
-прогоняется полный registry/compiler fixture set.
+identity, delivery и cardinality, L2.R2 — diagnostic contracts, validation
+rules, registration metadata и definition/artifact lifecycle, а L2.R3 — actual
+early-exit compiler graph. Следующий шаг — перенести custom flow context/factory
+и execution strategy contracts. Проверенный producer `QueueExecutionStrategy`
+остаётся в core, а optional worker package получает только consumption,
+heartbeat, recovery и process control; затем прогоняется полный
+registry/compiler fixture set.
 После полного registry parity без нового design round реализуется уже принятый
 Decision 15.2 — explicit versioned JSON codecs/upcasters. Вопросы с вариантами
 открываются только для реально отсутствующего в v6 и dependency baseline
 поведения. G0 и G1 остаются gates только для application source.
 
 ## История Документа
+
+### 0.17.0 — 2026-11-02
+
+- facade stage mapping заменён actual v6 early-exit compiler graph;
+- partial `HandlerBindingDefinition` graph сохраняется на каждой стадии;
+- compile-time definitions отделены от runtime typed service references;
+- добавлены stage-boundary fixtures; итог — 8 тестов и 64 assertions;
+- PHPStan добавлен в `require-dev`, а level max закреплён командой
+  `composer analyse`.
 
 ### 0.16.0 — 2026-11-02
 
