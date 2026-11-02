@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; MessageBus idempotency/replay ready, outbox seam next`
-- Версия документа: `0.28.0`
+- Статус: `Active; MessageBus L3 ready, worker runner next`
+- Версия документа: `0.29.0`
 - Обновлено: `2026-11-02`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -646,7 +646,7 @@ fixtures версии N читаются текущим codec, а application se
 - [x] Реализовать AMPHP-safe PostgreSQL producer/status/cancel API.
 - [x] Добавить claim/lease/ack/retry/reject contracts и stale recovery fixtures.
 - [x] Проверить idempotency/replay policy и отсутствие blocking PDO в producer.
-- [ ] Оставить transactional outbox вне `0.1.0`, сохранив extension seam.
+- [x] Оставить transactional outbox вне `0.1.0`, сохранив extension seam.
 
 Готовность: HTTP fiber неблокирующе публикует durable message, producer и status
 API integration-tested на real PostgreSQL, schema совместима с worker package.
@@ -720,8 +720,26 @@ API integration-tested на real PostgreSQL, schema совместима с work
   библиотека его не реализовывала, поэтому скрытый dedup contract не введён.
 - Fast core gate: PHPUnit `102 tests / 414 assertions`, PHPStan level max и
   `composer validate --strict`.
-- Следующий slice: явно оставить transactional outbox вне `0.1.0`, сохранив
-  extension seam без реализации недоказанного dual-write scenario.
+- Следующий slice закрыт в L3.R4: transactional outbox оставлен вне `0.1.0`, а
+  extension seam доказан через существующий producer port.
+
+#### L3.R4 — Transactional Outbox Extension Seam
+
+- State: L3 закрыт `2026-11-02`; outbox storage/relay не входят в core `0.1.0`.
+- Новый `OutboxInterface` не добавлен: `QueueExecutionStrategy` уже зависит
+  только от `QueueProviderInterface`, а `QueueMessage` несёт полный routing,
+  retry и serialized-envelope snapshot.
+- Будущий application adapter может записать тот же `QueueMessage` в outbox и
+  вернуть ID outbox record без изменения bus, strategy или codecs.
+- Adapter владеет transaction joining, schema, relay, dedup/recovery и
+  observability; core не принимает application transaction object и не зависит
+  от ambient global transaction state.
+- Contract fixture проверяет заменяемость direct PostgreSQL gateway на
+  outbox-style provider через существующий port.
+- Fast core gate: PHPUnit `103 tests / 419 assertions`, PHPStan level max и
+  `composer validate --strict`.
+- Следующий slice: L4 consumer runner, job scope, heartbeat и graceful
+  cancellation в optional worker package.
 
 ### L4 — Worker Extension `0.1.0`
 
@@ -991,14 +1009,25 @@ state machine и AMP producer/status/cancel gateway с real PostgreSQL 17 gate.
 L3.R2 добавил в optional worker package claim/lease/ack/retry/reject/cancel,
 heartbeat и transactional stale recovery на общей schema. L3.R3 перенёс
 проверенную v6 handler-idempotency interceptor модель и зафиксировал, что
-deterministic producer enqueue dedup в baseline отсутствовал. Следующий
-implementation slice документирует outbox extension seam без включения outbox в
-`0.1.0`. Затем L4 добавляет runner, message scope и graceful process lifecycle.
-Вопросы с вариантами открываются только для реально отсутствующего в v6 и
-dependency baseline поведения. G0 и G1 остаются gates только для application
-source.
+deterministic producer enqueue dedup в baseline отсутствовал. L3.R4 доказал
+outbox extension seam через существующий `QueueProviderInterface`, не добавляя
+outbox storage/relay в core `0.1.0`. L3 закрыт. Следующий implementation slice —
+L4 runner, job scope, heartbeat и graceful process lifecycle. Вопросы с
+вариантами открываются только для реально отсутствующего в v6 и dependency
+baseline поведения. G0 и G1 остаются gates только для application source.
 
 ## История Документа
+
+### 0.29.0 — 2026-11-02
+
+- transactional outbox явно оставлен вне core `0.1.0`;
+- существующий `QueueProviderInterface` зафиксирован как application adapter
+  seam без нового dormant `OutboxInterface`;
+- contract fixture доказал заменяемость direct gateway на outbox-style provider;
+- transaction joining, schema, relay, dedup и recovery оставлены владельцу
+  будущего adapter-а;
+- L3 закрыт; frontier переведён на L4 worker runner/job scope/lifecycle;
+- итог — 103 fast tests / 419 assertions и зелёный PHPStan level max.
 
 ### 0.28.0 — 2026-11-02
 
