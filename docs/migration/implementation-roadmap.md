@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; MessageBus PostgreSQL producer ready, worker transitions next`
-- Версия документа: `0.26.0`
+- Статус: `Active; MessageBus worker transitions ready, idempotency next`
+- Версия документа: `0.27.0`
 - Обновлено: `2026-11-02`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -644,7 +644,7 @@ fixtures версии N читаются текущим codec, а application se
 
 - [x] Определить общую queue schema, state machine и at-least-once semantics.
 - [x] Реализовать AMPHP-safe PostgreSQL producer/status/cancel API.
-- [ ] Добавить claim/lease/ack/retry/reject contracts и stale recovery fixtures.
+- [x] Добавить claim/lease/ack/retry/reject contracts и stale recovery fixtures.
 - [ ] Проверить idempotency/replay policy и отсутствие blocking PDO в producer.
 - [ ] Оставить transactional outbox вне `0.1.0`, сохранив extension seam.
 
@@ -672,6 +672,31 @@ API integration-tested на real PostgreSQL, schema совместима с work
   assertions`, включая apply-from-zero, enqueue/status/list/cancel и batch.
 - Следующий slice: публичные worker transition contracts и stale recovery
   fixtures, затем deterministic enqueue idempotency/replay policy.
+
+#### L3.R2 — Worker Transitions И Stale Recovery
+
+- State: consumer transition slice закрыт `2026-11-02` в optional
+  `message-bus-async-worker` package.
+- Сохранены v6 `ConsumerOptions`, `ReceivedQueueMessage` и consumer operation
+  names; I/O contracts получили `Amp\Cancellation`, raw PostgreSQL row удалён
+  из public received-message contract.
+- `PostgresMessageConsumer` реализует transactional claim через
+  `FOR UPDATE SKIP LOCKED`, persisted attempts/lease/heartbeat и typed envelope
+  reconstruction на общей core schema.
+- Ack/retry/reject/cancel/heartbeat/cancellation polling защищены job ID,
+  `running` state и lease owner; stale worker получает typed `QueueLeaseLost` и
+  не может завершить уже переарендованную job.
+- Stale recovery выбирает и переводит jobs в одной transaction с row locks:
+  незавершённый attempt возвращается в `pending` с persisted retry delay,
+  exhausted attempt переходит в `failed`.
+- Dependency direction проверен: core не ссылается на worker namespace; local
+  source workspace связывает два соседних repository через Composer path.
+- Fast worker gate: PHPUnit `3 tests / 12 assertions`, PHPStan level max и
+  `composer validate --strict --no-check-lock`. Real PostgreSQL 17 gate:
+  `1 test / 25 assertions` для claim, heartbeat, cancellation flag,
+  ack/retry/reject/cancel, lease loss и stale recovery.
+- Следующий slice: deterministic enqueue idempotency/replay policy в core;
+  runner/job scope и graceful process lifecycle остаются L4.
 
 ### L4 — Worker Extension `0.1.0`
 
@@ -938,14 +963,25 @@ upcasters, L2.R9 — composite runtime с root/nested scope lifecycle, L2.R10 �
 parallel scope isolation и optional PSR-11/Thesis DIC adapters, а L2.R11 закрыл
 применимый v6 behavioral fixture set. L3.R1 добавил общую PostgreSQL schema,
 state machine и AMP producer/status/cancel gateway с real PostgreSQL 17 gate.
-Следующий implementation slice — L3 worker-facing claim/lease/ack/retry/reject
-contracts и stale recovery fixtures; их consumer implementation остаётся в L4.
-После этого L3 закрывает deterministic enqueue idempotency/replay policy и
-explicit outbox seam. Вопросы с вариантами открываются только для реально
+L3.R2 добавил в optional worker package claim/lease/ack/retry/reject/cancel,
+heartbeat и transactional stale recovery на общей schema. Следующий
+implementation slice закрывает deterministic enqueue idempotency/replay policy
+и explicit outbox seam в core. Затем L4 добавляет runner, message scope и
+graceful process lifecycle. Вопросы с вариантами открываются только для реально
 отсутствующего в v6 и dependency baseline поведения. G0 и G1 остаются gates
 только для application source.
 
 ## История Документа
+
+### 0.27.0 — 2026-11-02
+
+- worker package получил AMP PostgreSQL consumer и v6-compatible contracts;
+- все running transitions защищены lease owner и typed lease-loss failure;
+- stale recovery выполняется transactionally через row locks и retry snapshot;
+- real PostgreSQL 17 fixture проверил полный transition lifecycle;
+- dependency direction `worker -> core` сохранён;
+- итог — 3 fast tests / 12 assertions, 1 PostgreSQL test / 25 assertions и
+  зелёный PHPStan level max.
 
 ### 0.26.0 — 2026-11-02
 
