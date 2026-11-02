@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; composite bus runtime implemented, scope integrations next`
-- Версия документа: `0.23.0`
+- Статус: `Active; MessageBus L1/L2 parity closed, PostgreSQL producer next`
+- Версия документа: `0.25.0`
 - Обновлено: `2026-11-02`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -367,7 +367,7 @@ Library, application foundation и database fixture tracks можно вести
   control остаётся в worker package.
 - [x] Восстановить `MessageRegistryDefinition`, VarExporter dumper, atomic writer,
   compiled registry hydration и runtime loader lifecycle v6.
-- [ ] Прогнать полный перенесённый v6 registry/compiler fixture set.
+- [x] Прогнать полный перенесённый v6 registry/compiler fixture set.
 
 ### L2.R2 — Diagnostic Contracts, Definition И Artifact Lifecycle
 
@@ -505,6 +505,47 @@ Library, application foundation и database fixture tracks можно вести
 - Verified: PHPUnit `38 tests / 239 assertions` и PHPStan level max по
   `src + tests`.
 
+### L2.R10 — Parallel Scope Isolation И Optional Container Adapters
+
+- State: реализовано и проверено `2026-11-02`.
+- Параллельные AMPHP fibers открывают независимые root scopes, а nested query
+  переиспользует resolver только своего root execution.
+- `ServiceScopeInterface::dispose()` получает исходную execution error, поэтому
+  lifecycle adapter может корректно передать её container disposer-ам.
+- `PsrContainerServiceResolver` предоставляет optional PSR-11 bridge с runtime
+  проверкой типа относительно compiled `ServiceReference`.
+- `ThesisServiceResolver` использует provider closures, а
+  `ThesisServiceScopeFactory` адаптирует public `Scoped<T>::run()` lifecycle без
+  зависимости core package от Thesis DIC.
+- Thesis scope удерживается отдельным fiber до deterministic disposal; success,
+  failure и parallel paths проверены на реальном `thesis/dic` `0.5.3`.
+- `psr/container` и `thesis/dic` объявлены только в `suggest` и `require-dev`.
+- Verified: PHPUnit `41 tests / 249 assertions`, PHPStan level max,
+  `composer validate --strict` и `git diff --check`.
+
+### L2.R11 — V6 Behavioral Parity Closure
+
+- State: применимый L1/L2 fixture set прогнан и закрыт `2026-11-02`.
+- Восстановлен v6 direct path для contextless sync binding без interceptors:
+  context factory и execution strategy не разрешаются без необходимости.
+- Contextless invocation mode проверен через runtime, repeatable attributes,
+  custom flow и compiled artifact round-trip; invalid signatures и async query
+  сохраняют v6 diagnostic contracts.
+- Local event subscribers снова выполняются по descending priority, сохраняя
+  aggregate result и partial-failure behavior нового public API.
+- Runtime loader проверен в build-only режиме с обязательным compiled artifact;
+  optional service resolvers возвращают typed missing/type mismatch failures.
+- К L3 отнесены PostgreSQL queue schema, status/cancel и idempotency/replay; к
+  L4 — consumption, internal binding execution, heartbeat и process control.
+- Runtime discovery, reflection/PHP serialization и monolithic advanced bus API
+  не возвращены по уже принятым modernisation deltas; cache остаётся deferred
+  до доказанного application scenario.
+- Target application использует query dispatch, nested dispatch и event publish;
+  `SagaHandler`, `dispatchAll`, fan-out facade и cache annotations не являются
+  необходимыми compatibility contracts первой package line.
+- Verified: PHPUnit `48 tests / 270 assertions`, PHPStan level max и
+  `git diff --check`.
+
 ## Общий Definition Of Done Для Slice
 
 Каждый slice обязан:
@@ -575,14 +616,14 @@ Package: новый `message-bus-async`, версия `0.1.0`.
 - [x] Оставить core независимым от Thesis DIC, Symfony Console и worker package.
 - [x] Реализовать composite runtime с root scope, nested causation и
   local/queued fan-out.
-- [ ] Перенести только доказанные behavioral contracts из v6 через tests.
+- [x] Перенести только доказанные behavioral contracts из v6 через tests.
 
 Готовность: local query/command/event flows выполняются через hand-written
 container/fakes, имеют стабильный public API и не содержат worker runtime.
 
 ### L2 — Registry, Scoped Resolution И Versioned Codecs
 
-- [ ] Сверить provisional L2 implementation с v6 registry/flow/compiler tests и
+- [x] Сверить provisional L2 implementation с v6 registry/flow/compiler tests и
   устранить необоснованные semantic deltas.
 - [x] Сохранить compile-time attributes и explicit class-list source без
   runtime scanning.
@@ -591,8 +632,8 @@ container/fakes, имеют стабильный public API и не содерж
 - [x] Реализовать explicit registry definitions и deterministic compilation.
 - [x] Добавить stable aliases/binding IDs и duplicate/missing diagnostics.
 - [x] Реализовать versioned JSON codecs и upcaster chain.
-- [ ] Добавить PSR-11 bridge и Thesis DIC adapter как optional integrations.
-- [ ] Проверить request/message scope isolation и disposer lifecycle между
+- [x] Добавить PSR-11 bridge и Thesis DIC adapter как optional integrations.
+- [x] Проверить request/message scope isolation и disposer lifecycle между
   параллельными fibers.
 
 Готовность: registry компилируется в artifact без внешних сервисов, durable
@@ -871,14 +912,33 @@ early-exit compiler graph, L2.R4 — custom flow context/factory с AMPHP
 cancellation, L2.R5 — local sequential execution strategy, L2.R6 — producer
 `QueueExecutionStrategy`, L2.R7 — применимую v6 diagnostic fixture matrix и
 typed diagnostic targets, L2.R8 — принятые explicit versioned JSON codecs и
-upcasters, а L2.R9 — composite runtime с root/nested scope lifecycle. Следующий
-implementation slice — проверить parallel fiber isolation и подключить optional
-Thesis DIC adapter без зависимости core от container. Optional worker package
-получает только consumption, heartbeat, recovery и process control. Вопросы с вариантами
+upcasters, L2.R9 — composite runtime с root/nested scope lifecycle, L2.R10 —
+parallel scope isolation и optional PSR-11/Thesis DIC adapters, а L2.R11 закрыл
+применимый v6 behavioral fixture set. Следующий implementation slice — L3:
+общая PostgreSQL queue schema/state machine и producer status/cancel contracts,
+после чего AMPHP-safe adapter. Optional worker package получает только
+consumption, heartbeat, recovery и process control. Вопросы с вариантами
 открываются только для реально отсутствующего в v6 и dependency baseline
 поведения. G0 и G1 остаются gates только для application source.
 
 ## История Документа
+
+### 0.25.0 — 2026-11-02
+
+- закрыт применимый v6 registry/compiler/runtime fixture set для L1/L2;
+- восстановлен contextless direct path без лишнего context lifecycle;
+- local subscribers выполняются по descending priority;
+- проверены repeatable attributes, artifact metadata и build-only loader;
+- PostgreSQL producer/idempotency и worker contracts направлены в L3/L4;
+- итог — 48 тестов, 270 assertions и зелёный PHPStan level max.
+
+### 0.24.0 — 2026-11-02
+
+- доказана изоляция root/nested scopes между параллельными AMPHP fibers;
+- добавлены optional PSR-11 resolver и Thesis DIC lifecycle adapter;
+- исходная execution error передаётся container disposer-ам;
+- core остаётся независимым от container packages в runtime requirements;
+- итог — 41 тест, 249 assertions и зелёный PHPStan level max.
 
 ### 0.23.0 — 2026-11-02
 
