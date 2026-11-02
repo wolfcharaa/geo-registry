@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; v6 queue producer strategy parity remains`
-- Версия документа: `0.19.0`
+- Статус: `Active; full v6 registry fixtures and versioned codecs remain`
+- Версия документа: `0.20.0`
 - Обновлено: `2026-11-02`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -361,7 +361,7 @@ Library, application foundation и database fixture tracks можно вести
   worker runtime dependency.
 - [x] Перенести local execution request/result contracts и
   `SequentialExecutionStrategy` с neutral service resolution.
-- [ ] Перенести producer `QueueExecutionStrategy` в core; consumption/process
+- [x] Перенести producer `QueueExecutionStrategy` в core; consumption/process
   control остаётся в worker package.
 - [x] Восстановить `MessageRegistryDefinition`, VarExporter dumper, atomic writer,
   compiled registry hydration и runtime loader lifecycle v6.
@@ -429,6 +429,22 @@ Library, application foundation и database fixture tracks можно вести
 - AMPHP cancellation проверяется перед выполнением каждого binding.
 - Verified: PHPUnit `14 tests / 93 assertions` и PHPStan level max по
   `src + tests`.
+
+### L2.R6 — Queue Producer Execution Strategy
+
+- State: реализовано и проверено `2026-11-02`.
+- Возвращены producer-only queue provider, batch enqueue, queue message,
+  enqueue result/failure и retry policy snapshot contracts v6.
+- `QueueExecutionStrategy` сохраняет delivery merge order
+  `flow -> binding -> execution`, single/batch mapping и per-binding failures.
+- Accepted adaptations: queue providers получают AMPHP `Cancellation`;
+  envelope serialization остаётся typed port до отдельного Decision 15.2 codec
+  slice; flow/binding metadata принадлежит `QueueMessage`, а не core envelope.
+- `psr/clock 1.0.0` закреплён как прямая dependency для deterministic
+  `availableAt`.
+- Worker consumption, heartbeat, recovery и process control не добавлены в core.
+- Verified: PHPUnit `20 tests / 127 assertions`, PHPStan level max и PHP syntax
+  по `src + tests`.
 
 ## Общий Definition Of Done Для Slice
 
@@ -791,16 +807,23 @@ G4 и L1.1–L1.8 остаются принятыми modernisation deltas. L2.R
 identity, delivery и cardinality, L2.R2 — diagnostic contracts, validation
 rules, registration metadata и definition/artifact lifecycle, L2.R3 — actual
 early-exit compiler graph, L2.R4 — custom flow context/factory с AMPHP
-cancellation, а L2.R5 — local sequential execution strategy. Следующий шаг —
-перенести producer `QueueExecutionStrategy` в core. Optional worker package
-получает только consumption, heartbeat, recovery и process control; затем
-прогоняется полный registry/compiler fixture set.
-После полного registry parity без нового design round реализуется уже принятый
-Decision 15.2 — explicit versioned JSON codecs/upcasters. Вопросы с вариантами
+cancellation, L2.R5 — local sequential execution strategy, а L2.R6 — producer
+`QueueExecutionStrategy`. Следующий шаг — прогнать полный registry/compiler
+fixture set, затем реализовать уже принятый Decision 15.2 — explicit versioned
+JSON codecs/upcasters. Optional worker package получает только consumption,
+heartbeat, recovery и process control. Вопросы с вариантами
 открываются только для реально отсутствующего в v6 и dependency baseline
 поведения. G0 и G1 остаются gates только для application source.
 
 ## История Документа
+
+### 0.20.0 — 2026-11-02
+
+- перенесены producer queue/retry contracts и `QueueExecutionStrategy` v6;
+- сохранены delivery merge, retry snapshot, single/batch и failure semantics;
+- provider ports получили AMPHP cancellation, добавлен `psr/clock 1.0.0`;
+- worker operational surface остался вне core;
+- добавлены behavioral fixtures; итог — 20 тестов и 127 assertions.
 
 ### 0.19.0 — 2026-11-02
 
