@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; MessageBus L3 ready, worker runner next`
-- Версия документа: `0.29.0`
+- Статус: `Active; worker runner ready, control plane next`
+- Версия документа: `0.30.0`
 - Обновлено: `2026-11-02`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -747,7 +747,7 @@ Package: новый `message-bus-async-worker`.
 
 - [x] Создать независимый package scaffold на PHP `^8.4.12` с dependency
   direction `worker -> core`.
-- [ ] Реализовать consumer loop, job scope, heartbeat и graceful cancellation.
+- [x] Реализовать consumer loop, job scope, heartbeat и graceful cancellation.
 - [ ] Добавить retry/reject, stale recovery и worker control plane.
 - [ ] Предоставить отдельный Symfony Console executable и process adapters.
 - [ ] Доказать dependency direction только `worker -> core`.
@@ -755,6 +755,26 @@ Package: новый `message-bus-async-worker`.
 
 Готовность: worker восстанавливает stale lease, не теряет ack/retry transition,
 корректно завершается и не добавляет worker dependencies в core package.
+
+#### L4.R1 — AMPHP Runner И Per-Job Scope
+
+- State: runner/job-scope slice закрыт `2026-11-02` в worker package.
+- `QueueWorkerRunner` использует AMPHP `delay()` и cancellation вместо
+  `usleep()`; consumer claim прекращается сразу после process stop request.
+- Каждая claimed job открывает отдельный core `ServiceScopeInterface`, разрешает
+  `QueueWorkerInterface` внутри него и dispose-ит scope с исходной ошибкой.
+- Concurrent monitor heartbeat-ит lease, poll-ит durable cancellation и
+  отменяет cooperative handler при lease loss или после graceful timeout.
+- Process stop позволяет текущей job завершиться в grace window; timeout ведёт
+  к retry/reject по attempt budget. Durable cancellation ведёт к `cancel`.
+- Ack/retry/reject/cancel выполняются отдельной uncancelled transition phase,
+  чтобы shutdown не оборвал фиксацию результата посередине.
+- `NonRetryableMessageExceptionInterface` reject-ится; обычная ошибка retry-ится
+  до исчерпания snapshot; stale worker после `QueueLeaseLost` ничего не пишет.
+- Fast worker gate: PHPUnit `10 tests / 41 assertions`, PHPStan level max и
+  `composer validate --strict --no-check-lock`.
+- Следующий slice: worker control plane и затем job-scoped adapter точного
+  queued binding для composition root/CLI.
 
 ## Wave 2 — Application Foundation
 
@@ -1011,12 +1031,24 @@ heartbeat и transactional stale recovery на общей schema. L3.R3 пере
 проверенную v6 handler-idempotency interceptor модель и зафиксировал, что
 deterministic producer enqueue dedup в baseline отсутствовал. L3.R4 доказал
 outbox extension seam через существующий `QueueProviderInterface`, не добавляя
-outbox storage/relay в core `0.1.0`. L3 закрыт. Следующий implementation slice —
-L4 runner, job scope, heartbeat и graceful process lifecycle. Вопросы с
-вариантами открываются только для реально отсутствующего в v6 и dependency
-baseline поведения. G0 и G1 остаются gates только для application source.
+outbox storage/relay в core `0.1.0`. L3 закрыт. L4.R1 добавил AMPHP consumer
+loop, per-job scope, heartbeat/cancellation monitor и graceful process stop.
+Следующий implementation slice — worker control plane, после него exact-binding
+adapter и executable. Вопросы с вариантами открываются только для реально
+отсутствующего в v6 и dependency baseline поведения. G0 и G1 остаются gates
+только для application source.
 
 ## История Документа
+
+### 0.30.0 — 2026-11-02
+
+- worker package получил AMPHP-native consumer loop без `usleep()`;
+- каждая job выполняется в отдельном disposable service scope;
+- concurrent monitor проверяет heartbeat, durable cancel и process grace;
+- graceful timeout retry-ит/reject-ит job, lease loss запрещает stale transition;
+- final durable transition не отменяется process cancellation;
+- frontier переведён на worker control plane и exact-binding adapter;
+- итог — 10 fast tests / 41 assertion и зелёный PHPStan level max.
 
 ### 0.29.0 — 2026-11-02
 
