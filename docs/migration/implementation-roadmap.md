@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; explicit codecs implemented, composite bus runtime next`
-- Версия документа: `0.22.0`
+- Статус: `Active; composite bus runtime implemented, scope integrations next`
+- Версия документа: `0.23.0`
 - Обновлено: `2026-11-02`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -486,6 +486,25 @@ Library, application foundation и database fixture tracks можно вести
 - Verified: PHPUnit `34 tests / 211 assertions` и PHPStan level max по
   `src + tests`.
 
+### L2.R9 — Composite MessageBus Runtime
+
+- State: реализовано и проверено `2026-11-02`.
+- Concrete `MessageBus` реализует segregated query/command/event interfaces и
+  группирует bindings по уже скомпилированным flows/strategies.
+- Root `ask/dispatch/publish` открывает один `ServiceScopeInterface`; nested
+  facade переиспользует scope, а disposal выполняется в `finally` на success и
+  failure paths.
+- Nested envelope получает новый message ID, сохраняет correlation, записывает
+  parent message ID как causation и объединяет immutable headers.
+- Command runtime поддерживает primary sync binding вместе с async fan-out и
+  async-only command; event runtime агрегирует local/queued executions и
+  сохраняет successes в `PublishFailed` при partial failure.
+- Accepted adaptation: context получает per-execution `NestedMessageBus`, а не
+  resolver или fiber-local mutable state; advanced worker binding execution
+  остаётся отдельным worker contract.
+- Verified: PHPUnit `38 tests / 239 assertions` и PHPStan level max по
+  `src + tests`.
+
 ## Общий Definition Of Done Для Slice
 
 Каждый slice обязан:
@@ -554,6 +573,8 @@ Package: новый `message-bus-async`, версия `0.1.0`.
 - [x] Определить immutable envelope identity и causation inheritance.
 - [x] Перенести generic interceptor pipeline без параллельного middleware API.
 - [x] Оставить core независимым от Thesis DIC, Symfony Console и worker package.
+- [x] Реализовать composite runtime с root scope, nested causation и
+  local/queued fan-out.
 - [ ] Перенести только доказанные behavioral contracts из v6 через tests.
 
 Готовность: local query/command/event flows выполняются через hand-written
@@ -849,14 +870,23 @@ rules, registration metadata и definition/artifact lifecycle, L2.R3 — actual
 early-exit compiler graph, L2.R4 — custom flow context/factory с AMPHP
 cancellation, L2.R5 — local sequential execution strategy, L2.R6 — producer
 `QueueExecutionStrategy`, L2.R7 — применимую v6 diagnostic fixture matrix и
-typed diagnostic targets, а L2.R8 — принятые explicit versioned JSON codecs и
-upcasters. Следующий implementation slice — composite bus runtime поверх уже
-готовых registry, context и execution strategies. Optional worker package
+typed diagnostic targets, L2.R8 — принятые explicit versioned JSON codecs и
+upcasters, а L2.R9 — composite runtime с root/nested scope lifecycle. Следующий
+implementation slice — проверить parallel fiber isolation и подключить optional
+Thesis DIC adapter без зависимости core от container. Optional worker package
 получает только consumption, heartbeat, recovery и process control. Вопросы с вариантами
 открываются только для реально отсутствующего в v6 и dependency baseline
 поведения. G0 и G1 остаются gates только для application source.
 
 ## История Документа
+
+### 0.23.0 — 2026-11-02
+
+- реализован concrete composite `MessageBus` для query, command и event lanes;
+- nested calls переиспользуют root scope и сохраняют causation/correlation;
+- async-only commands и local/queued event fan-out проходят общую orchestration;
+- partial publish failure сохраняет успешные executions, scope всегда disposed;
+- итог — 38 тестов, 239 assertions и зелёный PHPStan level max.
 
 ### 0.22.0 — 2026-11-02
 
