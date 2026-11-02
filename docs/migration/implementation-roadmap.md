@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; full v6 registry fixtures and versioned codecs remain`
-- Версия документа: `0.20.0`
+- Статус: `Active; explicit codecs implemented, composite bus runtime next`
+- Версия документа: `0.22.0`
 - Обновлено: `2026-11-02`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -354,6 +354,8 @@ Library, application foundation и database fixture tracks можно вести
 
 - [x] Восстановить v6 flow, sync/async identity, delivery и cardinality.
 - [x] Перенести diagnostic model, stage values и project validation rules v6.
+- [x] Перенести применимую diagnostic fixture matrix v6 для aliases, bindings,
+  cardinality, message kinds, handler/interceptor signatures и flows.
 - [x] Перенести actual v6 early-exit compiler graph и partial graph-context
   fixtures без facade stage mapping.
 - [x] Перенести registration owner/source metadata v6.
@@ -446,6 +448,44 @@ Library, application foundation и database fixture tracks можно вести
 - Verified: PHPUnit `20 tests / 127 assertions`, PHPStan level max и PHP syntax
   по `src + tests`.
 
+### L2.R7 — Registry Diagnostic Fixture Matrix
+
+- State: реализовано и проверено `2026-11-02`.
+- Перенесены применимые cases `RegistryDiagnosticsTest` v6: duplicate/multiple
+  aliases, duplicate binding IDs, missing flows, query/command cardinality,
+  async query, ambiguous message kind, handler return/argument variants,
+  interceptor contract и invalid flow definitions.
+- Accepted adaptation: fixtures используют новые `Query<TResult>`/`Command`/
+  `Event` markers и обязательный `InterceptorInterface`; отдельный middleware
+  contract не возвращён.
+- Public diagnostic target снова получает `messageClass`, handler, method и
+  flow из partial compilation graph, поэтому structured diagnostics не теряют
+  v6 binding context.
+- Cache policy/idempotency, neutral resolver failures и compile CLI не
+  объявлены compiler diagnostics: они остаются отдельными interceptor,
+  integration и worker/CLI slices по уже принятым package boundaries.
+- Verified: PHPUnit `27 tests / 184 assertions`, PHPStan level max и
+  `git diff --check`.
+
+### L2.R8 — Explicit Versioned JSON Codecs
+
+- State: реализовано и проверено `2026-11-02` по принятому Decision 15.2.
+- `MessageCodecInterface` связывает stable alias, message class и current
+  message version; `JsonValue` допускает только portable JSON tree без objects,
+  resources и non-finite numbers.
+- `MessageUpcasterInterface` выполняет один шаг `N -> N+1`, а
+  `MessageCodecRegistry` отклоняет duplicate codecs и разрывы цепочки от версии
+  `1` до current.
+- `JsonEnvelopeSerializer` хранит message alias/version/payload независимо от
+  envelope schema version и восстанавливает identity, causation и headers без
+  reflection/object normalization и PHP serialization.
+- `MessageCodecRegistryValidationRule` проверяет, что каждый async binding alias
+  имеет codec для того же message class; sync-local messages codec не требуют.
+- Unknown alias/version и malformed payload дают typed controlled failures;
+  golden fixture доказывает чтение message version `1` codec-ом version `3`.
+- Verified: PHPUnit `34 tests / 211 assertions` и PHPStan level max по
+  `src + tests`.
+
 ## Общий Definition Of Done Для Slice
 
 Каждый slice обязан:
@@ -529,7 +569,7 @@ container/fakes, имеют стабильный public API и не содерж
   validated runtime loader.
 - [x] Реализовать explicit registry definitions и deterministic compilation.
 - [x] Добавить stable aliases/binding IDs и duplicate/missing diagnostics.
-- [ ] Реализовать versioned JSON codecs и upcaster chain.
+- [x] Реализовать versioned JSON codecs и upcaster chain.
 - [ ] Добавить PSR-11 bridge и Thesis DIC adapter как optional integrations.
 - [ ] Проверить request/message scope isolation и disposer lifecycle между
   параллельными fibers.
@@ -807,15 +847,33 @@ G4 и L1.1–L1.8 остаются принятыми modernisation deltas. L2.R
 identity, delivery и cardinality, L2.R2 — diagnostic contracts, validation
 rules, registration metadata и definition/artifact lifecycle, L2.R3 — actual
 early-exit compiler graph, L2.R4 — custom flow context/factory с AMPHP
-cancellation, L2.R5 — local sequential execution strategy, а L2.R6 — producer
-`QueueExecutionStrategy`. Следующий шаг — прогнать полный registry/compiler
-fixture set, затем реализовать уже принятый Decision 15.2 — explicit versioned
-JSON codecs/upcasters. Optional worker package получает только consumption,
-heartbeat, recovery и process control. Вопросы с вариантами
+cancellation, L2.R5 — local sequential execution strategy, L2.R6 — producer
+`QueueExecutionStrategy`, L2.R7 — применимую v6 diagnostic fixture matrix и
+typed diagnostic targets, а L2.R8 — принятые explicit versioned JSON codecs и
+upcasters. Следующий implementation slice — composite bus runtime поверх уже
+готовых registry, context и execution strategies. Optional worker package
+получает только consumption, heartbeat, recovery и process control. Вопросы с вариантами
 открываются только для реально отсутствующего в v6 и dependency baseline
 поведения. G0 и G1 остаются gates только для application source.
 
 ## История Документа
+
+### 0.22.0 — 2026-11-02
+
+- реализованы explicit `MessageCodecInterface`, `JsonValue` и непрерывная
+  upcaster chain по Decision 15.2;
+- envelope schema version отделена от message version;
+- async registry validation требует codec с совпадающими alias/message class;
+- добавлены controlled failures и backward-read golden fixture;
+- итог — 34 теста, 211 assertions и зелёный PHPStan level max.
+
+### 0.21.0 — 2026-11-02
+
+- перенесена применимая v6 diagnostic fixture matrix для registry compiler;
+- восстановлено заполнение typed diagnostic target из partial graph;
+- новые marker/interceptor contracts сохранены как уже принятые adaptations;
+- cache/idempotency, resolver и CLI fixtures направлены в отдельные slices;
+- итог — 27 тестов, 184 assertions и зелёный PHPStan level max.
 
 ### 0.20.0 — 2026-11-02
 
