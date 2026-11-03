@@ -47,6 +47,10 @@ check: guard-user ## Run formatting, strict PHPStan, and Testo
 	$(COMPOSE) run --rm --no-deps app composer check
 .PHONY: check
 
+architecture-check: guard-user ## Verify application and module dependency directions
+	$(COMPOSE) run --rm --no-deps app composer deptrac
+.PHONY: architecture-check
+
 fix: guard-user ## Apply PHP formatting
 	$(COMPOSE) run --rm --no-deps app composer cs-fix
 .PHONY: fix

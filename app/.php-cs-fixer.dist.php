@@ -16,5 +16,9 @@ return (new PhpCsFixer\Config())
                 __DIR__ . '/bin',
                 __DIR__ . '/src',
                 __DIR__ . '/tests',
+            ])
+            ->append([
+                __DIR__ . '/deptrac.php',
+                __DIR__ . '/testo.php',
             ]),
     );

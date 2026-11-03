@@ -90,7 +90,8 @@ offsets. Testo запускает unit suite из `app/tests/`; тесты об�
 
 ```shell
 make doctor   # проверить Compose
-make check    # formatter + strict PHPStan + Testo
+make check    # formatter + strict PHPStan + Deptrac + fast Testo
+make architecture-check # отдельно проверить направления зависимостей
 make smoke    # проверить запущенный HTTP service
 make down     # остановить без удаления volumes
 ```

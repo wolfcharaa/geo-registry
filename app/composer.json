@@ -16,6 +16,7 @@
         "monolog/monolog": "^3.0"
     },
     "require-dev": {
+        "deptrac/deptrac": "^4.7",
         "friendsofphp/php-cs-fixer": "^3.89",
         "phpstan/phpstan": "^2.3",
         "phpstan/phpstan-strict-rules": "^2.1",
@@ -38,10 +39,12 @@
         "check": [
             "@cs-check",
             "@phpstan",
+            "@deptrac",
             "@test"
         ],
         "cs-check": "php-cs-fixer fix --diff --dry-run --sequential --using-cache=no",
         "cs-fix": "php-cs-fixer fix --diff --sequential --using-cache=no",
+        "deptrac": "deptrac --no-progress --fail-on-uncovered",
         "phpstan": "phpstan analyse --memory-limit=1G",
         "test": "testo --suite=Unit --suite=Scenario"
     }
