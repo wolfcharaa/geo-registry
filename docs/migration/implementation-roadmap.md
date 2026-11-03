@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; worker runtime foundation ready, executable next`
-- Версия документа: `0.33.0`
+- Статус: `Active; worker runtime complete, application foundation next`
+- Версия документа: `0.34.0`
 - Обновлено: `2026-11-03`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -129,6 +129,7 @@ tests, OpenAPI по публично подтверждённому контра
 ```text
 G4 ──> L1 MessageBus core ──> L2 registry/codecs ──> L3 async producer
                                                     └── L4 worker package
+L2 + L4 ──> L5 final Thesis DIC modules (deferred package polish)
 G1 ──> A1 quality/docs ──> A2 DIC/runtime roots ──> A3 bus integration
 G0 + G2 + G3 ──> D1 migration continuity ──> D2 parity fixtures
 
@@ -749,7 +750,7 @@ Package: новый `message-bus-async-worker`.
   direction `worker -> core`.
 - [x] Реализовать consumer loop, job scope, heartbeat и graceful cancellation.
 - [x] Добавить retry/reject, stale recovery и worker control plane.
-- [ ] Предоставить отдельный Symfony Console executable и process adapters.
+- [x] Предоставить отдельный Symfony Console executable и signal adapter.
 - [x] Доказать dependency direction только `worker -> core`.
 - [x] Проверить совместимость core/worker release line `0.1.x`.
 
@@ -853,6 +854,57 @@ Package: новый `message-bus-async-worker`.
   через объявленный `^0.1` constraint.
 - Следующий slice: отдельный Symfony Console worker executable и optional
   signal/process adapter поверх AMPHP cancellation.
+
+#### L4.R5 — Worker Console Executable И Signal Adapter
+
+- State: executable slice закрыт `2026-11-03`; L4 functional scope завершён.
+- Worker package зависит от `symfony/console ^7.4` и устанавливает отдельный
+  `vendor/bin/message-bus-worker`; core не получил Console/PCNTL dependencies.
+- Application-owned bootstrap обязан вернуть явный `WorkerRuntime` с runner и
+  optional control runtime. Автоматический импорт application container и
+  обязательный PSR-11 bridge не введены.
+- CLI сохраняет проверенную v6 command surface: `worker:run`, общий
+  `worker:control`, action aliases pause/resume/drain/stop/kill/restart,
+  `worker:status` и `worker:schema:postgres`.
+- `worker:run` передаёт consumer/runner options, печатает итоговые counters и
+  возвращает restart exit code process supervisor-у.
+- Optional `PcntlSignalCancellation` переводит SIGTERM/SIGINT/SIGQUIT в
+  cooperative AMPHP cancellation и восстанавливает предыдущие signal handlers.
+  Без `ext-pcntl` worker сохраняет queue/control behavior.
+- V6 `auto/fork` mode намеренно не перенесён в async kernel: multi-process
+  orchestration остаётся отдельным подключаемым process/worker package.
+- Fast worker gate: PHPUnit `29 tests / 135 assertions`, PHPStan level max,
+  `composer validate --strict --no-check-lock`, executable list/schema smoke и
+  `git diff --check`.
+- Следующий активный track: A1 application quality/docs skeleton. L5 DIC modules
+  сохранены как последний package-polish slice после стабилизации public API.
+
+### L5 — Default Thesis DIC Modules Для Обеих Библиотек
+
+Timing: `Deferred until final package-polish`. Этот slice выполняется в
+последний момент перед фиксацией первого package release, когда публичные
+core/worker contracts и фактическая A3 composition уже стабилизированы. Он не
+должен сейчас останавливать A1–A3 или менять neutral library contracts.
+
+- [ ] В core добавить первичный default `Thesis\Dic\Module`, предлагаемый public
+  class `Fedor\MessageBus\Integration\Thesis\MessageBusModule`.
+- [ ] В worker добавить первичный default `Thesis\Dic\Module`, предлагаемый
+  public class
+  `Fedor\MessageBus\Worker\Integration\Thesis\WorkerModule`.
+- [ ] В обоих packages объявить `thesis/dic` только через Composer `suggest` и
+  `require-dev`; обязательной runtime dependency не добавлять.
+- [ ] Default modules должны экспортировать только library-owned composition и
+  extension points, не импортировать application services и допускать явное
+  application override/import поверх defaults.
+- [ ] Проверить отдельную установку каждого module и совместный core+worker
+  graph на реальном `thesis/dic`, включая scope lifecycle и disposal.
+- [ ] Описать минимальный copyable application bootstrap, чтобы после установки
+  библиотеки был готовый стандартный Module class без ручного повторения всех
+  library bindings.
+
+Готовность: приложение может подключить core и worker через два поставляемых
+Module class, а пользователи других DI/container решений не получают Thesis DIC
+в обязательных dependencies.
 
 ## Wave 2 — Application Foundation
 
@@ -1112,13 +1164,27 @@ outbox extension seam через существующий `QueueProviderInterfac
 outbox storage/relay в core `0.1.0`. L3 закрыт. L4.R1 добавил AMPHP consumer
 loop, per-job scope, heartbeat/cancellation monitor и graceful process stop.
 L4.R2 перенёс worker control storage/registry, L4.R3 подключил control state
-machine к runner, а L4.R4 закрыл scoped exact-binding execution без повторного
-enqueue. Следующий implementation slice — отдельный worker executable и
-optional signal/process adapter. Вопросы с вариантами открываются только для
-реально отсутствующего в v6 и dependency baseline поведения. G0 и G1 остаются
-gates только для application source.
+machine к runner, L4.R4 закрыл scoped exact-binding execution без повторного
+enqueue, а L4.R5 добавил отдельный Console executable и optional signal adapter.
+L4 завершён; следующий активный implementation track — A1. Default Thesis DIC
+modules для core и worker зафиксированы в L5 как намеренно последний
+package-polish slice после стабилизации фактической A3 composition. Вопросы с
+вариантами открываются только для реально отсутствующего в v6 и dependency
+baseline поведения. G0 и G1 остаются gates только для application source.
 
 ## История Документа
+
+### 0.34.0 — 2026-11-03
+
+- worker package получил отдельный Symfony Console executable и явный
+  application-owned `WorkerRuntime` bootstrap;
+- перенесены v6 run/control/status/schema commands без возвращения fork mode в
+  async kernel;
+- SIGTERM/SIGINT/SIGQUIT переводятся optional PCNTL adapter-ом в cooperative
+  AMPHP cancellation;
+- L4 завершён с gate 29 tests / 135 assertions и PHPStan level max;
+- default Thesis DIC Module classes для core и worker зафиксированы в L5 как
+  последний отложенный package-polish slice через Composer `suggest`.
 
 ### 0.33.0 — 2026-11-03
 
