@@ -4,6 +4,10 @@
 `amphp/http-server`. В development-контур входят отдельная PostgreSQL приложения,
 Nominatim и OpenSearch.
 
+Целевые layer/runtime/data boundaries описаны в
+[docs/architecture.md](docs/architecture.md). Текущий HTTP scaffold является
+переходным и не задаёт placement новых business scenarios.
+
 ## Быстрый старт
 
 ```shell
@@ -69,17 +73,11 @@ fiber-aware ожидание I/O, никаких Guzzle/PSR-18 adapters и сг�
 
 ## Контейнер приложения
 
-AMPHP не поставляет DI-контейнер: его официальный набор сосредоточен на
-event loop, HTTP, async I/O, процессах и синхронизации. Пока граф зависимостей
-небольшой, `app/src/Bootstrap.php` остаётся явным composition root — это проще
-проверять и не превращает handlers в service locator.
-
-Если модулей станет больше, основной кандидат — PSR-11 совместимый PHP-DI с
-явными definitions и разрешением сервисов только при старте процесса. Yii DI
-имеет смысл рассматривать, если появится реальная потребность сбрасывать
-состояние shared-сервисов между запросами. Внутренний контейнер, установленный
-как зависимость Testo, не является runtime-контейнером приложения и напрямую
-использоваться не должен.
+Пока граф зависимостей мал, `app/src/Bootstrap.php` остаётся явным переходным
+composition root. Целевая composition использует `thesis/dic` и три независимых
+root export: HTTP, CLI и worker. MessageBus сохраняет neutral resolver/scope
+contracts, поэтому application container не становится service locator внутри
+handlers. Внутренний контейнер Testo не является runtime-контейнером приложения.
 
 ## Статический анализ и тесты
 
