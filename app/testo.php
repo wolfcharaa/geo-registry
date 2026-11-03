@@ -10,7 +10,19 @@ return new ApplicationConfig(
     suites: [
         new SuiteConfig(
             name: 'Unit',
-            location: ['tests'],
+            location: ['tests/Unit'],
+        ),
+        new SuiteConfig(
+            name: 'Scenario',
+            location: ['tests/Scenario'],
+        ),
+        new SuiteConfig(
+            name: 'Integration',
+            location: ['tests/Integration'],
+        ),
+        new SuiteConfig(
+            name: 'Contract',
+            location: ['tests/Contract'],
         ),
     ],
 );

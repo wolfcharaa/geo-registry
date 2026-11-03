@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Infrastructure\OpenSearch;
+namespace App\Tests\Unit\Infrastructure\OpenSearch;
 
 use App\Infrastructure\OpenSearch\OpenSearchRequestFactory;
 use InvalidArgumentException;

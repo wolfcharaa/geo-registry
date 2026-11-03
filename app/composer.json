@@ -43,6 +43,6 @@
         "cs-check": "php-cs-fixer fix --diff --dry-run --sequential --using-cache=no",
         "cs-fix": "php-cs-fixer fix --diff --sequential --using-cache=no",
         "phpstan": "phpstan analyse --memory-limit=1G",
-        "test": "testo"
+        "test": "testo --suite=Unit --suite=Scenario"
     }
 }
