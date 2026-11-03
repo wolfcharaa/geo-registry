@@ -10,8 +10,10 @@ permissions:
   contents: read
 
 jobs:
-  php:
+  fast:
+    name: Fast quality gate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: app
@@ -26,3 +28,23 @@ jobs:
       - run: composer validate --strict
       - run: composer install --no-interaction --prefer-dist
       - run: composer check
+
+  integration:
+    name: PostgreSQL and OpenSearch integration
+    needs: fast
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pcntl, pgsql
+          tools: composer:v2
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist
+        working-directory: app
+      - run: sudo sysctl -w vm.max_map_count=262144
+      - run: make test-integration
+        env:
+          INTEGRATION_PROJECT_NAME: geo-registry-integration-${{ github.run_id }}-${{ github.run_attempt }}

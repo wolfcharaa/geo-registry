@@ -69,6 +69,10 @@ integration-down: guard-user ## Stop and remove isolated integration resources
 	$(INTEGRATION_COMPOSE) down --remove-orphans
 .PHONY: integration-down
 
+test-integration: guard-user ## Run real PostgreSQL and OpenSearch integration tests
+	docker/scripts/run-integration-tests.sh
+.PHONY: test-integration
+
 smoke: ## Probe the running HTTP service and its integrations
 	APP_BASE_URL=$${APP_BASE_URL:-http://127.0.0.1:$${APP_PORT:-8080}} docker/scripts/smoke-check.sh
 .PHONY: smoke

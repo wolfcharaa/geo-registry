@@ -1,6 +1,27 @@
 name: geo-registry-integration
 
 services:
+  tests:
+    profiles: [runner]
+    build:
+      context: ../../..
+      dockerfile: docker/php/Dockerfile
+    init: true
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    working_dir: /app
+    command: ["composer", "test:integration"]
+    environment:
+      COMPOSER_HOME: /tmp/composer
+      INTEGRATION_DATABASE_DSN: "host=postgres port=5432 user=integration password=integration-only db=integration application_name=geo-registry-integration"
+      INTEGRATION_OPENSEARCH_URL: "http://opensearch:9200"
+    volumes:
+      - ../../../app:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+
   postgres:
     image: postgres:17-alpine
     profiles: [integration]

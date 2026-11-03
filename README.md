@@ -101,9 +101,13 @@ Ephemeral PostgreSQL и OpenSearch для будущей Integration suite за�
 
 ```shell
 make integration-up
-# integration tests
+make test-integration
 make integration-down
 ```
+
+`make test-integration` сам собирает PHP runner, ждёт health обоих сервисов и
+всегда выполняет cleanup через shell trap. Отдельные `integration-up/down` нужны
+для диагностики и ручного запуска тестов.
 
 По умолчанию они доступны только на loopback-портах `55432` и `59200`.
 Параллельный запуск можно изолировать через `INTEGRATION_PROJECT_NAME`,

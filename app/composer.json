@@ -46,6 +46,7 @@
         "cs-fix": "php-cs-fixer fix --diff --sequential --using-cache=no",
         "deptrac": "deptrac --no-progress --fail-on-uncovered",
         "phpstan": "phpstan analyse --memory-limit=1G",
-        "test": "testo --suite=Unit --suite=Scenario"
+        "test": "testo --suite=Unit --suite=Scenario",
+        "test:integration": "testo --suite=Integration"
     }
 }
