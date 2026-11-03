@@ -33,4 +33,19 @@ final class CliRuntimeModuleTest
         Assert::same($exitCode, 0);
         Assert::true(str_contains($output->fetch(), 'geo-registry-test'));
     }
+
+    public function testItCompilesTheExplicitMessageBusRegistry(): void
+    {
+        $output = new BufferedOutput();
+        $exitCode = Dic::run(
+            new CliRuntimeModule(new EnvironmentSnapshot([])),
+            static fn(CliRuntime $runtime): int => $runtime->run(
+                new ArrayInput(['command' => 'message-bus:registry:check', '--no-ansi' => true]),
+                $output,
+            ),
+        );
+
+        Assert::same($exitCode, 0);
+        Assert::true(str_contains($output->fetch(), 'bindings=0 source_hash='));
+    }
 }

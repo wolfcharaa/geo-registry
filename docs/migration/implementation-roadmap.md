@@ -1,8 +1,8 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; A1 foundation partial, typed config next`
-- Версия документа: `0.39.0`
-- Обновлено: `2026-11-03`
+- Статус: `Active; A3 scope bridge next`
+- Версия документа: `0.40.0`
+- Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
 
@@ -969,15 +969,34 @@ network I/O, optional outage даёт `degraded`, process-specific resources н�
 
 ### A3 — MessageBus Application Integration
 
-- [ ] Подключить выпущенный либо path-pinned development build core package.
-- [ ] Описать application flows и registry source явно, без runtime scanning.
+- [x] Подключить выпущенный либо path-pinned development build core package.
+- [x] Описать application flows и registry source явно, без runtime scanning.
 - [ ] Добавить Thesis scope bridge и correlation/telemetry middleware seams.
-- [ ] Включить registry compile в fast/release gates.
+- [x] Включить registry compile в fast gate.
+- [ ] Включить registry compile в release gate после принятия G2.
 - [ ] Доказать nested dispatch и cancellation через representative target-owned
   test, не перенося business scenario раньше data foundation.
 
 Готовность: application dispatch работает через public bus interfaces, registry
 artifact воспроизводим, три runtime graph компилируются.
+
+#### A3.R1 — Explicit Registry Source И Fast Compile Gate
+
+- State: application registry foundation закрыт `2026-11-04`; A3 остаётся
+  active до scope bridge, interceptor seams и representative dispatch test.
+- Core `romanfedorskij/message-bus-async 0.1.0` подключён path-pinned из
+  соседнего repository без копирования library source в приложение.
+- `config/message_bus_registry.php` возвращает typed explicit source с class,
+  flow и service declarations; filesystem/runtime scanning отсутствует.
+- Source hash строится детерминированно и не зависит от порядка class/service
+  declarations; duplicate message classes отклоняются до compilation.
+- CLI command `message-bus:registry:check` компилирует registry без внешних
+  сервисов и входит в `composer check`; текущий честный baseline содержит
+  `0 bindings`, пока target-owned scenarios ещё не добавлены.
+- Release gate остаётся G2-dependent и не считается закрытым только наличием
+  fast command.
+- Следующий atom: application-owned Thesis scope bridge и существующий
+  interceptor contract для переноса correlation context.
 
 ## Wave 3 — Database Foundation И Первый HTTP Slice
 
@@ -1202,8 +1221,11 @@ Testo, Deptrac и real PostgreSQL/OpenSearch integration job; MODULE.md ждёт
 `CliRuntime` с исполняемым Symfony Console entrypoint; следующий slice —
 реальный `WorkerRuntime` одновременно с A3 package composition: worker root без
 `QueueWorkerRunner`, registry и scope bridge не создаётся как фиктивная
-заглушка. JSON stdout, HTTP request/correlation lifecycle и graceful shutdown
-уже находятся в application shell; message/job fields будут seeded A3 scopes.
+заглушка. A3 уже подключил path-pinned core package, explicit application
+registry source и fast compile gate; следующий atom собирает Thesis scope bridge
+и correlation interceptor. JSON stdout, HTTP request/correlation lifecycle и
+graceful shutdown уже находятся в application shell; message/job fields будут
+seeded A3 scopes.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
 последний package-polish slice после стабилизации фактической A3 composition.
 Вопросы с вариантами открываются только для реально отсутствующего в v6 и
@@ -1211,6 +1233,16 @@ dependency baseline поведения. G0 и G1 остаются gates толь
 source.
 
 ## История Документа
+
+### 0.40.0 — 2026-11-04
+
+- path-pinned `romanfedorskij/message-bus-async 0.1.0` подключён к приложению;
+- добавлены typed explicit application registry source и deterministic source
+  hash без runtime scanning;
+- `message-bus:registry:check` включён в fast `composer check` и компилирует
+  текущий честный baseline с нулём bindings без внешних сервисов;
+- release registry gate оставлен открытым до принятия G2;
+- A3 frontier переведён на Thesis scope bridge и correlation interceptor.
 
 ### 0.39.0 — 2026-11-03
 

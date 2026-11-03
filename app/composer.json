@@ -14,6 +14,7 @@
         "amphp/log": "^2.0",
         "amphp/postgres": "^2.2",
         "monolog/monolog": "^3.0",
+        "romanfedorskij/message-bus-async": "^0.1",
         "symfony/console": "^8.1",
         "thesis/dic": "^0.5.3"
     },
@@ -34,6 +35,18 @@
             "App\\Tests\\": "tests/"
         }
     },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../../library/MessageBusAsync",
+            "options": {
+                "symlink": true,
+                "versions": {
+                    "romanfedorskij/message-bus-async": "0.1.0"
+                }
+            }
+        }
+    ],
     "config": {
         "sort-packages": true
     },
@@ -42,12 +55,14 @@
             "@cs-check",
             "@phpstan",
             "@deptrac",
+            "@registry:check",
             "@test"
         ],
         "cs-check": "php-cs-fixer fix --diff --dry-run --sequential --using-cache=no",
         "cs-fix": "php-cs-fixer fix --diff --sequential --using-cache=no",
         "deptrac": "deptrac --no-progress --fail-on-uncovered",
         "phpstan": "phpstan analyse --memory-limit=1G",
+        "registry:check": "php bin/console message-bus:registry:check --no-interaction",
         "test": "testo --suite=Unit --suite=Scenario",
         "test:integration": "testo --suite=Integration"
     }
