@@ -13,10 +13,13 @@ return static function (DeptracConfig $config): void {
         ->cacheFile('./var/deptrac.cache')
         ->layers(
             $application = Layer::withName('Application')->collectors(
-                ClassLikeConfig::create('^App\\(?:Bootstrap$|Application\\(?!Health\\))'),
+                ClassLikeConfig::create('^App\\(?:Bootstrap$|Application\\(?!(?:Health|Observability)\\))'),
             ),
             $applicationHealth = Layer::withName('Application Health')->collectors(
                 ClassLikeConfig::create('^App\\Application\\Health\\'),
+            ),
+            $applicationObservability = Layer::withName('Application Observability')->collectors(
+                ClassLikeConfig::create('^App\\Application\\Observability\\'),
             ),
             $configLayer = Layer::withName('Config')->collectors(
                 ClassLikeConfig::create('^App\\Config\\'),
@@ -84,6 +87,7 @@ return static function (DeptracConfig $config): void {
         ->rulesets(
             Ruleset::forLayer($application)->accesses(
                 $applicationHealth,
+                $applicationObservability,
                 $configLayer,
                 $scaffoldUserInterface,
                 $scaffoldInfrastructure,
@@ -106,12 +110,15 @@ return static function (DeptracConfig $config): void {
                 $migrationTooling,
             ),
             Ruleset::forLayer($applicationHealth)->accesses(
+                $applicationObservability,
                 $ampCore,
                 $logging,
             ),
+            Ruleset::forLayer($applicationObservability),
             Ruleset::forLayer($configLayer),
             Ruleset::forLayer($scaffoldUserInterface)->accesses(
                 $applicationHealth,
+                $applicationObservability,
                 $configLayer,
                 $scaffoldInfrastructure,
                 $ampCore,
@@ -121,6 +128,7 @@ return static function (DeptracConfig $config): void {
             ),
             Ruleset::forLayer($scaffoldInfrastructure)->accesses(
                 $applicationHealth,
+                $applicationObservability,
                 $configLayer,
                 $ampCore,
                 $httpClient,

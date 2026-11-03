@@ -32,11 +32,17 @@ final readonly class HttpRuntime
         $server->expose($this->config->listen);
         $server->start($router, $errorHandler);
         $this->startupState->markComplete();
-        $this->logger->info('HTTP server started', ['listen' => $this->config->listen]);
+        $this->logger->info('HTTP server started', [
+            'event' => 'http.server.started',
+            'listen' => $this->config->listen,
+        ]);
 
         try {
             $signal = trapSignal([SIGINT, SIGTERM]);
-            $this->logger->info('Stopping HTTP server', ['signal' => $signal]);
+            $this->logger->info('Stopping HTTP server', [
+                'event' => 'http.server.stopping',
+                'signal' => $signal,
+            ]);
         } finally {
             $server->stop();
         }

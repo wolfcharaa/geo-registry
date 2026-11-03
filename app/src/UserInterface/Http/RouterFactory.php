@@ -27,11 +27,13 @@ final readonly class RouterFactory
         private NominatimClient $nominatim,
         private OpenSearchClient $openSearch,
         private string $openSearchIndex,
+        private CorrelationMiddleware $correlationMiddleware,
     ) {}
 
     public function create(HttpServer $server, ErrorHandler $errorHandler): Router
     {
         $router = new Router($server, $this->logger, $errorHandler);
+        $router->addMiddleware($this->correlationMiddleware);
 
         $router->addRoute('GET', '/health/live', new ClosureRequestHandler(
             fn(Request $_request): Response => $this->healthResponse($this->health->liveness()),
@@ -74,7 +76,11 @@ final readonly class RouterFactory
         try {
             return JsonResponse::create($this->nominatim->search($query, self::limit($request)));
         } catch (Throwable $exception) {
-            $this->logger->error('Nominatim search failed', ['exception' => $exception]);
+            $this->logger->error('Nominatim search failed', [
+                'event' => 'integration.nominatim.search.failed',
+                'exception_type' => $exception::class,
+                'integration' => 'nominatim',
+            ]);
 
             return JsonResponse::create(['error' => 'Nominatim is unavailable.'], HttpStatus::BAD_GATEWAY);
         }
@@ -94,7 +100,11 @@ final readonly class RouterFactory
                 self::limit($request),
             ));
         } catch (Throwable $exception) {
-            $this->logger->error('OpenSearch query failed', ['exception' => $exception]);
+            $this->logger->error('OpenSearch query failed', [
+                'event' => 'integration.opensearch.search.failed',
+                'exception_type' => $exception::class,
+                'integration' => 'opensearch',
+            ]);
 
             return JsonResponse::create(['error' => 'OpenSearch is unavailable.'], HttpStatus::BAD_GATEWAY);
         }

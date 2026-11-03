@@ -8,6 +8,8 @@ use function Amp\async;
 
 use Amp\Future;
 use Amp\TimeoutCancellation;
+use App\Application\Observability\CorrelationContext;
+use App\Application\Observability\CorrelationIds;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
@@ -18,6 +20,7 @@ final readonly class HealthRegistry
         private array $checks,
         private StartupState $startupState,
         private LoggerInterface $logger,
+        private CorrelationContext $correlationContext,
     ) {}
 
     public function liveness(): HealthReport
@@ -50,7 +53,18 @@ final readonly class HealthRegistry
     /** @return Future<HealthComponentResult> */
     private function start(HealthCheckDefinition $definition): Future
     {
-        return async(fn(): HealthComponentResult => $this->run($definition));
+        $correlation = $this->correlationContext->current();
+
+        return async(fn(): HealthComponentResult => $this->runWithCorrelation($definition, $correlation));
+    }
+
+    private function runWithCorrelation(
+        HealthCheckDefinition $definition,
+        ?CorrelationIds $correlation,
+    ): HealthComponentResult {
+        return $correlation === null
+            ? $this->run($definition)
+            : $this->correlationContext->run($correlation, fn(): HealthComponentResult => $this->run($definition));
     }
 
     private function run(HealthCheckDefinition $definition): HealthComponentResult
@@ -65,7 +79,8 @@ final readonly class HealthRegistry
         } catch (Throwable $exception) {
             $this->logger->warning('Health check failed', [
                 'component' => $definition->name,
-                'exception' => $exception,
+                'event' => 'health.check.failed',
+                'exception_type' => $exception::class,
                 'policy' => $definition->policy->value,
             ]);
 

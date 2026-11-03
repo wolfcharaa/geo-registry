@@ -105,6 +105,19 @@ application container не становится service locator внутри han
 offsets. Testo запускает unit suite из `app/tests/`; тесты объявляются атрибутом
 `#[Test]` и не наследуются от базового класса.
 
+## Логи и correlation
+
+Production-default `LOG_FORMAT=json` пишет JSON Lines в stdout. Локальный
+`config/.env.example` использует `LOG_FORMAT=console`; допустимы только эти два
+значения. Каждый record получает `event`, `service` и `runtime` в `extra`, а
+активный scope добавляет `request_id`, `message_id`, `correlation_id`,
+`operation_id` и `job_id`, когда они известны.
+
+HTTP boundary принимает безопасные `X-Request-ID` и `X-Correlation-ID`, создаёт
+новые IDs при отсутствии/невалидном значении и возвращает принятые IDs в
+response headers. Fiber-local context очищается после запроса и явно
+переносится в параллельные health checks.
+
 ## Команды
 
 ```shell

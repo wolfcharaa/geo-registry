@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
 - Статус: `Active; A1 foundation partial, typed config next`
-- Версия документа: `0.38.0`
+- Версия документа: `0.39.0`
 - Обновлено: `2026-11-03`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -957,7 +957,7 @@ volumes.
   - [x] `CliRuntime` собирается отдельным Thesis DIC module;
   - [ ] `WorkerRuntime`.
 - [x] Добавить Symfony Console application и `app/bin/console`.
-- [ ] Вынести JSON logging, correlation context и graceful shutdown в
+- [x] Вынести JSON logging, correlation context и graceful shutdown в
   application shell.
 - [x] Реализовать live/ready/startup registry с required/optional policy.
 - [ ] Проверить три DIC graph без внешних сервисов: HTTP и CLI graphs уже
@@ -1200,15 +1200,28 @@ Testo, Deptrac и real PostgreSQL/OpenSearch integration job; MODULE.md ждёт
 а contract/release smoke — G2. A2 получил typed settings и первый независимый
 `HttpRuntime` Thesis DIC root с container-owned PostgreSQL lifecycle и отдельный
 `CliRuntime` с исполняемым Symfony Console entrypoint; следующий slice —
-JSON logging/correlation и затем реальный `WorkerRuntime` одновременно с A3
-package composition: worker root без `QueueWorkerRunner`, registry и scope bridge
-не создаётся как фиктивная заглушка. Default Thesis DIC modules для core и worker
-зафиксированы в L5 как намеренно последний package-polish slice после
-стабилизации фактической A3 composition. Вопросы с вариантами открываются только
-для реально отсутствующего в v6 и dependency baseline поведения. G0 и G1
-остаются gates только для application source.
+реальный `WorkerRuntime` одновременно с A3 package composition: worker root без
+`QueueWorkerRunner`, registry и scope bridge не создаётся как фиктивная
+заглушка. JSON stdout, HTTP request/correlation lifecycle и graceful shutdown
+уже находятся в application shell; message/job fields будут seeded A3 scopes.
+Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
+последний package-polish slice после стабилизации фактической A3 composition.
+Вопросы с вариантами открываются только для реально отсутствующего в v6 и
+dependency baseline поведения. G0 и G1 остаются gates только для application
+source.
 
 ## История Документа
+
+### 0.39.0 — 2026-11-03
+
+- production-default logging переведён на JSON Lines через существующий
+  Monolog/Amp stdout handler, development сохраняет opt-in console format;
+- добавлен fiber-local correlation context с request/message/operation/job
+  identifiers и явным переносом в параллельные health checks;
+- HTTP middleware валидирует/создаёт request и correlation IDs, возвращает их в
+  response headers и пишет duration/status без query payload;
+- exception logging ограничен безопасным type/integration context;
+- параллельная изоляция, JSON fields и HTTP header lifecycle покрыты fast tests.
 
 ### 0.38.0 — 2026-11-03
 

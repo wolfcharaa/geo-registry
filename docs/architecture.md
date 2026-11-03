@@ -302,7 +302,10 @@ Environment читается один раз до сборки graph и прео
 runtime/integration settings. Feature code не вызывает `getenv()` и не читает
 global configuration.
 
-Production logs пишутся JSON в stdout и содержат correlation/message/job IDs.
+Production logs пишутся JSON Lines в stdout; HTTP scope принимает или создаёт
+request/correlation IDs, возвращает их в response headers и изолирует context
+между fibers. Единая модель также содержит message/operation/job IDs для
+подключения MessageBus и worker roots в A3.
 Telemetry является optional module: при его отсутствии graph использует no-op
 providers. Liveness проверяет только локальное состояние process; readiness
 различает required и optional integrations; startup отражает завершение

@@ -10,14 +10,16 @@ use App\Application\Health\HealthCheckDefinition;
 use App\Application\Health\HealthCheckPolicy;
 use App\Application\Health\HealthRegistry;
 use App\Application\Health\StartupState;
+use App\Application\Observability\CorrelationContext;
 use App\Application\Runtime\HttpRuntime;
 use App\Config\EnvironmentSnapshot;
 use App\Config\HttpServerConfig;
+use App\Config\LoggingConfig;
 use App\Config\NominatimConfig;
 use App\Config\OpenSearchConfig;
 use App\Config\PostgresConfig;
 use App\Infrastructure\Http\AmpHttpClientFactory;
-use App\Infrastructure\Logging\ConsoleLoggerFactory;
+use App\Infrastructure\Logging\StdoutLoggerFactory;
 use App\Infrastructure\Nominatim\NominatimClient;
 use App\Infrastructure\Nominatim\NominatimHealthCheck;
 use App\Infrastructure\OpenSearch\OpenSearchClient;
@@ -25,6 +27,7 @@ use App\Infrastructure\OpenSearch\OpenSearchClientFactory;
 use App\Infrastructure\OpenSearch\OpenSearchHealthCheck;
 use App\Infrastructure\Postgres\PostgresHealthCheck;
 use App\Infrastructure\Postgres\PostgresPoolFactory;
+use App\UserInterface\Http\CorrelationMiddleware;
 use App\UserInterface\Http\RouterFactory;
 use Monolog\Logger;
 use Thesis\Dic;
@@ -40,11 +43,21 @@ final readonly class HttpRuntimeModule implements Module
     public function configure(Dic $dic): Ref
     {
         $httpConfig = HttpServerConfig::fromEnvironment($this->environment);
+        $loggingConfig = LoggingConfig::fromEnvironment($this->environment);
         $postgresConfig = PostgresConfig::fromEnvironment($this->environment);
         $nominatimConfig = NominatimConfig::fromEnvironment($this->environment);
         $openSearchConfig = OpenSearchConfig::fromEnvironment($this->environment);
 
-        $logger = $dic->object(Logger::class, ConsoleLoggerFactory::create(...));
+        $correlationContext = $dic->object(CorrelationContext::class);
+        $loggerFactory = $dic
+            ->object(StdoutLoggerFactory::class)
+            ->arg('context', $correlationContext);
+        $logger = $dic
+            ->object(Logger::class, [$loggerFactory, 'create'])
+            ->args([
+                'config' => $dic->value($loggingConfig),
+                'runtime' => 'http',
+            ]);
         $httpClient = $dic
             ->object(
                 HttpClient::class,
@@ -122,6 +135,13 @@ final readonly class HttpRuntimeModule implements Module
                 ],
                 'startupState' => $startupState,
                 'logger' => $logger,
+                'correlationContext' => $correlationContext,
+            ]);
+        $correlationMiddleware = $dic
+            ->object(CorrelationMiddleware::class)
+            ->args([
+                'context' => $correlationContext,
+                'logger' => $logger,
             ]);
         $routerFactory = $dic
             ->object(RouterFactory::class)
@@ -131,6 +151,7 @@ final readonly class HttpRuntimeModule implements Module
                 'nominatim' => $nominatim,
                 'openSearch' => $openSearch,
                 'openSearchIndex' => $openSearchConfig->index,
+                'correlationMiddleware' => $correlationMiddleware,
             ]);
 
         return $dic

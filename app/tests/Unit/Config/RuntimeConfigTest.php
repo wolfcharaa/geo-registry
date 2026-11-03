@@ -7,6 +7,8 @@ namespace App\Tests\Unit\Config;
 use App\Config\ConsoleConfig;
 use App\Config\EnvironmentSnapshot;
 use App\Config\HttpServerConfig;
+use App\Config\LogFormat;
+use App\Config\LoggingConfig;
 use App\Config\NominatimConfig;
 use App\Config\OpenSearchConfig;
 use App\Config\PostgresConfig;
@@ -26,6 +28,7 @@ final class RuntimeConfigTest
             'APP_LISTEN' => '0.0.0.0:9000',
             'APP_USER_AGENT' => 'geo-registry/test',
             'HTTP_TIMEOUT_SECONDS' => '3.5',
+            'LOG_FORMAT' => 'console',
             'DATABASE_DSN' => 'host=postgres db=geo',
             'DATABASE_POOL_SIZE' => '7',
             'NOMINATIM_URL' => 'https://nominatim.example',
@@ -35,6 +38,7 @@ final class RuntimeConfigTest
         ]);
 
         $http = HttpServerConfig::fromEnvironment($environment);
+        $logging = LoggingConfig::fromEnvironment($environment);
         $console = ConsoleConfig::fromEnvironment($environment);
         $postgres = PostgresConfig::fromEnvironment($environment);
         $nominatim = NominatimConfig::fromEnvironment($environment);
@@ -44,6 +48,8 @@ final class RuntimeConfigTest
         Assert::same($console->version, 'test');
         Assert::same($http->listen, '0.0.0.0:9000');
         Assert::same($http->timeoutSeconds, 3.5);
+        Assert::same($logging->service, 'geo-registry-test');
+        Assert::same($logging->format, LogFormat::Console);
         Assert::same($postgres->dsn, 'host=postgres db=geo');
         Assert::same($postgres->poolSize, 7);
         Assert::same($nominatim->url, 'https://nominatim.example');
@@ -65,6 +71,22 @@ final class RuntimeConfigTest
     {
         NominatimConfig::fromEnvironment(new EnvironmentSnapshot([
             'NOMINATIM_URL' => 'file:///tmp/nominatim',
+        ]));
+    }
+
+    public function testLoggingDefaultsToJson(): void
+    {
+        Assert::same(
+            LoggingConfig::fromEnvironment(new EnvironmentSnapshot([]))->format,
+            LogFormat::Json,
+        );
+    }
+
+    #[ExpectException(InvalidArgumentException::class)]
+    public function testLoggingRejectsAnUnknownFormat(): void
+    {
+        LoggingConfig::fromEnvironment(new EnvironmentSnapshot([
+            'LOG_FORMAT' => 'pretty',
         ]));
     }
 }

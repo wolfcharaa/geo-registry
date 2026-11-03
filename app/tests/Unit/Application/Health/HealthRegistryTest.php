@@ -14,6 +14,8 @@ use App\Application\Health\HealthCheckPolicy;
 use App\Application\Health\HealthRegistry;
 use App\Application\Health\HealthStatus;
 use App\Application\Health\StartupState;
+use App\Application\Observability\CorrelationContext;
+use App\Application\Observability\CorrelationIds;
 use Closure;
 use Psr\Log\NullLogger;
 use RuntimeException;
@@ -105,12 +107,41 @@ final class HealthRegistryTest
         Assert::same($report->status, HealthStatus::Degraded);
     }
 
+    public function testReadinessPropagatesCorrelationIntoCheckFibers(): void
+    {
+        $context = new CorrelationContext();
+        $observedRequestId = null;
+        $registry = self::registry([
+            self::check('postgres', HealthCheckPolicy::Required, static function (
+                Cancellation $_cancellation,
+            ) use ($context, &$observedRequestId): void {
+                $observedRequestId = $context->current()?->requestId;
+            }),
+        ], correlationContext: $context);
+
+        $context->run(
+            new CorrelationIds(requestId: 'request-health', correlationId: 'correlation-health'),
+            static fn() => $registry->readiness(),
+        );
+
+        Assert::same($observedRequestId, 'request-health');
+        Assert::same($context->current(), null);
+    }
+
     /**
      * @param list<HealthCheckDefinition> $checks
      */
-    private static function registry(array $checks, ?StartupState $startupState = null): HealthRegistry
-    {
-        return new HealthRegistry($checks, $startupState ?? new StartupState(), new NullLogger());
+    private static function registry(
+        array $checks,
+        ?StartupState $startupState = null,
+        ?CorrelationContext $correlationContext = null,
+    ): HealthRegistry {
+        return new HealthRegistry(
+            $checks,
+            $startupState ?? new StartupState(),
+            new NullLogger(),
+            $correlationContext ?? new CorrelationContext(),
+        );
     }
 
     /** @param Closure(Cancellation): void $callback */
