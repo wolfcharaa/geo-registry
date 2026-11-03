@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Nominatim;
 
+use Amp\Cancellation;
 use Amp\Http\Client\HttpClient;
 use Amp\Http\Client\Request;
 use JsonException;
@@ -19,14 +20,14 @@ final readonly class NominatimClient
     ) {}
 
     /** @return list<array<string, mixed>> */
-    public function search(string $query, int $limit = 5): array
+    public function search(string $query, int $limit = 5, ?Cancellation $cancellation = null): array
     {
         $payload = $this->get('/search', [
             'addressdetails' => 1,
             'format' => 'jsonv2',
             'limit' => max(1, min(50, $limit)),
             'q' => $query,
-        ]);
+        ], $cancellation);
 
         if (!array_is_list($payload)) {
             throw new RuntimeException('Nominatim returned an unexpected search response.');
@@ -37,9 +38,9 @@ final readonly class NominatimClient
     }
 
     /** @return array<string, mixed> */
-    public function status(): array
+    public function status(?Cancellation $cancellation = null): array
     {
-        $payload = $this->get('/status', ['format' => 'json']);
+        $payload = $this->get('/status', ['format' => 'json'], $cancellation);
 
         if (array_is_list($payload) || ($payload['status'] ?? null) !== 0) {
             throw new RuntimeException('Nominatim is not ready.');
@@ -54,7 +55,7 @@ final readonly class NominatimClient
      * @return array<array-key, mixed>
      * @throws JsonException
      */
-    private function get(string $path, array $query): array
+    private function get(string $path, array $query, ?Cancellation $cancellation = null): array
     {
         $url = rtrim($this->baseUrl, '/') . $path . '?' . http_build_query($query, encoding_type: PHP_QUERY_RFC3986);
         $request = new Request($url);
@@ -62,7 +63,7 @@ final readonly class NominatimClient
         $request->setHeader('Accept-Language', $this->language);
         $request->setHeader('User-Agent', $this->userAgent);
 
-        $response = $this->httpClient->request($request);
+        $response = $this->httpClient->request($request, $cancellation);
         if ($response->getStatus() < 200 || $response->getStatus() >= 300) {
             throw new RuntimeException(sprintf('Nominatim returned HTTP %d.', $response->getStatus()));
         }

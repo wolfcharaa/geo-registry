@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\UserInterface\Http;
 
-use function Amp\async;
-
 use Amp\Http\HttpStatus;
 use Amp\Http\Server\ErrorHandler;
 use Amp\Http\Server\HttpServer;
@@ -13,18 +11,19 @@ use Amp\Http\Server\Request;
 use Amp\Http\Server\RequestHandler\ClosureRequestHandler;
 use Amp\Http\Server\Response;
 use Amp\Http\Server\Router;
-use Amp\Postgres\PostgresConnectionPool;
+use App\Application\Health\HealthRegistry;
+use App\Application\Health\HealthReport;
+use App\Application\Health\HealthStatus;
 use App\Infrastructure\Nominatim\NominatimClient;
 use App\Infrastructure\OpenSearch\OpenSearchClient;
 use Psr\Log\LoggerInterface;
-use RuntimeException;
 use Throwable;
 
 final readonly class RouterFactory
 {
     public function __construct(
         private LoggerInterface $logger,
-        private PostgresConnectionPool $postgres,
+        private HealthRegistry $health,
         private NominatimClient $nominatim,
         private OpenSearchClient $openSearch,
         private string $openSearchIndex,
@@ -35,11 +34,15 @@ final readonly class RouterFactory
         $router = new Router($server, $this->logger, $errorHandler);
 
         $router->addRoute('GET', '/health/live', new ClosureRequestHandler(
-            static fn(Request $_request): Response => JsonResponse::create(['status' => 'ok']),
+            fn(Request $_request): Response => $this->healthResponse($this->health->liveness()),
         ));
 
         $router->addRoute('GET', '/health/ready', new ClosureRequestHandler(
-            fn(Request $_request): Response => $this->readiness(),
+            fn(Request $_request): Response => $this->healthResponse($this->health->readiness()),
+        ));
+
+        $router->addRoute('GET', '/health/startup', new ClosureRequestHandler(
+            fn(Request $_request): Response => $this->healthResponse($this->health->startup()),
         ));
 
         $router->addRoute('GET', '/geocode', new ClosureRequestHandler(
@@ -53,33 +56,11 @@ final readonly class RouterFactory
         return $router;
     }
 
-    private function readiness(): Response
+    private function healthResponse(HealthReport $report): Response
     {
-        $checks = [
-            'nominatim' => async(fn(): array => $this->nominatim->status()),
-            'opensearch' => async(fn(): array => $this->openSearch->health()),
-            'postgres' => async(fn() => $this->checkPostgres()),
-        ];
-        $ready = true;
-        $details = [];
-
-        foreach ($checks as $name => $future) {
-            try {
-                $future->await();
-                $details[$name] = 'ok';
-            } catch (Throwable $exception) {
-                $ready = false;
-                $details[$name] = 'unavailable';
-                $this->logger->warning('Readiness check failed', [
-                    'exception' => $exception,
-                    'integration' => $name,
-                ]);
-            }
-        }
-
         return JsonResponse::create(
-            ['status' => $ready ? 'ok' : 'unavailable', 'checks' => $details],
-            $ready ? HttpStatus::OK : HttpStatus::SERVICE_UNAVAILABLE,
+            $report->toArray(),
+            $report->status === HealthStatus::Unavailable ? HttpStatus::SERVICE_UNAVAILABLE : HttpStatus::OK,
         );
     }
 
@@ -117,15 +98,6 @@ final readonly class RouterFactory
 
             return JsonResponse::create(['error' => 'OpenSearch is unavailable.'], HttpStatus::BAD_GATEWAY);
         }
-    }
-
-    private function checkPostgres(): void
-    {
-        foreach ($this->postgres->query('SELECT 1 AS ready') as $_row) {
-            return;
-        }
-
-        throw new RuntimeException('PostgreSQL readiness query returned no rows.');
     }
 
     private static function queryParameter(Request $request, string $name): ?string

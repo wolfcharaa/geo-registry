@@ -6,6 +6,10 @@ namespace App\Application\DependencyInjection;
 
 use Amp\Http\Client\HttpClient;
 use Amp\Postgres\PostgresConnectionPool;
+use App\Application\Health\HealthCheckDefinition;
+use App\Application\Health\HealthCheckPolicy;
+use App\Application\Health\HealthRegistry;
+use App\Application\Health\StartupState;
 use App\Application\Runtime\HttpRuntime;
 use App\Config\EnvironmentSnapshot;
 use App\Config\HttpServerConfig;
@@ -15,8 +19,11 @@ use App\Config\PostgresConfig;
 use App\Infrastructure\Http\AmpHttpClientFactory;
 use App\Infrastructure\Logging\ConsoleLoggerFactory;
 use App\Infrastructure\Nominatim\NominatimClient;
+use App\Infrastructure\Nominatim\NominatimHealthCheck;
 use App\Infrastructure\OpenSearch\OpenSearchClient;
 use App\Infrastructure\OpenSearch\OpenSearchClientFactory;
+use App\Infrastructure\OpenSearch\OpenSearchHealthCheck;
+use App\Infrastructure\Postgres\PostgresHealthCheck;
 use App\Infrastructure\Postgres\PostgresPoolFactory;
 use App\UserInterface\Http\RouterFactory;
 use Monolog\Logger;
@@ -71,11 +78,56 @@ final readonly class HttpRuntimeModule implements Module
                 'username' => $openSearchConfig->username,
                 'password' => $openSearchConfig->password,
             ]);
+        $startupState = $dic->object(StartupState::class);
+        $postgresHealth = $dic
+            ->object(PostgresHealthCheck::class)
+            ->arg('postgres', $postgres);
+        $nominatimHealth = $dic
+            ->object(NominatimHealthCheck::class)
+            ->arg('client', $nominatim);
+        $openSearchHealth = $dic
+            ->object(OpenSearchHealthCheck::class)
+            ->arg('client', $openSearch);
+        $postgresHealthDefinition = $dic
+            ->object(HealthCheckDefinition::class)
+            ->args([
+                'name' => 'postgres',
+                'policy' => HealthCheckPolicy::Required,
+                'deadlineSeconds' => 2,
+                'check' => $postgresHealth,
+            ]);
+        $nominatimHealthDefinition = $dic
+            ->object(HealthCheckDefinition::class)
+            ->args([
+                'name' => 'nominatim',
+                'policy' => HealthCheckPolicy::Optional,
+                'deadlineSeconds' => 2,
+                'check' => $nominatimHealth,
+            ]);
+        $openSearchHealthDefinition = $dic
+            ->object(HealthCheckDefinition::class)
+            ->args([
+                'name' => 'opensearch',
+                'policy' => HealthCheckPolicy::Optional,
+                'deadlineSeconds' => 2,
+                'check' => $openSearchHealth,
+            ]);
+        $health = $dic
+            ->object(HealthRegistry::class)
+            ->args([
+                'checks' => [
+                    $postgresHealthDefinition,
+                    $nominatimHealthDefinition,
+                    $openSearchHealthDefinition,
+                ],
+                'startupState' => $startupState,
+                'logger' => $logger,
+            ]);
         $routerFactory = $dic
             ->object(RouterFactory::class)
             ->args([
                 'logger' => $logger,
-                'postgres' => $postgres,
+                'health' => $health,
                 'nominatim' => $nominatim,
                 'openSearch' => $openSearch,
                 'openSearchIndex' => $openSearchConfig->index,
@@ -87,6 +139,7 @@ final readonly class HttpRuntimeModule implements Module
                 'config' => $dic->value($httpConfig),
                 'logger' => $logger,
                 'routerFactory' => $routerFactory,
+                'startupState' => $startupState,
             ]);
     }
 }

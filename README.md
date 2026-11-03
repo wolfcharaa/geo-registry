@@ -47,8 +47,24 @@ volumes. Их миграции, backup и reset нельзя объединят�
 
 ## HTTP endpoints
 
-- `GET /health/live` — жив ли AMPHP process.
-- `GET /health/ready` — параллельная проверка PostgreSQL, Nominatim и OpenSearch.
+- `GET /health/live` — локальная проверка AMPHP process без network I/O.
+- `GET /health/startup` — завершён ли startup HTTP runtime.
+- `GET /health/ready` — параллельная проверка required PostgreSQL и optional
+  Nominatim/OpenSearch с двухсекундным deadline на компонент.
+
+Readiness возвращает `unavailable`/`503` только при отказе required-компонента.
+Отказ только optional-компонентов возвращает `degraded`/`200`. Component payload
+содержит безопасные имена, policy и status без DSN и текста исключений:
+
+```json
+{
+  "status": "degraded",
+  "components": [
+    {"name": "postgres", "policy": "required", "status": "ok"},
+    {"name": "opensearch", "policy": "optional", "status": "unavailable"}
+  ]
+}
+```
 - `GET /geocode?q=Monte+Carlo&limit=5` — поиск через Nominatim.
 - `GET /search?q=example&limit=5` — поиск в `OPENSEARCH_INDEX`.
 

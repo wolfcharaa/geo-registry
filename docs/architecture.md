@@ -49,7 +49,8 @@ Nominatim и OpenSearch routes и напрямую использует concrete
 
 До появления parity replacement сохраняются:
 
-- `GET /health/live` и `GET /health/ready` как ранний operational contract;
+- `GET /health/live`, `/health/startup` и `/health/ready` как ранний
+  operational contract;
 - `GET /geocode` и `GET /search` как временные integration probes;
 - typed runtime/integration settings из одного immutable environment snapshot;
 - HTTP resource lifecycle через Thesis DIC disposer-ы.

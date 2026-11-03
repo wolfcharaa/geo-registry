@@ -13,7 +13,10 @@ return static function (DeptracConfig $config): void {
         ->cacheFile('./var/deptrac.cache')
         ->layers(
             $application = Layer::withName('Application')->collectors(
-                ClassLikeConfig::create('^App\\(?:Bootstrap$|Application\\)'),
+                ClassLikeConfig::create('^App\\(?:Bootstrap$|Application\\(?!Health\\))'),
+            ),
+            $applicationHealth = Layer::withName('Application Health')->collectors(
+                ClassLikeConfig::create('^App\\Application\\Health\\'),
             ),
             $configLayer = Layer::withName('Config')->collectors(
                 ClassLikeConfig::create('^App\\Config\\'),
@@ -53,7 +56,7 @@ return static function (DeptracConfig $config): void {
             ),
             $ampCore = Layer::withName('AMPHP Core')->collectors(
                 ClassLikeConfig::create(
-                    '^Amp\\(?:Cancellation|CancelledException|DeferredCancellation|Future|NullCancellation)$',
+                    '^Amp\\(?:Cancellation|CancelledException|DeferredCancellation|Future|NullCancellation|TimeoutCancellation)$',
                 ),
             ),
             $httpServer = Layer::withName('AMPHP HTTP Server')->collectors(
@@ -80,6 +83,7 @@ return static function (DeptracConfig $config): void {
         )
         ->rulesets(
             Ruleset::forLayer($application)->accesses(
+                $applicationHealth,
                 $configLayer,
                 $scaffoldUserInterface,
                 $scaffoldInfrastructure,
@@ -101,8 +105,13 @@ return static function (DeptracConfig $config): void {
                 $validator,
                 $migrationTooling,
             ),
+            Ruleset::forLayer($applicationHealth)->accesses(
+                $ampCore,
+                $logging,
+            ),
             Ruleset::forLayer($configLayer),
             Ruleset::forLayer($scaffoldUserInterface)->accesses(
+                $applicationHealth,
                 $configLayer,
                 $scaffoldInfrastructure,
                 $ampCore,
@@ -111,6 +120,7 @@ return static function (DeptracConfig $config): void {
                 $logging,
             ),
             Ruleset::forLayer($scaffoldInfrastructure)->accesses(
+                $applicationHealth,
                 $configLayer,
                 $ampCore,
                 $httpClient,

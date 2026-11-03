@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
 - Статус: `Active; A1 foundation partial, typed config next`
-- Версия документа: `0.37.0`
+- Версия документа: `0.38.0`
 - Обновлено: `2026-11-03`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -959,7 +959,7 @@ volumes.
 - [x] Добавить Symfony Console application и `app/bin/console`.
 - [ ] Вынести JSON logging, correlation context и graceful shutdown в
   application shell.
-- [ ] Реализовать live/ready/startup registry с required/optional policy.
+- [x] Реализовать live/ready/startup registry с required/optional policy.
 - [ ] Проверить три DIC graph без внешних сервисов: HTTP и CLI graphs уже
   покрыты, worker graph ожидает свой root.
 
@@ -1200,13 +1200,26 @@ Testo, Deptrac и real PostgreSQL/OpenSearch integration job; MODULE.md ждёт
 а contract/release smoke — G2. A2 получил typed settings и первый независимый
 `HttpRuntime` Thesis DIC root с container-owned PostgreSQL lifecycle и отдельный
 `CliRuntime` с исполняемым Symfony Console entrypoint; следующий slice —
-`WorkerRuntime`. Default Thesis DIC modules для core и worker зафиксированы в L5
-как намеренно последний package-polish slice после стабилизации фактической A3
-composition. Вопросы с вариантами открываются только для реально отсутствующего
-в v6 и dependency baseline поведения. G0 и G1 остаются gates только для
-application source.
+JSON logging/correlation и затем реальный `WorkerRuntime` одновременно с A3
+package composition: worker root без `QueueWorkerRunner`, registry и scope bridge
+не создаётся как фиктивная заглушка. Default Thesis DIC modules для core и worker
+зафиксированы в L5 как намеренно последний package-polish slice после
+стабилизации фактической A3 composition. Вопросы с вариантами открываются только
+для реально отсутствующего в v6 и dependency baseline поведения. G0 и G1
+остаются gates только для application source.
 
 ## История Документа
+
+### 0.38.0 — 2026-11-03
+
+- добавлен отдельный application health layer и registry;
+- liveness остаётся локальным, startup отражает готовность HTTP runtime;
+- PostgreSQL объявлен required, Nominatim и OpenSearch — optional;
+- readiness checks запускаются параллельно с per-component cancellation deadline,
+  required failure даёт `unavailable/503`, optional failure — `degraded/200`;
+- safe component payload и deadline/parallel semantics покрыты fast tests;
+- пустой worker graph отклонён: реальный root будет собран вместе с A3 package
+  composition.
 
 ### 0.37.0 — 2026-11-03
 

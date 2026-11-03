@@ -9,6 +9,7 @@ use Amp\Http\Server\SocketHttpServer;
 
 use function Amp\trapSignal;
 
+use App\Application\Health\StartupState;
 use App\Config\HttpServerConfig;
 use App\UserInterface\Http\RouterFactory;
 use Psr\Log\LoggerInterface;
@@ -19,6 +20,7 @@ final readonly class HttpRuntime
         private HttpServerConfig $config,
         private LoggerInterface $logger,
         private RouterFactory $routerFactory,
+        private StartupState $startupState,
     ) {}
 
     public function run(): void
@@ -29,6 +31,7 @@ final readonly class HttpRuntime
 
         $server->expose($this->config->listen);
         $server->start($router, $errorHandler);
+        $this->startupState->markComplete();
         $this->logger->info('HTTP server started', ['listen' => $this->config->listen]);
 
         try {
