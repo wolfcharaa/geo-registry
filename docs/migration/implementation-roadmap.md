@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; worker control storage ready, runtime integration next`
-- Версия документа: `0.31.0`
+- Статус: `Active; worker control runtime ready, queued binding adapter next`
+- Версия документа: `0.32.0`
 - Обновлено: `2026-11-03`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -748,7 +748,7 @@ Package: новый `message-bus-async-worker`.
 - [x] Создать независимый package scaffold на PHP `^8.4.12` с dependency
   direction `worker -> core`.
 - [x] Реализовать consumer loop, job scope, heartbeat и graceful cancellation.
-- [ ] Добавить retry/reject, stale recovery и worker control plane.
+- [x] Добавить retry/reject, stale recovery и worker control plane.
 - [ ] Предоставить отдельный Symfony Console executable и process adapters.
 - [ ] Доказать dependency direction только `worker -> core`.
 - [ ] Проверить совместимость core/worker release line `0.1.x`.
@@ -802,8 +802,33 @@ Package: новый `message-bus-async-worker`.
   `composer validate --strict --no-check-lock`.
 - Текущая граница: runner ещё не poll-ит inbox, не применяет process commands и
   не обновляет control registry автоматически.
-- Следующий slice: runtime coordinator для control inbox/registry и затем
-  job-scoped adapter точного queued binding для composition root/CLI.
+- Следующий slice закрыт в L4.R3: control inbox/registry подключены к AMPHP
+  runner без обязательной process dependency.
+
+#### L4.R3 — Control-Aware AMPHP Runner
+
+- State: runtime control integration закрыт `2026-11-03` в worker package.
+- Сохранена v6 composition boundary: `WorkerControlRuntime` агрегирует control
+  service, command/desired repositories, inbox, registry и status facade;
+  queue-only runner по-прежнему работает без этого optional runtime.
+- `WorkerControlSession` переносит проверенную state machine
+  pause/resume/drain/stop/kill/restart и используется основным loop и
+  concurrent monitor без process-global state.
+- Runner регистрирует single-mode worker до первого claim, poll-ит control
+  между jobs и во время suspended handler, пишет idle/busy heartbeat,
+  acknowledgement и финальный stopped/failed/restarting lifecycle.
+- Pause останавливает новые claims; drain/stop/restart дают текущей job
+  завершиться; kill cooperative-cancel-ит handler и сохраняет v6 retry/reject
+  по attempt budget. Restart возвращает настроенный process exit code в
+  `QueueWorkerRunResult`.
+- Unit fixture доказывает stop до claim и kill текущей job; real PostgreSQL
+  session fixture доказывает register → poll/ack → heartbeat → stop через FK и
+  фактический gateway.
+- Real PostgreSQL gate: PHPUnit `4 tests / 51 assertions`; fast worker gate:
+  PHPUnit `22 tests / 102 assertions`, PHPStan level max и
+  `composer validate --strict --no-check-lock`.
+- Следующий slice: job-scoped adapter точного queued binding, затем отдельный
+  Symfony Console executable и optional signal/process adapters.
 
 ## Wave 2 — Application Foundation
 
