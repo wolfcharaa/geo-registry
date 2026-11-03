@@ -29,6 +29,7 @@ make logs SERVICE=nominatim
 app/                                   сердце приложения: код, тесты, Composer
 app/bin/server.php                     HTTP entrypoint
 app/src/Bootstrap.php                  composition root
+app/src/Application/                   process runtimes и DIC modules
 app/src/Config/                        environment contract
 app/src/Infrastructure/Postgres/       async application DB pool
 app/src/Infrastructure/Nominatim/      async geocoding client
@@ -73,11 +74,12 @@ fiber-aware ожидание I/O, никаких Guzzle/PSR-18 adapters и сг�
 
 ## Контейнер приложения
 
-Пока граф зависимостей мал, `app/src/Bootstrap.php` остаётся явным переходным
-composition root. Целевая composition использует `thesis/dic` и три независимых
-root export: HTTP, CLI и worker. MessageBus сохраняет neutral resolver/scope
-contracts, поэтому application container не становится service locator внутри
-handlers. Внутренний контейнер Testo не является runtime-контейнером приложения.
+`app/src/Bootstrap.php` запускает application-owned Thesis DIC module отдельного
+`HttpRuntime`; PostgreSQL pool закрывается disposer-ом контейнера. Следующие
+независимые root exports — CLI и worker. MessageBus сохраняет neutral
+resolver/scope contracts, поэтому application container не становится service
+locator внутри handlers. Внутренний контейнер Testo не является
+runtime-контейнером приложения.
 
 ## Статический анализ и тесты
 

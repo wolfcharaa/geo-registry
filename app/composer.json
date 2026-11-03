@@ -4,7 +4,7 @@
     "license": "MIT",
     "type": "project",
     "require": {
-        "php": "^8.4",
+        "php": "^8.4.12",
         "ext-json": "*",
         "ext-pcntl": "*",
         "ext-pgsql": "*",
@@ -13,7 +13,9 @@
         "amphp/http-server-router": "^2.0",
         "amphp/log": "^2.0",
         "amphp/postgres": "^2.2",
-        "monolog/monolog": "^3.0"
+        "monolog/monolog": "^3.0",
+        "symfony/console": "^8.1",
+        "thesis/dic": "^0.5.3"
     },
     "require-dev": {
         "deptrac/deptrac": "^4.7",

@@ -40,17 +40,18 @@ boundary, а не четвёртым business layer. Обязательный `D
 
 ## Текущее Переходное Состояние
 
-Сейчас `app/src/Bootstrap.php` вручную собирает один HTTP runtime.
-`RouterFactory` содержит демонстрационные health, Nominatim и OpenSearch routes
-и напрямую использует concrete adapters. Это разрешённый scaffold, но не
-эталон для новых business scenarios.
+Сейчас `app/src/Bootstrap.php` запускает application-owned Thesis DIC module
+для отдельного `HttpRuntime`. `RouterFactory` содержит демонстрационные health,
+Nominatim и OpenSearch routes и напрямую использует concrete adapters. Это
+разрешённый scaffold, но не эталон для новых business scenarios. Независимые
+`CliRuntime` и `WorkerRuntime` ещё не добавлены.
 
 До появления parity replacement сохраняются:
 
 - `GET /health/live` и `GET /health/ready` как ранний operational contract;
 - `GET /geocode` и `GET /search` как временные integration probes;
-- `AppConfig` как единый environment object;
-- прямой composition в `Bootstrap`.
+- typed runtime/integration settings из одного immutable environment snapshot;
+- HTTP resource lifecycle через Thesis DIC disposer-ы.
 
 Новый business flow не расширяет эти временные handlers. Он создаётся
 вертикальным slice внутри принятого business module и подключается через
