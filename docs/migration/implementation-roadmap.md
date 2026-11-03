@@ -1,8 +1,8 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; worker runner ready, control plane next`
-- Версия документа: `0.30.0`
-- Обновлено: `2026-11-02`
+- Статус: `Active; worker control storage ready, runtime integration next`
+- Версия документа: `0.31.0`
+- Обновлено: `2026-11-03`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
 
@@ -773,8 +773,37 @@ Package: новый `message-bus-async-worker`.
   до исчерпания snapshot; stale worker после `QueueLeaseLost` ничего не пишет.
 - Fast worker gate: PHPUnit `10 tests / 41 assertions`, PHPStan level max и
   `composer validate --strict --no-check-lock`.
-- Следующий slice: worker control plane и затем job-scoped adapter точного
-  queued binding для composition root/CLI.
+- Следующий slice закрыт в L4.R2: worker control contracts, PostgreSQL storage и
+  registry/status lifecycle.
+
+#### L4.R2 — Worker Control Storage И Registry
+
+- State: contracts/storage slice закрыт `2026-11-03` в worker package.
+- Проверенная v6-модель перенесена без нового design round: command/receipt,
+  desired state, target specificity, inbox cursor, acknowledgement,
+  worker/child registry и status repository.
+- `DefaultWorkerControlService` сохраняет pause/resume desired state,
+  idempotency и TTL one-shot команд: 60 секунд для kill, 300 секунд для
+  drain/stop/restart.
+- `PostgresWorkerControlGateway` реализует command, desired-state, inbox,
+  registry и status ports через `amphp/postgres`; каждый I/O contract принимает
+  AMPHP `Cancellation`.
+- `PostgresWorkerControlSchemaGenerator` владеет полным v6-shaped набором
+  commands, desired states, workers, children, deliveries, acknowledgements и
+  audit без PDO и без schema-version subsystem старой библиотеки.
+- Cursor продвигается по последней просмотренной, а не только совпавшей
+  команде; expired commands исключаются, desired state выбирается по
+  specificity и времени. PostgreSQL FK требует зарегистрировать worker до
+  child/ack lifecycle.
+- Real PostgreSQL gate проверяет DDL, idempotent append, targeting/cursor,
+  desired-state resolution, acknowledgement upsert и worker/child lifecycle:
+  PHPUnit `3 tests / 44 assertions`.
+- Fast worker gate: PHPUnit `18 tests / 75 assertions`, PHPStan level max и
+  `composer validate --strict --no-check-lock`.
+- Текущая граница: runner ещё не poll-ит inbox, не применяет process commands и
+  не обновляет control registry автоматически.
+- Следующий slice: runtime coordinator для control inbox/registry и затем
+  job-scoped adapter точного queued binding для composition root/CLI.
 
 ## Wave 2 — Application Foundation
 
