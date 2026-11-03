@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; worker runtime complete, application foundation next`
-- Версия документа: `0.34.0`
+- Статус: `Active; A1 foundation partial, typed config next`
+- Версия документа: `0.35.0`
 - Обновлено: `2026-11-03`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -910,17 +910,42 @@ Module class, а пользователи других DI/container решени
 
 ### A1 — Architecture, Test И CI Skeleton
 
-- [ ] Создать устойчивый `docs/architecture.md`.
+- [x] Создать устойчивый `docs/architecture.md`.
 - [ ] После принятия G1 создать `Module/AddressRegistry/MODULE.md` версии 0.1.0.
-- [ ] Разделить Testo suites на Unit, Scenario, Integration и Contract.
-- [ ] Добавить Deptrac rules и project checks для запрещённых dependencies.
-- [ ] Добавить Compose integration profile с ephemeral PostgreSQL/OpenSearch.
+- [x] Разделить Testo suites на Unit, Scenario, Integration и Contract.
+- [x] Добавить Deptrac rules и project checks для запрещённых dependencies.
+- [x] Добавить Compose integration profile с ephemeral PostgreSQL/OpenSearch.
 - [ ] Разделить `make check`, `make test-integration`, `make contract` и
   `make smoke-release`; обновить CI fast/integration jobs.
 
 Готовность: пустой module skeleton не нужен; gates проверяют реальный scaffold,
 Testo suites запускаются отдельно, integration resources не используют dev
 volumes.
+
+#### A1.R1 — Architecture И Executable Quality Gates
+
+- State: незаблокированная часть A1 закрыта `2026-11-03`; A1 остаётся partial
+  из-за G1/G2-dependent artifacts.
+- `docs/architecture.md` стал целевым источником layer/runtime/data boundaries и
+  явно отделяет transitional HTTP scaffold от placement нового business code.
+- Testo разделён на Unit, Scenario, Integration и Contract; fast gate запускает
+  Unit+Scenario без фиктивных placeholder tests.
+- `deptrac/deptrac 4.7.2` включён в `composer check`; проверяются scaffold и
+  target module layers, `worker -> core`, Thesis DIC ownership и allowlist
+  внешних AMPHP/PostgreSQL/Console/Validator dependencies. Текущий gate:
+  `0 violations`, `0 uncovered`, `64 allowed`.
+- Отдельный integration Compose project поднимает PostgreSQL 17 и OpenSearch
+  3.9 на `tmpfs`, loopback ports и не использует development data volumes.
+- `make test-integration` собирает PHP 8.4 runner, ждёт health, выполняет Testo и
+  всегда удаляет containers/network через shell trap. Real-service gate:
+  `2 tests / 7 assertions` для PostgreSQL query и OpenSearch
+  health/index/search/delete lifecycle.
+- GitHub Actions разделён на `fast` и следующий после него `integration` job;
+  CI вызывает те же Composer/Make entrypoints, что и local workflow.
+- `make contract` и `make smoke-release` не создаются как пустые команды: первый
+  ждёт G2 OpenAPI/Postman contract, второй — состав принятого release smoke.
+- `MODULE.md` остаётся заблокирован G1. Следующий незаблокированный slice — A2
+  typed config и Thesis DIC runtime roots.
 
 ### A2 — Typed Config, Thesis DIC И Runtime Roots
 
@@ -1166,13 +1191,28 @@ loop, per-job scope, heartbeat/cancellation monitor и graceful process stop.
 L4.R2 перенёс worker control storage/registry, L4.R3 подключил control state
 machine к runner, L4.R4 закрыл scoped exact-binding execution без повторного
 enqueue, а L4.R5 добавил отдельный Console executable и optional signal adapter.
-L4 завершён; следующий активный implementation track — A1. Default Thesis DIC
-modules для core и worker зафиксированы в L5 как намеренно последний
-package-polish slice после стабилизации фактической A3 composition. Вопросы с
-вариантами открываются только для реально отсутствующего в v6 и dependency
-baseline поведения. G0 и G1 остаются gates только для application source.
+L4 завершён. Незаблокированная часть A1 закрыла architecture source, tiered
+Testo, Deptrac и real PostgreSQL/OpenSearch integration job; MODULE.md ждёт G1,
+а contract/release smoke — G2. Следующий активный implementation slice — A2
+typed config и Thesis DIC runtime roots. Default Thesis DIC modules для core и
+worker зафиксированы в L5 как намеренно последний package-polish slice после
+стабилизации фактической A3 composition. Вопросы с вариантами открываются только
+для реально отсутствующего в v6 и dependency baseline поведения. G0 и G1
+остаются gates только для application source.
 
 ## История Документа
+
+### 0.35.0 — 2026-11-03
+
+- создан основной `docs/architecture.md` с target hexagonal/runtime/data
+  boundaries и явным transitional scaffold status;
+- Testo разделён на четыре tiers, fast gate оставлен Unit+Scenario;
+- Deptrac 4.7.2 включён в обязательный quality gate без baseline/skip;
+- добавлен isolated tmpfs Compose project для PostgreSQL/OpenSearch и два
+  real-service integration tests;
+- CI разделён на fast и integration jobs с общими local/CI entrypoints;
+- A1 оставлен partial только по G1/G2-dependent MODULE/contract/release smoke,
+  frontier переведён на A2 typed config и Thesis DIC roots.
 
 ### 0.34.0 — 2026-11-03
 
