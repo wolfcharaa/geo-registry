@@ -12,7 +12,11 @@ use Amp\Log\StreamHandler;
 
 use function Amp\trapSignal;
 
-use App\Config\AppConfig;
+use App\Config\EnvironmentSnapshot;
+use App\Config\HttpServerConfig;
+use App\Config\NominatimConfig;
+use App\Config\OpenSearchConfig;
+use App\Config\PostgresConfig;
 use App\Infrastructure\Http\AmpHttpClientFactory;
 use App\Infrastructure\Nominatim\NominatimClient;
 use App\Infrastructure\OpenSearch\OpenSearchClientFactory;
@@ -25,30 +29,34 @@ final class Bootstrap
 {
     public static function run(): void
     {
-        $config = AppConfig::fromEnvironment();
+        $environment = EnvironmentSnapshot::capture();
+        $httpConfig = HttpServerConfig::fromEnvironment($environment);
+        $postgresConfig = PostgresConfig::fromEnvironment($environment);
+        $nominatimConfig = NominatimConfig::fromEnvironment($environment);
+        $openSearchConfig = OpenSearchConfig::fromEnvironment($environment);
         $logger = self::logger();
-        $httpClient = AmpHttpClientFactory::create($config->httpTimeoutSeconds);
-        $postgres = PostgresPoolFactory::create($config->databaseDsn, $config->databasePoolSize);
+        $httpClient = AmpHttpClientFactory::create($httpConfig->timeoutSeconds);
+        $postgres = PostgresPoolFactory::create($postgresConfig->dsn, $postgresConfig->poolSize);
         $nominatim = new NominatimClient(
             $httpClient,
-            $config->nominatimUrl,
-            $config->userAgent,
-            $config->nominatimLanguage,
+            $nominatimConfig->url,
+            $httpConfig->userAgent,
+            $nominatimConfig->language,
         );
         $openSearch = (new OpenSearchClientFactory($httpClient))->create(
-            $config->openSearchUrl,
-            $config->userAgent,
-            $config->openSearchUsername,
-            $config->openSearchPassword,
+            $openSearchConfig->url,
+            $httpConfig->userAgent,
+            $openSearchConfig->username,
+            $openSearchConfig->password,
         );
         $errorHandler = new DefaultErrorHandler();
         $server = SocketHttpServer::createForDirectAccess($logger);
-        $router = (new RouterFactory($logger, $postgres, $nominatim, $openSearch, $config->openSearchIndex))
+        $router = (new RouterFactory($logger, $postgres, $nominatim, $openSearch, $openSearchConfig->index))
             ->create($server, $errorHandler);
 
-        $server->expose($config->listen);
+        $server->expose($httpConfig->listen);
         $server->start($router, $errorHandler);
-        $logger->info('HTTP server started', ['listen' => $config->listen]);
+        $logger->info('HTTP server started', ['listen' => $httpConfig->listen]);
 
         try {
             $signal = trapSignal([SIGINT, SIGTERM]);
