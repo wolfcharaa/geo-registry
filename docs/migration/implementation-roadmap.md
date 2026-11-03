@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; worker control runtime ready, queued binding adapter next`
-- Версия документа: `0.32.0`
+- Статус: `Active; worker runtime foundation ready, executable next`
+- Версия документа: `0.33.0`
 - Обновлено: `2026-11-03`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -750,8 +750,8 @@ Package: новый `message-bus-async-worker`.
 - [x] Реализовать consumer loop, job scope, heartbeat и graceful cancellation.
 - [x] Добавить retry/reject, stale recovery и worker control plane.
 - [ ] Предоставить отдельный Symfony Console executable и process adapters.
-- [ ] Доказать dependency direction только `worker -> core`.
-- [ ] Проверить совместимость core/worker release line `0.1.x`.
+- [x] Доказать dependency direction только `worker -> core`.
+- [x] Проверить совместимость core/worker release line `0.1.x`.
 
 Готовность: worker восстанавливает stale lease, не теряет ack/retry transition,
 корректно завершается и не добавляет worker dependencies в core package.
@@ -827,8 +827,32 @@ Package: новый `message-bus-async-worker`.
 - Real PostgreSQL gate: PHPUnit `4 tests / 51 assertions`; fast worker gate:
   PHPUnit `22 tests / 102 assertions`, PHPStan level max и
   `composer validate --strict --no-check-lock`.
-- Следующий slice: job-scoped adapter точного queued binding, затем отдельный
-  Symfony Console executable и optional signal/process adapters.
+- Следующий slice закрыт в L4.R4: job-scoped adapter исполняет точный queued
+  binding через отдельный advanced core contract.
+
+#### L4.R4 — Scoped Exact-Binding Execution
+
+- State: exact-binding core/worker slice закрыт `2026-11-03`.
+- Core получил отдельный `BindingEnvelopeExecutorInterface`; composite
+  application bus API не расширен worker-specific методом.
+- `MessageBus::executeEnvelopeToBinding()` принимает восстановленный envelope,
+  resolver уже открытого job scope и AMPHP `Cancellation`, проверяет binding и
+  тип message, затем принудительно исполняет только этот binding через local
+  sequential pipeline даже для async flow.
+- Worker `MessageBusQueueWorker` десериализует envelope, использует
+  authoritative `QueueMessage::bindingId` и передаёт текущий resolver; повторный
+  fan-out и re-enqueue исключены.
+- Scope ownership не дублируется: runner открывает и dispose-ит один job scope,
+  core executor использует его resolver для handler, interceptors, context и
+  nested dispatch.
+- Core gate: PHPUnit `104 tests / 426 assertions`, PHPStan level max и
+  `composer validate --strict --no-check-lock`; worker fast gate: PHPUnit
+  `23 tests / 109 assertions` с теми же статическими gates.
+- Проверка dependency graph не нашла worker namespace/package references в
+  core `src`/`composer.json`; worker lock разрешает path-pinned core `0.1.0`
+  через объявленный `^0.1` constraint.
+- Следующий slice: отдельный Symfony Console worker executable и optional
+  signal/process adapter поверх AMPHP cancellation.
 
 ## Wave 2 — Application Foundation
 
@@ -1087,12 +1111,37 @@ deterministic producer enqueue dedup в baseline отсутствовал. L3.R4
 outbox extension seam через существующий `QueueProviderInterface`, не добавляя
 outbox storage/relay в core `0.1.0`. L3 закрыт. L4.R1 добавил AMPHP consumer
 loop, per-job scope, heartbeat/cancellation monitor и graceful process stop.
-Следующий implementation slice — worker control plane, после него exact-binding
-adapter и executable. Вопросы с вариантами открываются только для реально
-отсутствующего в v6 и dependency baseline поведения. G0 и G1 остаются gates
-только для application source.
+L4.R2 перенёс worker control storage/registry, L4.R3 подключил control state
+machine к runner, а L4.R4 закрыл scoped exact-binding execution без повторного
+enqueue. Следующий implementation slice — отдельный worker executable и
+optional signal/process adapter. Вопросы с вариантами открываются только для
+реально отсутствующего в v6 и dependency baseline поведения. G0 и G1 остаются
+gates только для application source.
 
 ## История Документа
+
+### 0.33.0 — 2026-11-03
+
+- core получил scoped exact-binding executor contract;
+- worker adapter восстанавливает envelope и исполняет authoritative queue
+  binding без повторного enqueue;
+- подтверждены dependency direction `worker -> core` и совместимая `0.1.x`
+  release line;
+- frontier переведён на отдельный worker executable и process adapters.
+
+### 0.32.0 — 2026-11-03
+
+- `WorkerControlRuntime` и session state machine подключены к AMPHP runner;
+- stop применяется до нового claim, kill cooperative-cancel-ит текущую job;
+- register/heartbeat/ack/final lifecycle подтверждены real PostgreSQL fixture;
+- итог — 22 fast tests / 102 assertions и 4 integration tests / 51 assertion.
+
+### 0.31.0 — 2026-11-03
+
+- перенесены v6 worker control contracts, targeting и desired state;
+- добавлены AMP PostgreSQL schema/gateway, worker/child registry и status API;
+- idempotency, cursor, acknowledgement и lifecycle подтверждены real database;
+- итог — 18 fast tests / 75 assertions и 3 integration tests / 44 assertions.
 
 ### 0.30.0 — 2026-11-02
 
