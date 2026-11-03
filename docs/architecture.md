@@ -44,7 +44,8 @@ boundary, а не четвёртым business layer. Обязательный `D
 для отдельного `HttpRuntime`. `RouterFactory` содержит демонстрационные health,
 Nominatim и OpenSearch routes и напрямую использует concrete adapters. Это
 разрешённый scaffold, но не эталон для новых business scenarios. Независимые
-`CliRuntime` и `WorkerRuntime` ещё не добавлены.
+`HttpRuntime` и `CliRuntime` уже имеют отдельные DIC graphs; `WorkerRuntime` ещё
+не добавлен.
 
 До появления parity replacement сохраняются:
 

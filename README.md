@@ -28,6 +28,7 @@ make logs SERVICE=nominatim
 ```text
 app/                                   сердце приложения: код, тесты, Composer
 app/bin/server.php                     HTTP entrypoint
+app/bin/console                        CLI entrypoint
 app/src/Bootstrap.php                  composition root
 app/src/Application/                   process runtimes и DIC modules
 app/src/Config/                        environment contract
@@ -76,10 +77,10 @@ fiber-aware ожидание I/O, никаких Guzzle/PSR-18 adapters и сг�
 
 `app/src/Bootstrap.php` запускает application-owned Thesis DIC module отдельного
 `HttpRuntime`; PostgreSQL pool закрывается disposer-ом контейнера. Следующие
-независимые root exports — CLI и worker. MessageBus сохраняет neutral
-resolver/scope contracts, поэтому application container не становится service
-locator внутри handlers. Внутренний контейнер Testo не является
-runtime-контейнером приложения.
+независимые root exports — `CliRuntime`, уже доступный через `app/bin/console`,
+и будущий worker. MessageBus сохраняет neutral resolver/scope contracts, поэтому
+application container не становится service locator внутри handlers. Внутренний
+контейнер Testo не является runtime-контейнером приложения.
 
 ## Статический анализ и тесты
 
@@ -94,6 +95,7 @@ offsets. Testo запускает unit suite из `app/tests/`; тесты об�
 make doctor   # проверить Compose
 make check    # formatter + strict PHPStan + Deptrac + fast Testo
 make architecture-check # отдельно проверить направления зависимостей
+app/bin/console list # показать CLI commands
 make smoke    # проверить запущенный HTTP service
 make down     # остановить без удаления volumes
 ```

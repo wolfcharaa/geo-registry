@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
 - Статус: `Active; A1 foundation partial, typed config next`
-- Версия документа: `0.36.0`
+- Версия документа: `0.37.0`
 - Обновлено: `2026-11-03`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -954,14 +954,14 @@ volumes.
 - [ ] Подключить Thesis DIC и создать независимые `HttpRuntime`, `CliRuntime`,
   `WorkerRuntime` root exports.
   - [x] `HttpRuntime` собирается application-owned Thesis DIC module;
-  - [ ] `CliRuntime`;
+  - [x] `CliRuntime` собирается отдельным Thesis DIC module;
   - [ ] `WorkerRuntime`.
-- [ ] Добавить Symfony Console application и `app/bin/console`.
+- [x] Добавить Symfony Console application и `app/bin/console`.
 - [ ] Вынести JSON logging, correlation context и graceful shutdown в
   application shell.
 - [ ] Реализовать live/ready/startup registry с required/optional policy.
-- [ ] Проверить три DIC graph без внешних сервисов: HTTP graph уже покрыт,
-  CLI и worker graphs ожидают свои roots.
+- [ ] Проверить три DIC graph без внешних сервисов: HTTP и CLI graphs уже
+  покрыты, worker graph ожидает свой root.
 
 Готовность: server и console запускаются из DIC composition; liveness не делает
 network I/O, optional outage даёт `degraded`, process-specific resources не
@@ -1198,14 +1198,24 @@ enqueue, а L4.R5 добавил отдельный Console executable и option
 L4 завершён. Незаблокированная часть A1 закрыла architecture source, tiered
 Testo, Deptrac и real PostgreSQL/OpenSearch integration job; MODULE.md ждёт G1,
 а contract/release smoke — G2. A2 получил typed settings и первый независимый
-`HttpRuntime` Thesis DIC root с container-owned PostgreSQL lifecycle; следующий
-slice — Symfony Console и `CliRuntime`, затем `WorkerRuntime`. Default Thesis
-DIC modules для core и worker зафиксированы в L5 как намеренно последний
-package-polish slice после стабилизации фактической A3 composition. Вопросы с
-вариантами открываются только для реально отсутствующего в v6 и dependency
-baseline поведения. G0 и G1 остаются gates только для application source.
+`HttpRuntime` Thesis DIC root с container-owned PostgreSQL lifecycle и отдельный
+`CliRuntime` с исполняемым Symfony Console entrypoint; следующий slice —
+`WorkerRuntime`. Default Thesis DIC modules для core и worker зафиксированы в L5
+как намеренно последний package-polish slice после стабилизации фактической A3
+composition. Вопросы с вариантами открываются только для реально отсутствующего
+в v6 и dependency baseline поведения. G0 и G1 остаются gates только для
+application source.
 
 ## История Документа
+
+### 0.37.0 — 2026-11-03
+
+- добавлен независимый `CliRuntime` Thesis DIC root;
+- `app/bin/console` запускает Symfony Console с explicit process exit code;
+- console name/version вынесены в immutable settings из общего environment
+  snapshot;
+- executable `list` contract и DIC graph teardown покрыты fast test;
+- A2 frontier переведён на независимый `WorkerRuntime` root.
 
 ### 0.36.0 — 2026-11-03
 

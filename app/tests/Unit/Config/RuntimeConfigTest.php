@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Config;
 
+use App\Config\ConsoleConfig;
 use App\Config\EnvironmentSnapshot;
 use App\Config\HttpServerConfig;
 use App\Config\NominatimConfig;
@@ -20,6 +21,8 @@ final class RuntimeConfigTest
     public function testItBuildsIndependentTypedSettingsFromTheSameSnapshot(): void
     {
         $environment = new EnvironmentSnapshot([
+            'APP_NAME' => 'geo-registry-test',
+            'APP_VERSION' => 'test',
             'APP_LISTEN' => '0.0.0.0:9000',
             'APP_USER_AGENT' => 'geo-registry/test',
             'HTTP_TIMEOUT_SECONDS' => '3.5',
@@ -32,10 +35,13 @@ final class RuntimeConfigTest
         ]);
 
         $http = HttpServerConfig::fromEnvironment($environment);
+        $console = ConsoleConfig::fromEnvironment($environment);
         $postgres = PostgresConfig::fromEnvironment($environment);
         $nominatim = NominatimConfig::fromEnvironment($environment);
         $openSearch = OpenSearchConfig::fromEnvironment($environment);
 
+        Assert::same($console->name, 'geo-registry-test');
+        Assert::same($console->version, 'test');
         Assert::same($http->listen, '0.0.0.0:9000');
         Assert::same($http->timeoutSeconds, 3.5);
         Assert::same($postgres->dsn, 'host=postgres db=geo');

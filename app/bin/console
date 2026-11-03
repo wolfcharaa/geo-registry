@@ -1,0 +1,16 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use App\Application\DependencyInjection\CliRuntimeModule;
+use App\Application\Runtime\CliRuntime;
+use App\Config\EnvironmentSnapshot;
+use Thesis\Dic;
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+exit(Dic::run(
+    new CliRuntimeModule(EnvironmentSnapshot::capture()),
+    static fn(CliRuntime $runtime): int => $runtime->run(),
+));
