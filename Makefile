@@ -1,6 +1,7 @@
 SHELL := /bin/sh
 
 COMPOSE := docker/compose/dev.sh
+INTEGRATION_COMPOSE := docker/compose/integration.sh
 
 export HOST_UID ?= $(shell id -u)
 export HOST_GID ?= $(shell id -g)
@@ -57,7 +58,16 @@ fix: guard-user ## Apply PHP formatting
 
 doctor: ## Validate the resolved Compose configuration
 	$(COMPOSE) config --quiet
+	$(INTEGRATION_COMPOSE) config --quiet
 .PHONY: doctor
+
+integration-up: guard-user ## Start isolated PostgreSQL and OpenSearch test resources
+	$(INTEGRATION_COMPOSE) up --detach --wait --no-build --remove-orphans
+.PHONY: integration-up
+
+integration-down: guard-user ## Stop and remove isolated integration resources
+	$(INTEGRATION_COMPOSE) down --remove-orphans
+.PHONY: integration-down
 
 smoke: ## Probe the running HTTP service and its integrations
 	APP_BASE_URL=$${APP_BASE_URL:-http://127.0.0.1:$${APP_PORT:-8080}} docker/scripts/smoke-check.sh

@@ -96,6 +96,21 @@ make smoke    # проверить запущенный HTTP service
 make down     # остановить без удаления volumes
 ```
 
+Ephemeral PostgreSQL и OpenSearch для будущей Integration suite запускаются
+отдельным Compose project и не используют development data volumes:
+
+```shell
+make integration-up
+# integration tests
+make integration-down
+```
+
+По умолчанию они доступны только на loopback-портах `55432` и `59200`.
+Параллельный запуск можно изолировать через `INTEGRATION_PROJECT_NAME`,
+`INTEGRATION_POSTGRES_PORT` и `INTEGRATION_OPENSEARCH_PORT`. Прямой Compose
+вызов остаётся доступен через
+`docker compose -f docker/compose/integration/compose.yaml --profile integration`.
+
 `config/.env` игнорируется Git. Значения из `.env.example` предназначены только
 для локальной разработки. Образ `mediagis/nominatim` является community image;
 для production следует закрепить проверенный digest или собрать Nominatim из
