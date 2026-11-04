@@ -170,6 +170,8 @@ make worker-logs     # следить за логами обоих worker servic
 make worker-down     # остановить оба worker services
 make smoke    # проверить запущенный HTTP service
 make smoke-release POSTMAN_ENVIRONMENT=config/release.postman_environment.json # strict Postman parity
+make server-source-bundle # собрать проверяемый source workspace для data server
+make server-preflight GAR_SOURCE=/data/gar SERVER_STORAGE_PATH=/data # read-only server gate
 make down     # остановить без удаления volumes
 ```
 
@@ -181,6 +183,13 @@ Postman gate и матрица сравнения legacy/AMPHP описаны в
 [release-parity.md](docs/migration/release-parity.md). `make smoke-release`
 записывает JUnit/JSON artifacts в `/tmp` по умолчанию и не подменяет фактический
 import, queue drain или operator approval.
+
+Перенос на сервер с полным GAR начинается с source-only архива трёх связанных
+repositories. Он фиксирует exact revisions и не включает данные, secrets,
+Docker images или volumes. Сборка архива, восстановление соседней workspace
+структуры и fail-closed server preflight описаны в
+[server-handoff.md](docs/migration/server-handoff.md). Текущий Compose остаётся
+development topology и сам по себе не является production release artifact.
 
 Команды `migrate:*` входят только в `CliRuntime` и используют `DATABASE_DSN`.
 Они работают через blocking PDO и не включаются в HTTP/worker DIC graphs. База

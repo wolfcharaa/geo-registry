@@ -120,6 +120,18 @@ test-integration: guard-user ## Run real PostgreSQL and OpenSearch integration t
 	docker/scripts/run-integration-tests.sh
 .PHONY: test-integration
 
+server-source-bundle: guard-user ## Package the clean three-repository source workspace for transfer
+	SERVER_SOURCE_OUTPUT="$(SERVER_SOURCE_OUTPUT)" docker/scripts/create-server-source-bundle.sh
+.PHONY: server-source-bundle
+
+server-preflight: guard-user ## Validate a data server without starting or changing services
+	GAR_SOURCE="$(GAR_SOURCE)" \
+		SERVER_STORAGE_PATH="$(SERVER_STORAGE_PATH)" \
+		SERVER_MIN_FREE_GB="$(SERVER_MIN_FREE_GB)" \
+		SERVER_MIN_MEMORY_GB="$(SERVER_MIN_MEMORY_GB)" \
+		docker/scripts/server-preflight.sh
+.PHONY: server-preflight
+
 smoke: ## Probe the running HTTP service and its integrations
 	APP_BASE_URL=$${APP_BASE_URL:-http://127.0.0.1:$${APP_PORT:-8080}} docker/scripts/smoke-check.sh
 .PHONY: smoke

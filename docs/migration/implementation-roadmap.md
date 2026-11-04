@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
 - Статус: `Active; local R1 preparation continues, full-data execution deferred to data server`
-- Версия документа: `0.63.0`
+- Версия документа: `0.64.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -1594,6 +1594,24 @@ online queries читают только выбранный регион.
   PostgreSQL/OpenSearch Integration `15/218` gates; `smoke-release` сначала
   компилирует explicit MessageBus registry.
 
+#### R1.R2 — Source Handoff На Data Server
+
+- [x] Зафиксировать перенос согласованных revisions приложения и двух path
+  repositories без runtime data и secrets.
+- [x] Проверять clean worktrees и совпадение library HEAD с Composer lock до
+  создания transport archive.
+- [x] Добавить manifest с full commit IDs и SHA-256 каждого Git bundle.
+- [x] Добавить read-only fail-closed preflight с явными capacity budgets.
+- [ ] Передать и проверить archive на выбранном data server.
+- [ ] Выполнить full-data R1 procedure после отдельного operator start.
+
+`make server-source-bundle` создаёт source-only tar из трёх self-contained Git
+bundles. `make server-preflight` не запускает containers и не изменяет данные;
+он блокирует дальнейшие шаги при development credentials/Monaco dataset,
+недостаточном согласованном storage/memory или несовместимых revisions.
+Процедура записана в [server-handoff.md](server-handoff.md). Это закрывает
+локальную подготовку transport boundary, но не full-data R1 и не G5.
+
 ### R2 — Cutover И Cleanup
 
 - [ ] Закрыть G5 и выполнить выбранный data path.
@@ -1694,6 +1712,15 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.64.0 — 2026-11-04
+
+- добавлен воспроизводимый source handoff приложения и двух MessageBus path
+  repositories через Git bundles с manifest/checksums;
+- добавлен read-only server preflight с явными storage/memory budgets и
+  fail-closed проверкой server configuration;
+- runtime data, secrets, Docker images и volumes оставлены вне transport
+  artifact; фактический full-data R1 по-прежнему выполняется на data server.
 
 ### 0.63.0 — 2026-11-04
 

@@ -9,3 +9,4 @@
 /.idea/
 /compose.override.yaml
 /docker/data/
+/geo-registry-server-source-*.tar
