@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; G2 accepted, V1 FindAddressById next`
-- Версия документа: `0.48.0`
+- Статус: `Active; V1 FindAddressById complete, V2 SearchAddress next`
+- Версия документа: `0.49.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -183,8 +183,9 @@ Library, application foundation и database fixture tracks можно вести
 - Accepted: OpenAPI 3.1 YAML является structural source, sanitized Postman v2.1
   collection — executable companion, а synthetic environment использует G3
   fixture вместо исходных имён, IDs и координат.
-- Boundary: health operations отражают текущий AMPHP runtime; address operations
-  помечены `planned` и не считаются реализованными до соответствующего V-slice.
+- Boundary: health operations и завершённый `FindAddressById` отражают текущий
+  AMPHP runtime; остальные address operations помечены `planned` до своего
+  V-slice.
 - Gate: Contract suite проверяет parsing, schema references, response examples,
   operationId/method/path coverage и отсутствие legacy/secret values.
 - Artifact: [HTTP contract baseline](../api/http-contract-baseline.md).
@@ -1174,15 +1175,29 @@ GAR import.
 
 ### V1 — `FindAddressById`
 
-- [ ] Создать typed message/result/document contract и scenario-local port.
-- [ ] Реализовать handler и AMPHP PostgreSQL adapter.
-- [ ] Добавить transport DTO, Symfony validation, presenter и error mapping.
-- [ ] Зарегистрировать `POST /api/addresses/find-by-id` и stable alias/binding.
-- [ ] Добавить Unit, Scenario, Integration, Contract и Postman coverage.
+- [x] Создать typed message/result/document contract и scenario-local port.
+- [x] Реализовать handler и AMPHP PostgreSQL adapter.
+- [x] Добавить transport DTO, Symfony validation, presenter и error mapping.
+- [x] Зарегистрировать `POST /api/addresses/find-by-id` и stable alias/binding.
+- [x] Добавить Unit, Scenario, Integration, Contract и Postman coverage.
 
 Готовность: первый business endpoint достигает согласованного parity; controller
 не знает SQL/handler, adapter не возвращает raw row, cancellation propagation
 проверена.
+
+- State: V1 закрыт `2026-11-04`; `findAddressById` переведён из `planned` в
+  `current` в OpenAPI/Postman.
+- Query и result типизированы, binding
+  `address-registry.find-address-by-id.v1` компилируется из explicit registry.
+- HTTP boundary использует Symfony Validator; capability передаёт AMPHP
+  cancellation в PostgreSQL reader и не знает transport/storage details.
+- Reader ищет UUID, `object_id` и числовые Data.Mos identifiers, возвращает оба
+  hierarchy documents в детерминированном порядке и не выполняет retry.
+- Fast gate: Testo `38 tests / 171 assertions`, PHPStan max, Deptrac
+  `0 violations / 0 uncovered`, registry `1 binding`; Contract gate:
+  `4 tests / 165 assertions`; Integration gate на PHP 8.4/PostgreSQL 17:
+  `5 tests / 42 assertions`.
+- Следующий vertical slice — V2 `SearchAddress` на PostgreSQL.
 
 ## Wave 4 — PostgreSQL Search И Suggest
 
@@ -1364,9 +1379,9 @@ loop, per-job scope, heartbeat/cancellation monitor и graceful process stop.
 L4.R2 перенёс worker control storage/registry, L4.R3 подключил control state
 machine к runner, L4.R4 закрыл scoped exact-binding execution без повторного
 enqueue, а L4.R5 добавил отдельный Console executable и optional signal adapter.
-L4 завершён. Незаблокированная часть A1 закрыла architecture source, tiered
-Testo, Deptrac, real PostgreSQL/OpenSearch integration job и G1-dependent
-`AddressRegistry/MODULE.md`; contract/release smoke ждёт G2. A2 получил typed
+L4 завершён. A1 закрыла architecture source, tiered Testo, Deptrac, real
+PostgreSQL/OpenSearch integration job и executable contract gate; состав
+release smoke остаётся отдельным решением. A2 получил typed
 settings и первый независимый
 `HttpRuntime` Thesis DIC root с container-owned PostgreSQL lifecycle и отдельный
 `CliRuntime` с исполняемым Symfony Console entrypoint. A3 подключил path-pinned
@@ -1379,10 +1394,11 @@ direct runtime bootstrap сохранён для совместимости. D1 
 содержит изолированный Yiisoft migration graph и PDO PostgreSQL adapter, все 21
 migration проходят apply-from-zero и полный rollback на PostgreSQL 17/PostGIS.
 D2 добавил target-owned fixture v1 с regional ambiguity, checksum и быстрым
-reset. G1 закрепил `AddressRegistry` как business owner и добавил первый
-source-verifiable `MODULE.md` без пустого code skeleton. G2 сохранил разрешённый
-публичный HTTP contract в OpenAPI/Postman, очистил examples и включил отдельный
-coverage gate. Следующий HTTP slice — V1 `FindAddressById`. JSON stdout,
+reset. G1 закрепил `AddressRegistry` как business owner, G2 сохранил разрешённый
+публичный HTTP contract в OpenAPI/Postman и включил отдельный coverage gate. V1
+реализовал первый source-verifiable scenario `FindAddressById`: current HTTP
+route, typed MessageBus query/result, AMPHP PostgreSQL reader и все четыре Testo
+suites. Следующий HTTP slice — V2 `SearchAddress`. JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
 последний package-polish slice после стабилизации фактической A3 composition.
@@ -1391,6 +1407,17 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.49.0 — 2026-11-04
+
+- завершён V1 `FindAddressById` с typed capability contract, scenario-local port
+  и AMPHP PostgreSQL adapter;
+- зарегистрированы current HTTP route и stable MessageBus binding;
+- добавлены Symfony validation, compatibility presenter и `400`/`503` mapping;
+- Unit, Scenario, Contract и real PostgreSQL Integration gates подтверждают
+  transport, dispatch/cancellation, response envelope и storage lookup;
+- `MODULE.md`, OpenAPI и Postman синхронизированы; следующий slice — V2
+  `SearchAddress`.
 
 ### 0.48.0 — 2026-11-04
 

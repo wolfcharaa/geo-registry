@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\DependencyInjection;
 
+use Amp\Postgres\PostgresConnectionPool;
 use App\Application\Console\Command\MessageBusRegistryCheckCommand;
 use App\Application\MessageBus\ApplicationRegistryCompiler;
 use App\Application\MessageBus\MessageBusRegistrySource;
@@ -14,6 +15,7 @@ use App\Config\EnvironmentSnapshot;
 use App\Config\LoggingConfig;
 use App\Config\PostgresConfig;
 use App\Infrastructure\Logging\StdoutLoggerFactory;
+use App\Infrastructure\Postgres\PostgresPoolFactory;
 use Monolog\Logger;
 use Symfony\Component\Console\Application;
 use Thesis\Dic;
@@ -33,11 +35,13 @@ final readonly class CliRuntimeModule implements Module
     {
         $config = ConsoleConfig::fromEnvironment($this->environment);
         $loggingConfig = LoggingConfig::fromEnvironment($this->environment);
+        $postgresConfig = PostgresConfig::fromEnvironment($this->environment);
+        $source = $this->messageBusRegistry ?? MessageBusRegistrySource::empty();
         $application = $dic->object(
             Application::class,
             static fn(): Application => new Application($config->name, $config->version),
         );
-        $registrySource = $dic->value($this->messageBusRegistry ?? MessageBusRegistrySource::empty());
+        $registrySource = $dic->value($source);
         $correlationContext = $dic->object(CorrelationContext::class);
         $loggerFactory = $dic
             ->object(StdoutLoggerFactory::class)
@@ -48,10 +52,20 @@ final readonly class CliRuntimeModule implements Module
                 'config' => $dic->value($loggingConfig),
                 'runtime' => 'cli',
             ]);
+        $postgres = $dic
+            ->object(
+                PostgresConnectionPool::class,
+                static fn(): PostgresConnectionPool => PostgresPoolFactory::create(
+                    $postgresConfig->dsn,
+                    $postgresConfig->poolSize,
+                ),
+            )
+            ->disposer(static fn(PostgresConnectionPool $pool) => $pool->close());
         $messageBus = $dic->import(new ApplicationMessageBusModule(
-            $this->messageBusRegistry ?? MessageBusRegistrySource::empty(),
+            $source,
             $correlationContext,
             $logger,
+            AddressRegistryMessageBusServices::configure($dic, $source, $postgres),
         ));
         $registryCompiler = $dic->object(ApplicationRegistryCompiler::class);
         $registryCheck = $dic
@@ -62,7 +76,7 @@ final readonly class CliRuntimeModule implements Module
             ]);
         $application->call('addCommand', [$registryCheck]);
         $application->call('addCommands', [
-            $dic->import(new MigrationCliModule(PostgresConfig::fromEnvironment($this->environment))),
+            $dic->import(new MigrationCliModule($postgresConfig)),
         ]);
 
         return $dic

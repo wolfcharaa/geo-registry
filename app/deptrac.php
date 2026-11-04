@@ -121,6 +121,7 @@ return static function (DeptracConfig $config): void {
                 $applicationObservability,
                 $configLayer,
                 $scaffoldInfrastructure,
+                $moduleUserInterface,
                 $ampCore,
                 $httpServer,
                 $postgres,

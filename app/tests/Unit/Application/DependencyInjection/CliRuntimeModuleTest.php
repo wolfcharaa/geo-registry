@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Application\DependencyInjection;
 
 use App\Application\DependencyInjection\CliRuntimeModule;
+use App\Application\MessageBus\MessageBusRegistrySource;
 use App\Application\Runtime\CliRuntime;
 use App\Config\EnvironmentSnapshot;
 use Symfony\Component\Console\Input\ArrayInput;
@@ -20,10 +21,13 @@ final class CliRuntimeModuleTest
     {
         $output = new BufferedOutput();
         $exitCode = Dic::run(
-            new CliRuntimeModule(new EnvironmentSnapshot([
-                'APP_NAME' => 'geo-registry-test',
-                'APP_VERSION' => 'test',
-            ])),
+            new CliRuntimeModule(
+                new EnvironmentSnapshot([
+                    'APP_NAME' => 'geo-registry-test',
+                    'APP_VERSION' => 'test',
+                ]),
+                MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_registry.php'),
+            ),
             static fn(CliRuntime $runtime): int => $runtime->run(
                 new ArrayInput(['command' => 'list', '--no-ansi' => true]),
                 $output,
@@ -44,7 +48,10 @@ final class CliRuntimeModuleTest
     {
         $output = new BufferedOutput();
         $exitCode = Dic::run(
-            new CliRuntimeModule(new EnvironmentSnapshot([])),
+            new CliRuntimeModule(
+                new EnvironmentSnapshot([]),
+                MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_registry.php'),
+            ),
             static fn(CliRuntime $runtime): int => $runtime->run(
                 new ArrayInput(['command' => 'message-bus:registry:check', '--no-ansi' => true]),
                 $output,
@@ -52,6 +59,6 @@ final class CliRuntimeModuleTest
         );
 
         Assert::same($exitCode, 0);
-        Assert::true(str_contains($output->fetch(), 'bindings=0 source_hash='));
+        Assert::true(str_contains($output->fetch(), 'bindings=1 source_hash='));
     }
 }

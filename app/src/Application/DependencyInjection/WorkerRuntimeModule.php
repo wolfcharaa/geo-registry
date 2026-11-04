@@ -58,11 +58,6 @@ final readonly class WorkerRuntimeModule implements Module
                 'config' => $dic->value($loggingConfig),
                 'runtime' => 'worker',
             ]);
-        $messageBus = $dic->import(new ApplicationMessageBusModule(
-            $registrySource,
-            $correlationContext,
-            $logger,
-        ));
         $postgres = $dic
             ->object(
                 PostgresConnectionPool::class,
@@ -72,6 +67,17 @@ final readonly class WorkerRuntimeModule implements Module
                 ),
             )
             ->disposer(static fn(PostgresConnectionPool $pool) => $pool->close());
+        $addressRegistryServices = AddressRegistryMessageBusServices::configure(
+            $dic,
+            $registrySource,
+            $postgres,
+        );
+        $messageBus = $dic->import(new ApplicationMessageBusModule(
+            $registrySource,
+            $correlationContext,
+            $logger,
+            $addressRegistryServices,
+        ));
         $consumer = $dic
             ->object(PostgresMessageConsumer::class)
             ->arg('postgres', $postgres);
@@ -105,6 +111,7 @@ final readonly class WorkerRuntimeModule implements Module
             MessageBusServiceMap::from($registrySource, $registry),
             $correlationContext,
             $logger,
+            $addressRegistryServices,
         ))->configure($dic);
         $messageServices = $dic
             ->object(ThesisServiceResolver::class)

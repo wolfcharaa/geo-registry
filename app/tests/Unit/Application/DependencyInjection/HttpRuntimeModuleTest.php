@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Application\DependencyInjection;
 
 use App\Application\DependencyInjection\HttpRuntimeModule;
+use App\Application\MessageBus\MessageBusRegistrySource;
 use App\Application\Runtime\HttpRuntime;
 use App\Config\EnvironmentSnapshot;
 use Testo\Assert;
@@ -17,7 +18,10 @@ final class HttpRuntimeModuleTest
     public function testItBuildsAndDisposesTheHttpRuntimeGraph(): void
     {
         $runtimeClass = Dic::run(
-            new HttpRuntimeModule(new EnvironmentSnapshot([])),
+            new HttpRuntimeModule(
+                new EnvironmentSnapshot([]),
+                MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_registry.php'),
+            ),
             static fn(HttpRuntime $runtime): string => $runtime::class,
         );
 

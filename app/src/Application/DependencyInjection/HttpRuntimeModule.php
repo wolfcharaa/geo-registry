@@ -28,9 +28,14 @@ use App\Infrastructure\OpenSearch\OpenSearchClientFactory;
 use App\Infrastructure\OpenSearch\OpenSearchHealthCheck;
 use App\Infrastructure\Postgres\PostgresHealthCheck;
 use App\Infrastructure\Postgres\PostgresPoolFactory;
+use App\Module\AddressRegistry\UserInterface\Http\FindAddressById\FindAddressByIdAction;
+use App\Module\AddressRegistry\UserInterface\Http\FindAddressById\FindAddressByIdPresenter;
+use App\Module\AddressRegistry\UserInterface\Http\FindAddressById\FindAddressByIdRequestMapper;
 use App\UserInterface\Http\CorrelationMiddleware;
 use App\UserInterface\Http\RouterFactory;
 use Monolog\Logger;
+use Symfony\Component\Validator\Validation;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Thesis\Dic;
 use Thesis\Dic\Module;
 use Thesis\Dic\Ref;
@@ -51,6 +56,7 @@ final readonly class HttpRuntimeModule implements Module
         $postgresConfig = PostgresConfig::fromEnvironment($this->environment);
         $nominatimConfig = NominatimConfig::fromEnvironment($this->environment);
         $openSearchConfig = OpenSearchConfig::fromEnvironment($this->environment);
+        $registrySource = $this->messageBusRegistry ?? MessageBusRegistrySource::empty();
 
         $correlationContext = $dic->object(CorrelationContext::class);
         $loggerFactory = $dic
@@ -62,11 +68,6 @@ final readonly class HttpRuntimeModule implements Module
                 'config' => $dic->value($loggingConfig),
                 'runtime' => 'http',
             ]);
-        $messageBus = $dic->import(new ApplicationMessageBusModule(
-            $this->messageBusRegistry ?? MessageBusRegistrySource::empty(),
-            $correlationContext,
-            $logger,
-        ));
         $httpClient = $dic
             ->object(
                 HttpClient::class,
@@ -81,6 +82,12 @@ final readonly class HttpRuntimeModule implements Module
                 ),
             )
             ->disposer(static fn(PostgresConnectionPool $pool) => $pool->close());
+        $messageBus = $dic->import(new ApplicationMessageBusModule(
+            $registrySource,
+            $correlationContext,
+            $logger,
+            AddressRegistryMessageBusServices::configure($dic, $registrySource, $postgres),
+        ));
         $nominatim = $dic
             ->object(NominatimClient::class)
             ->args([
@@ -152,6 +159,23 @@ final readonly class HttpRuntimeModule implements Module
                 'context' => $correlationContext,
                 'logger' => $logger,
             ]);
+        $validator = $dic->object(
+            ValidatorInterface::class,
+            static fn(): ValidatorInterface => Validation::createValidatorBuilder()
+                ->enableAttributeMapping()
+                ->getValidator(),
+        );
+        $findAddressByIdRequestMapper = $dic
+            ->object(FindAddressByIdRequestMapper::class)
+            ->arg('validator', $validator);
+        $findAddressById = $dic
+            ->object(FindAddressByIdAction::class)
+            ->args([
+                'requestMapper' => $findAddressByIdRequestMapper,
+                'presenter' => $dic->object(FindAddressByIdPresenter::class),
+                'messageBus' => $messageBus,
+                'timeoutSeconds' => $httpConfig->timeoutSeconds,
+            ]);
         $routerFactory = $dic
             ->object(RouterFactory::class)
             ->args([
@@ -161,6 +185,7 @@ final readonly class HttpRuntimeModule implements Module
                 'openSearch' => $openSearch,
                 'openSearchIndex' => $openSearchConfig->index,
                 'correlationMiddleware' => $correlationMiddleware,
+                'findAddressById' => $findAddressById,
             ]);
 
         return $dic

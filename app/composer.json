@@ -19,6 +19,7 @@
         "romanfedorskij/message-bus-async": "^0.1",
         "romanfedorskij/message-bus-async-worker": "^0.1",
         "symfony/console": "^8.1",
+        "symfony/validator": "^8.1",
         "thesis/dic": "^0.5.3",
         "yiisoft/db-migration": "^2.2",
         "yiisoft/db-pgsql": "^2.0"

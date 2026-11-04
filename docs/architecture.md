@@ -1,6 +1,6 @@
 # Архитектура Geo Registry
 
-- Версия документа: `0.2.0`
+- Версия документа: `0.3.0`
 - Обновлено: `2026-11-04`
 - Статус: `Target architecture; scaffold is transitional`
 - План миграции: [migration/implementation-roadmap.md](migration/implementation-roadmap.md)
@@ -42,16 +42,20 @@ boundary, а не четвёртым business layer. Обязательный `D
 ## Текущее Переходное Состояние
 
 Сейчас `app/src/Bootstrap.php` запускает application-owned Thesis DIC module
-для отдельного `HttpRuntime`. `RouterFactory` содержит демонстрационные health,
-Nominatim и OpenSearch routes и напрямую использует concrete adapters. Это
-разрешённый scaffold, но не эталон для новых business scenarios. Независимые
-`HttpRuntime`, `CliRuntime` и `WorkerRuntime` имеют отдельные DIC graphs; worker
-предоставляет управляемый run/control/status lifecycle.
+для отдельного `HttpRuntime`. Первый вертикальный slice
+`AddressRegistry/FindAddressById` проходит через transport DTO, MessageBus,
+capability-owned port и AMPHP PostgreSQL adapter. `RouterFactory` также содержит
+демонстрационные health, Nominatim и OpenSearch routes, напрямую использующие
+concrete adapters. Они остаются разрешённым scaffold, но не являются эталоном
+для новых business scenarios. Независимые `HttpRuntime`, `CliRuntime` и
+`WorkerRuntime` имеют отдельные DIC graphs; worker предоставляет управляемый
+run/control/status lifecycle.
 
-До появления parity replacement сохраняются:
+До появления остальных parity replacements сохраняются:
 
 - `GET /health/live`, `/health/startup` и `/health/ready` как ранний
   operational contract;
+- `POST /api/addresses/find-by-id` как первый текущий business contract;
 - `GET /geocode` и `GET /search` как временные integration probes;
 - typed runtime/integration settings из одного immutable environment snapshot;
 - HTTP resource lifecycle через Thesis DIC disposer-ы.
@@ -98,9 +102,9 @@ app/
 ```
 
 Имя первого module принято: `AddressRegistry`, namespace
-`App\Module\AddressRegistry`. Пока в нём нет executable business scenarios,
-создан только source-verifiable `MODULE.md`; пустые layer directories не
-добавляются до соответствующего vertical slice.
+`App\Module\AddressRegistry`. В нём реализован первый executable scenario
+`FindAddressById`; его source-verifiable карточка находится в `MODULE.md`.
+Пустые layer directories для будущих slices не добавляются заранее.
 
 `Database/Migration` принадлежит приложению. Имена миграций и SQL показывают
 module ownership, но отдельная таблица сама по себе не создаёт новый module.

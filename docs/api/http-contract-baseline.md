@@ -1,6 +1,6 @@
 # HTTP Contract Baseline
 
-- Версия baseline: `0.1.0`
+- Версия baseline: `0.2.0`
 - Дата: `2026-11-04`
 - Structural source: [OpenAPI 3.1](openapi.yaml)
 - Executable companion: [Postman collection](postman/geo-registry.postman_collection.json)
@@ -13,10 +13,10 @@ Baseline фиксирует публичное поведение, разреш�
 Исходные имена, идентификаторы и координаты в примерах заменены синтетическим
 двухрегиональным fixture проекта.
 
-Health operations со статусом `x-migration-status: current` уже обслуживаются
-целевым AMPHP runtime. Address operations со статусом `planned` являются целью
-parity и пока не маршрутизируются: запуск всей Postman collection против target
-до V1 ожидаемо не пройдёт. Переходные `/geocode` и `/search` не входят в
+Health operations и `POST /api/addresses/find-by-id` со статусом
+`x-migration-status: current` обслуживаются целевым AMPHP runtime. Остальные
+address operations со статусом `planned` являются целью следующих parity slices
+и пока не маршрутизируются. Переходные `/geocode` и `/search` не входят в
 публичный AddressRegistry contract.
 
 ## Правила Совместимости
@@ -35,9 +35,10 @@ parity и пока не маршрутизируются: запуск всей 
 - Empty/not-found для `find-by-id` — успешный ответ `200` с пустым массивом.
 - Malformed transport input возвращает `400`; отсутствующий suggest context —
   `422`; недоступность зависимого сервиса — `503` с route-specific error code.
-- Response examples не являются production data и не доказывают наличие route в
-  target. Исполняемость фиксируется только handler/contract test и карточкой
-  сценария в `MODULE.md`.
+- Response examples не являются production data и сами по себе не доказывают
+  наличие route в target. Исполняемость `find-by-id` подтверждают handler/
+  contract tests и карточка сценария в `MODULE.md`; остальные address examples
+  остаются baseline для следующих slices.
 
 ## Автоматическая Проверка
 

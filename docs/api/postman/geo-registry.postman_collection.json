@@ -2,7 +2,7 @@
     "info": {
         "_postman_id": "996a3909-6820-4e35-97f6-f9500c677529",
         "name": "Geo Registry HTTP Contract Baseline",
-        "description": "Executable companion to docs/api/openapi.yaml. Health requests target the current AMPHP runtime. Address requests preserve the accepted migration contract and become executable as V1-V4 are implemented. All examples use synthetic data.",
+        "description": "Executable companion to docs/api/openapi.yaml. Health and Find By Id target the current AMPHP runtime. Remaining address requests preserve the accepted migration contract and become executable as V2-V4 are implemented. All examples use synthetic data.",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "event": [
@@ -163,7 +163,7 @@
         },
         {
             "name": "Addresses",
-            "description": "Accepted legacy contract. These requests become live as the AMPHP vertical slices V1-V4 are completed.",
+            "description": "Accepted legacy contract. Find By Id is live in the AMPHP runtime; remaining requests become live as vertical slices V2-V4 are completed.",
             "item": [
                 {
                     "name": "Search",
@@ -390,7 +390,7 @@
                 },
                 {
                     "name": "Find By Id",
-                    "description": "OpenAPI operationId: findAddressById\nMigration status: planned; target slice V1.",
+                    "description": "OpenAPI operationId: findAddressById\nMigration status: current; implemented by slice V1.",
                     "event": [
                         {
                             "listen": "test",
@@ -417,7 +417,18 @@
                         },
                         "url": "{{baseUrl}}/api/addresses/find-by-id"
                     },
-                    "response": []
+                    "response": [
+                        {
+                            "name": "200 Found",
+                            "originalRequest": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\"query\":\"00000000-0000-4000-8000-000000770005\",\"limit\":5}"}, "url": "{{baseUrl}}/api/addresses/find-by-id"},
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [{"key": "Content-Type", "value": "application/json"}],
+                            "cookie": [],
+                            "body": "{\n  \"success\": true,\n  \"count\": 1,\n  \"query\": {\"query\": \"00000000-0000-4000-8000-000000770005\", \"limit\": 5},\n  \"suggestions\": [{\n    \"value\": \"Регион Альфа, г. Тестоград, ул. Общая, д. 10\",\n    \"unrestricted_value\": \"Регион Альфа, г. Тестоград, ул. Общая, д. 10\",\n    \"data\": {\"fias_id\": \"00000000-0000-4000-8000-000000770005\", \"fias_uuid\": \"00000000-0000-4000-8000-000000770005\", \"object_id\": 770005, \"object_guid\": \"00000000-0000-4000-8000-000000770005\", \"postal_code\": \"770001\", \"okato\": \"77001000000\", \"oktmo\": \"77001001000\", \"geo_lat\": 55.750001, \"geo_lon\": 37.610001, \"hierarchy_type\": \"adm\", \"level\": 8, \"score\": 1.0, \"search_backend\": \"postgres\", \"source\": \"gar\", \"source_id\": null, \"datamos_global_id\": null, \"unom\": null, \"nreg\": null, \"aliases\": [], \"alias_count\": 0, \"matched_alias\": null, \"adm_area\": null, \"district\": null, \"kad_n\": [], \"kad_zu\": []}\n  }],\n  \"meta\": {\"endpoint\": \"find-by-id\"}\n}"
+                        }
+                    ]
                 },
                 {
                     "name": "Reverse Geocode",

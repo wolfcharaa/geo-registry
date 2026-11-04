@@ -1,12 +1,13 @@
 openapi: 3.1.0
 info:
   title: Geo Registry HTTP API
-  version: 0.1.0
+  version: 0.2.0
   summary: Contract baseline for the Spiral-to-AMPHP migration
   description: |
-    Health operations describe the current AMPHP runtime. Address operations are
-    the accepted migration contract and are not routed by the target runtime yet.
-    The `x-migration-status` extension makes that distinction machine-readable.
+    Health operations and FindAddressById describe the current AMPHP runtime.
+    Remaining address operations are the accepted migration contract and are not
+    routed by the target runtime yet. The `x-migration-status` extension makes
+    that distinction machine-readable.
 servers:
   - url: http://127.0.0.1:8080
     description: Local development runtime
@@ -229,8 +230,8 @@ paths:
       operationId: findAddressById
       tags: [Addresses]
       summary: Find an address by a stable identifier
-      description: Accepted legacy contract; target AMPHP routing is planned for V1.
-      x-migration-status: planned
+      description: Current AMPHP V1 contract backed by the application PostgreSQL read model.
+      x-migration-status: current
       x-postman-folder: Addresses
       x-postman-request: Find By Id
       requestBody:
@@ -263,7 +264,7 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/AddressErrorResponse'}
               examples:
-                unavailable: {$ref: '#/components/examples/SearchUnavailable'}
+                unavailable: {$ref: '#/components/examples/FindByIdUnavailable'}
 
   /api/addresses/reverse-geocode:
     get:
@@ -664,6 +665,16 @@ components:
         meta: {endpoint: find-by-id}
         error: query must be a string.
         error_code: invalid_query
+
+    FindByIdUnavailable:
+      value:
+        success: false
+        count: 0
+        query: {query: '770005', limit: 20}
+        suggestions: []
+        meta: {endpoint: find-by-id}
+        error: Search service unavailable
+        error_code: search_unavailable
 
     ReverseGeocodeSuccess:
       value:
