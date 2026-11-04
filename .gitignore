@@ -1,5 +1,6 @@
 /.env
 /config/.env
+/config/release.postman_environment.json
 /app/.env
 /app/vendor/
 /app/var/

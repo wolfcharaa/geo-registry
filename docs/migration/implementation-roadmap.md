@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; W2 implementation complete, legacy queue cutover gate pending`
-- Версия документа: `0.58.0`
+- Статус: `Active; R1 executable gate ready, representative execution pending`
+- Версия документа: `0.59.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -970,7 +970,7 @@ Module class, а пользователи других DI/container решени
 - [x] Добавить Compose integration profile с ephemeral PostgreSQL/OpenSearch.
 - [x] Разделить `make check`, `make test-integration` и `make contract`; добавить
   отдельный CI contract job.
-- [ ] Добавить `make smoke-release` после принятия состава release smoke.
+- [x] Добавить `make smoke-release` после принятия состава release smoke.
 
 Готовность: пустой module skeleton не нужен; gates проверяют реальный scaffold,
 Testo suites запускаются отдельно, integration resources не используют dev
@@ -978,8 +978,7 @@ volumes.
 
 #### A1.R1 — Architecture И Executable Quality Gates
 
-- State: G1/G2-dependent часть A1 закрыта `2026-11-04`; A1 остаётся partial
-  только из-за состава release smoke.
+- State: completed `2026-11-04`; release smoke composition закрыта в R1.
 - `docs/architecture.md` стал целевым источником layer/runtime/data boundaries и
   явно отделяет transitional HTTP scaffold от placement нового business code.
 - Testo разделён на Unit, Scenario, Integration и Contract; fast gate запускает
@@ -997,7 +996,8 @@ volumes.
 - GitHub Actions разделён на `fast` и следующий после него `integration` job;
   CI вызывает те же Composer/Make entrypoints, что и local workflow.
 - `make contract` выполняет отдельную Contract suite для OpenAPI/Postman;
-  `make smoke-release` ждёт состав принятого release smoke.
+  `make smoke-release` запускает strict Postman mode pinned Newman image и
+  сохраняет JUnit/JSON artifacts вне repository.
 - `AddressRegistry/MODULE.md` версии 0.1.1 фиксирует ownership и отличает G2
   migration baseline от ещё отсутствующего executable module companion.
 
@@ -1510,7 +1510,7 @@ online queries читают только выбранный регион.
 
 ### R1 — Release Parity
 
-- [ ] Выполнить fast и real-service integration gates.
+- [x] Выполнить fast и real-service integration gates.
 - [ ] Выполнить full Nominatim/Postman smoke.
 - [ ] Проверить import -> read-model build -> OpenSearch rebuild -> API flow.
 - [ ] Сравнить find/search/suggest/reverse responses на representative dataset.
@@ -1519,6 +1519,23 @@ online queries читают только выбранный регион.
 
 Готовность: release candidate имеет воспроизводимые artifacts и не зависит от
 непроверенного legacy runtime behavior.
+
+Подготовлено:
+
+- [release-parity.md](release-parity.md) задаёт входные dataset/image manifests,
+  import -> regional build -> OpenSearch alias -> HTTP порядок, lifecycle
+  checks и явную матрицу legacy/AMPHP differences.
+- `make smoke-release` требует внешний representative Postman environment,
+  включает `releaseStrict=true` и запускает official Newman
+  `6.1.3-alpine` по multi-architecture manifest digest.
+- Strict collection не принимает degraded/`503`, empty success или скрытый
+  PostgreSQL fallback: health components должны быть `ok`, один GAR identity
+  обязан совпасть в search/find/reverse, search обязан доказать OpenSearch hit.
+- JUnit/JSON report пишется в configurable artifact directory. Dataset import,
+  Nominatim readiness, legacy queue drain и operator approval не объявляются
+  выполненными самим read-only runner.
+- На revision текущего slice пройдены Fast `81/366`, Contract `12/227` и real
+  PostgreSQL/OpenSearch Integration `14/209` gates.
 
 ### R2 — Cutover И Cleanup
 
@@ -1599,9 +1616,10 @@ gate. C1 добавил CLI-only XMLReader/COPY importer с operation checkpoint
 partitioned projection с parity gate и atomic cutover. C3 добавил native async
 OpenSearch blue-green rebuild, atomic alias cutover и отдельную cleanup
 operation. W1 application worker runtime и W2 coordinate enrichment
-реализованы. До release parity остаётся операторский gate старых RoadRunner
-queues; E1 Data.Mos/OSM extensions остаются deferred до отдельного подтверждения
-scope.
+реализованы. R1 получил pinned strict Postman runner и operator runbook; фактический
+full Nominatim/import/rebuild/legacy comparison и gate старых RoadRunner queues
+остаются release execution. E1 Data.Mos/OSM extensions остаются deferred до
+отдельного подтверждения scope.
 JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
@@ -1611,6 +1629,17 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.59.0 — 2026-11-04
+
+- закрыт A1 entrypoint `make smoke-release` на pinned official Newman image;
+- Postman collection получила отдельный strict release mode для health,
+  representative address identity и обязательного OpenSearch hit;
+- добавлен operator runbook полного import/rebuild/API/lifecycle потока и
+  матрица legacy/AMPHP differences;
+- пройдены Fast `81/366`, Contract `12/227` и Integration `14/209` gates;
+- фактические full Nominatim, representative dataset и RoadRunner drain gates
+  оставлены открытыми до появления release evidence.
 
 ### 0.58.0 — 2026-11-04
 

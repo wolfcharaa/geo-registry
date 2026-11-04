@@ -169,12 +169,18 @@ make worker-restart  # запросить restart через control plane
 make worker-logs     # следить за логами обоих worker services
 make worker-down     # остановить оба worker services
 make smoke    # проверить запущенный HTTP service
+make smoke-release POSTMAN_ENVIRONMENT=config/release.postman_environment.json # strict Postman parity
 make down     # остановить без удаления volumes
 ```
 
 Порядок перехода со старых RoadRunner/BoltDB queues и rollback описан в
 [worker-cutover.md](docs/migration/worker-cutover.md). Файлы старых queues нельзя
 удалять до подтверждённого нулевого остатка и завершения rollback window.
+Подготовка representative GAR/Nominatim dataset, rebuild проекций, строгий
+Postman gate и матрица сравнения legacy/AMPHP описаны в
+[release-parity.md](docs/migration/release-parity.md). `make smoke-release`
+записывает JUnit/JSON artifacts в `/tmp` по умолчанию и не подменяет фактический
+import, queue drain или operator approval.
 
 Команды `migrate:*` входят только в `CliRuntime` и используют `DATABASE_DSN`.
 Они работают через blocking PDO и не включаются в HTTP/worker DIC graphs. База

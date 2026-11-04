@@ -25,6 +25,7 @@ use function str_replace;
 use function str_starts_with;
 use function strtoupper;
 use function substr;
+use function substr_count;
 
 use Symfony\Component\Yaml\Yaml;
 use Testo\Assert;
@@ -131,6 +132,7 @@ final class HttpContractArtifactsTest
 
         Assert::same($environmentValues['baseUrl'] ?? null, 'http://127.0.0.1:8080');
         Assert::same($environmentValues['addressId'] ?? null, '00000000-0000-4000-8000-000000770005');
+        Assert::same($environmentValues['releaseStrict'] ?? null, 'false');
 
         $artifacts = implode("\n", [
             self::read(self::OPENAPI),
@@ -152,6 +154,14 @@ final class HttpContractArtifactsTest
         ] as $forbiddenValue) {
             Assert::false(str_contains($artifacts, $forbiddenValue));
         }
+    }
+
+    public function testReleaseCollectionHasStrictAssertions(): void
+    {
+        $collection = self::read(self::COLLECTION);
+        Assert::same(substr_count($collection, "pm.variables.get('releaseStrict') === 'true'"), 9);
+        Assert::true(str_contains($collection, "suggestion.data.search_backend === 'opensearch'"));
+        Assert::true(str_contains($collection, "suggestion.data.fias_id === pm.variables.get('addressId')"));
     }
 
     /** @return array<array-key, mixed> */

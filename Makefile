@@ -120,6 +120,15 @@ smoke: ## Probe the running HTTP service and its integrations
 	APP_BASE_URL=$${APP_BASE_URL:-http://127.0.0.1:$${APP_PORT:-8080}} docker/scripts/smoke-check.sh
 .PHONY: smoke
 
+smoke-release: guard-user ## Run strict executable Postman parity against prepared release data
+	POSTMAN_COLLECTION="$(POSTMAN_COLLECTION)" \
+		POSTMAN_ENVIRONMENT="$(POSTMAN_ENVIRONMENT)" \
+		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
+		RELEASE_RUN_NAME="$(RELEASE_RUN_NAME)" \
+		POSTMAN_BASE_URL=$${POSTMAN_BASE_URL:-http://host.docker.internal:$${APP_PORT:-8080}} \
+		docker/scripts/run-release-smoke.sh
+.PHONY: smoke-release
+
 help:
 	@awk 'BEGIN {FS=":.*?## "} /^[a-zA-Z0-9_-]+:.*## / {printf "%-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 .PHONY: help

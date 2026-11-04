@@ -1,6 +1,6 @@
 # HTTP Contract Baseline
 
-- Версия baseline: `0.6.0`
+- Версия baseline: `0.7.0`
 - Дата: `2026-11-04`
 - Structural source: [OpenAPI 3.1](openapi.yaml)
 - Executable companion: [Postman collection](postman/geo-registry.postman_collection.json)
@@ -59,3 +59,10 @@ schema и examples у JSON responses, отсутствие dangling schema refer
 соответствие method/path между OpenAPI и Postman, полное покрытие операций и
 отсутствие запрещённых legacy-значений. `make contract` запускает этот gate без
 внешних сервисов.
+
+Обычный executable contract допускает документированные optional dependency
+outage и PostgreSQL fallback. Release runner передаёт `releaseStrict=true` и
+дополнительно требует полностью готовые зависимости, непустые representative
+результаты, один согласованный GAR identity для search/find/reverse и реальный
+OpenSearch hit. Подготовка dataset и полный порядок проверки описаны в
+[release parity runbook](../migration/release-parity.md).

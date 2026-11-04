@@ -77,6 +77,11 @@
                                     "    });",
                                     "    if (body.status === 'unavailable') { pm.response.to.have.status(503); }",
                                     "    if (body.status !== 'unavailable') { pm.response.to.have.status(200); }",
+                                    "    if (pm.variables.get('releaseStrict') === 'true') {",
+                                    "        pm.response.to.have.status(200);",
+                                    "        pm.expect(body.status).to.eql('ok');",
+                                    "        pm.expect(body.components.every(function (component) { return component.status === 'ok'; })).to.eql(true);",
+                                    "    }",
                                     "});"
                                 ]
                             }
@@ -126,6 +131,10 @@
                                     "    pm.expect(body).not.to.have.property('components');",
                                     "    if (body.status === 'ok') { pm.response.to.have.status(200); }",
                                     "    if (body.status === 'unavailable') { pm.response.to.have.status(503); }",
+                                    "    if (pm.variables.get('releaseStrict') === 'true') {",
+                                    "        pm.response.to.have.status(200);",
+                                    "        pm.expect(body.status).to.eql('ok');",
+                                    "    }",
                                     "});"
                                 ]
                             }
@@ -180,6 +189,13 @@
                                     "    pm.expect(body).to.have.all.keys('success', 'count', 'query', 'suggestions', 'meta', ...(body.success ? [] : ['error', 'error_code']));",
                                     "    pm.expect(body.suggestions).to.be.an('array');",
                                     "    pm.expect(body.meta.endpoint).to.eql('search');",
+                                    "    if (pm.variables.get('releaseStrict') === 'true') {",
+                                    "        pm.response.to.have.status(200);",
+                                    "        pm.expect(body.success).to.eql(true);",
+                                    "        pm.expect(body.suggestions).not.to.be.empty;",
+                                    "        pm.expect(body.suggestions.some(function (suggestion) { return suggestion.data && suggestion.data.fias_id === pm.variables.get('addressId'); })).to.eql(true);",
+                                    "        pm.expect(body.suggestions.some(function (suggestion) { return suggestion.data && suggestion.data.search_backend === 'opensearch'; })).to.eql(true);",
+                                    "    }",
                                     "});"
                                 ]
                             }
@@ -256,6 +272,11 @@
                                     "    pm.expect(body.suggestions).to.be.an('array');",
                                     "    pm.expect(body.meta.endpoint).to.eql('suggest');",
                                     "    pm.expect(body.meta.contract_version).to.eql(2);",
+                                    "    if (pm.variables.get('releaseStrict') === 'true') {",
+                                    "        pm.response.to.have.status(200);",
+                                    "        pm.expect(body.success).to.eql(true);",
+                                    "        pm.expect(body.suggestions).not.to.be.empty;",
+                                    "    }",
                                     "});"
                                 ]
                             }
@@ -298,6 +319,11 @@
                                     "    const body = pm.response.json();",
                                     "    pm.expect(body.suggestions).to.be.an('array');",
                                     "    pm.expect(body.meta.contract_version).to.eql(2);",
+                                    "    if (pm.variables.get('releaseStrict') === 'true') {",
+                                    "        pm.response.to.have.status(200);",
+                                    "        pm.expect(body.success).to.eql(true);",
+                                    "        pm.expect(body.suggestions).not.to.be.empty;",
+                                    "    }",
                                     "});"
                                 ]
                             }
@@ -340,6 +366,11 @@
                                     "    const body = pm.response.json();",
                                     "    pm.expect(body.suggestions).to.be.an('array');",
                                     "    pm.expect(body.meta.contract_version).to.eql(2);",
+                                    "    if (pm.variables.get('releaseStrict') === 'true') {",
+                                    "        pm.response.to.have.status(200);",
+                                    "        pm.expect(body.success).to.eql(true);",
+                                    "        pm.expect(body.suggestions).not.to.be.empty;",
+                                    "    }",
                                     "});"
                                 ]
                             }
@@ -382,6 +413,10 @@
                                     "    const body = pm.response.json();",
                                     "    pm.expect(body.success).to.eql(false);",
                                     "    if (pm.response.code === 422) { pm.expect(body.error_code).to.eql('suggestion_context_not_found'); }",
+                                    "    if (pm.variables.get('releaseStrict') === 'true') {",
+                                    "        pm.response.to.have.status(422);",
+                                    "        pm.expect(body.error_code).to.eql('suggestion_context_not_found');",
+                                    "    }",
                                     "});"
                                 ]
                             }
@@ -424,6 +459,12 @@
                                     "    const body = pm.response.json();",
                                     "    pm.expect(body.suggestions).to.be.an('array');",
                                     "    pm.expect(body.meta.endpoint).to.eql('find-by-id');",
+                                    "    if (pm.variables.get('releaseStrict') === 'true') {",
+                                    "        pm.response.to.have.status(200);",
+                                    "        pm.expect(body.success).to.eql(true);",
+                                    "        pm.expect(body.suggestions).not.to.be.empty;",
+                                    "        pm.expect(body.suggestions.some(function (suggestion) { return suggestion.data && suggestion.data.fias_id === pm.variables.get('addressId'); })).to.eql(true);",
+                                    "    }",
                                     "});"
                                 ]
                             }
@@ -466,6 +507,12 @@
                                     "    const body = pm.response.json();",
                                     "    pm.expect(body.suggestions).to.be.an('array');",
                                     "    pm.expect(body.meta.endpoint).to.eql('reverse-geocode');",
+                                    "    if (pm.variables.get('releaseStrict') === 'true') {",
+                                    "        pm.response.to.have.status(200);",
+                                    "        pm.expect(body.success).to.eql(true);",
+                                    "        pm.expect(body.suggestions).not.to.be.empty;",
+                                    "        pm.expect(body.suggestions.some(function (suggestion) { return suggestion.data && suggestion.data.fias_id === pm.variables.get('addressId'); })).to.eql(true);",
+                                    "    }",
                                     "});"
                                 ]
                             }
