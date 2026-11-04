@@ -33,6 +33,7 @@ final class MigrationHistoryContract
         M260904010000CreateAddressAliases::class,
         M261104000000AddAddressSearchRegionCode::class,
         M261104010000CreateGarImportOperations::class,
+        M261104020000CreateAddressSearchRebuildOperations::class,
     ];
 
     private function __construct() {}

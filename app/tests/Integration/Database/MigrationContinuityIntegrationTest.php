@@ -48,6 +48,8 @@ SELECT
     to_regclass('public.idx_address_search_region_hierarchy')::text AS region_index,
     to_regclass('public.gar_import_operations')::text AS import_operations,
     to_regclass('public.gar_import_files')::text AS import_files,
+    to_regclass('public.address_search_rebuild_operations')::text AS rebuild_operations,
+    to_regclass('public.address_search_rebuild_regions')::text AS rebuild_regions,
     (
         SELECT is_generated
         FROM information_schema.columns
@@ -69,6 +71,8 @@ SQL)->fetchRow();
             Assert::same($schema['region_generated'] ?? null, 'ALWAYS');
             Assert::same($schema['import_operations'] ?? null, 'gar_import_operations');
             Assert::same($schema['import_files'] ?? null, 'gar_import_files');
+            Assert::same($schema['rebuild_operations'] ?? null, 'address_search_rebuild_operations');
+            Assert::same($schema['rebuild_regions'] ?? null, 'address_search_rebuild_regions');
 
             $extensions = [];
             $result = $pool->query(

@@ -81,6 +81,9 @@ final readonly class CliRuntimeModule implements Module
         $application->call('addCommand', [
             $dic->import(new GarImportCliModule($postgresConfig)),
         ]);
+        $application->call('addCommand', [
+            $dic->import(new AddressSearchRebuildCliModule($postgresConfig)),
+        ]);
 
         return $dic
             ->object(CliRuntime::class)

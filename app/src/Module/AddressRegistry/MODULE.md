@@ -1,6 +1,6 @@
 ---
 module: AddressRegistry
-version: 0.7.0
+version: 0.8.0
 updated: 2026-11-04
 language: ru
 ---
@@ -15,8 +15,8 @@ language: ru
 Модуль не владеет HTTP runtime, lifecycle PostgreSQL, Nominatim и OpenSearch.
 Canonical GAR tables остаются источником истины, а online-сценарии читают
 application-owned `address_search` и связанные иерархии через capability ports.
-Модуль также владеет состоянием CLI-операций импорта; физическая перестройка
-partitioned projection остаётся отдельным следующим сценарием.
+Модуль также владеет состоянием CLI-операций импорта и перестройки производной
+региональной projection. Эти blocking adapters доступны только в CLI runtime.
 
 - **Postman collection:** [HTTP-контракты модуля](../../../../docs/api/postman/geo-registry.postman_collection.json).
 
@@ -90,6 +90,71 @@ exit code `1`.
   импортёр или его blocking `ext-pgsql` connection.
 - Runtime обязан иметь `ext-xmlreader` и `ext-pgsql`; перед импортом должны быть
   применены migrations, создающие canonical GAR и operation tables.
+
+## Перестройка Региональной Проекции
+
+### Shadow rebuild — `Capability/RebuildAddressSearch`
+
+Оператор пересобирает `address_search` из активных административной и
+муниципальной GAR hierarchies. Новый physical parent и его LIST partitions
+строятся рядом с active table, поэтому online search не видит частичных batches.
+
+**Правила**
+
+- `address_search_rebuild_operations` хранит фазу операции, benchmark counters
+  и parity result; `address_search_rebuild_regions` хранит атомарный checkpoint
+  для каждой пары `(region_code, hierarchy_type)`.
+- Верхняя граница hierarchy id фиксируется в начале operation. Запись batch и
+  продвижение checkpoint выполняются одной PostgreSQL-транзакцией.
+- Shadow parent разделён `PARTITION BY LIST(region_code)`; unique/primary keys
+  включают partition key. Региональный predicate online query обеспечивает
+  partition pruning до ranking.
+- После build создаются read indexes, выполняется `ANALYZE`, затем проверяются
+  завершённость source checkpoints, пропущенные documents, duplicates и
+  некорректные region codes. Cutover запрещён при любой ошибке parity.
+- `--build-only` оставляет проверенную operation в `ready`, не меняя active
+  table. Следующий запуск продолжает её и выполняет atomic rename под
+  `ACCESS EXCLUSIVE` lock; interruption до switch не влияет на online reads.
+- `--restart` помечает незавершённую operation `abandoned`, удаляет только её
+  shadow table и начинает новый snapshot. Advisory lock допускает один rebuild.
+- После успешного switch прежняя physical table удаляется; если процесс
+  завершится между commit и cleanup, новый active parent уже однозначно выбран,
+  а оставшаяся previous table не участвует в read path.
+- Время build, scanned/written rows и physical row count сохраняются как
+  benchmark baseline. Canonical GAR partitioning остаётся запрещённым без
+  отдельного production-like сравнения этого baseline и query plans.
+
+**Параметры запуска**
+
+- `--batch-size` — число hierarchy rows в одном transaction batch; default
+  `50000`, допустимый диапазон `1..1000000`.
+- `--build-only` — завершить indexes/parity и остановиться в `ready` до cutover.
+- `--restart` — отказаться от существующего checkpoint и построить новый shadow.
+
+**Справка с хоста**
+
+```shell
+docker/compose/dev.sh run --rm --no-deps app php bin/console gar:address-search:rebuild --help
+```
+
+**Справка внутри runtime-контекста**
+
+```shell
+php bin/console gar:address-search:rebuild --help
+```
+
+**Результат запуска**
+
+Команда печатает status, operation id, progress region/hierarchy tasks,
+scanned/written rows, итоговый physical row count, elapsed milliseconds и
+признак resume. Ошибка возвращает exit code `1`, active table не переключается.
+
+**Подключение/условие**
+
+- `AddressSearchRebuildCliModule` подключён только к `CliRuntimeModule`;
+  HTTP/worker graphs и MessageBus registry не содержат blocking rebuild adapter.
+- Перед запуском применяются migrations и загружаются canonical GAR tables.
+  PostgreSQL runtime обязан предоставлять `pg_trgm` и `ext-pgsql`.
 
 ## Поиск И Идентификация Адреса
 
@@ -175,9 +240,9 @@ HTTP-клиент последовательно выбирает админис
 **Подключение/условие**
 
 - Runtime обязан зарегистрировать parent и все три nested bindings в одном
-  MessageBus registry. Физический LIST partition cutover и shadow rebuild
-  остаются gate этапа C2; текущая граница использует индексированный
-  `address_search.region_code`.
+  MessageBus registry. После C2 active `address_search` является LIST-partitioned
+  projection, поэтому обязательный downstream `region_code` выбирает одну
+  physical partition до построения candidate set.
 
 ### Определение регионального parent context — `Capability/ResolveSuggestionContext`
 

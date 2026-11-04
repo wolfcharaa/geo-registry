@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; C1 GAR XML import complete, C2 regional read model next`
-- Версия документа: `0.54.0`
+- Статус: `Active; C2 regional read model complete, C3 OpenSearch rebuild next`
+- Версия документа: `0.55.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -1313,7 +1313,7 @@ PostgreSQL остаётся корректным fallback и source of truth.
   `0 violations / 0 uncovered`; Contract gate: `11 tests / 222 assertions`;
   Integration gate на PHP 8.4/PostgreSQL 17/OpenSearch:
   `9 tests / 66 assertions`.
-- Следующий vertical slice — C2 regional `address_search` rebuild.
+- Следующий vertical slice — C3 OpenSearch blue-green rebuild.
 
 ## Wave 6 — CLI Data Pipeline
 
@@ -1350,14 +1350,39 @@ PostgreSQL остаётся корректным fallback и source of truth.
 
 ### C2 — Regional `address_search` Rebuild
 
-- [ ] Реализовать shadow rebuild и progress state по region batches.
-- [ ] Создать partitioned read model по `region_code` новой migration.
-- [ ] Добавить integrity/parity checks до переключения read path.
-- [ ] Сохранить benchmark gate перед изменением canonical GAR tables.
-- [ ] Проверить recovery после прерывания между build и switch.
+- [x] Реализовать shadow rebuild и progress state по region batches.
+- [x] Создать partitioned read model по `region_code` новой migration.
+- [x] Добавить integrity/parity checks до переключения read path.
+- [x] Сохранить benchmark gate перед изменением canonical GAR tables.
+- [x] Проверить recovery после прерывания между build и switch.
 
 Готовность: search/suggest read model пересобирается без долгого partial state,
 online queries читают только выбранный регион.
+
+Реализовано:
+
+- `gar:address-search:rebuild` переносит проверенную v6 последовательность
+  prepare/build/index/parity/switch в отдельный blocking CLI capability без
+  MessageBus handler.
+- Operation snapshot разбит на `(region_code, hierarchy_type)` tasks с
+  зафиксированным maximum hierarchy id; каждый data batch и checkpoint
+  коммитятся атомарно и возобновляются после failure.
+- Shadow parent использует `LIST(region_code)`, отдельные physical partitions и
+  composite uniqueness с partition key. Тяжёлый denormalization SQL заранее
+  схлопывает active versions и сохраняет enrichment active projection.
+- `--build-only` доказывает recovery в границе между build и switch: active
+  table остаётся обычной, ready shadow — partitioned; повторный запуск выполняет
+  один atomic cutover и удаляет previous table после commit.
+- Parity блокирует switch при незавершённых checkpoints, пропущенных source
+  documents, duplicates или некорректном регионе. `ANALYZE` выполняется до
+  cutover, а integration `EXPLAIN` подтверждает чтение только partition 77.
+- Operation сохраняет elapsed milliseconds, scanned/written и physical rows как
+  benchmark baseline. Решение о canonical GAR partitioning остаётся отдельным и
+  требует production-like evidence.
+- Fast gate: Testo `69 tests / 313 assertions`, PHPStan max, Deptrac
+  `0 violations / 0 uncovered`; Contract gate: `11 tests / 222 assertions`;
+  Integration gate на PHP 8.4/PostgreSQL 17/OpenSearch:
+  `11 tests / 121 assertions`.
 
 ### C3 — OpenSearch Blue-Green Rebuild
 
@@ -1493,8 +1518,9 @@ V3 реализовал current staged `SuggestAddress`, nested MessageBus orche
 typed Nominatim boundary и GAR match через public `SearchAddress`. V5 подключил
 optional OpenSearch decorator с PostgreSQL fallback и real regional mapping
 gate. C1 добавил CLI-only XMLReader/COPY importer с operation checkpoints и
-проверенным partial-file recovery. Следующий slice — C2 regional
-`address_search` rebuild.
+проверенным partial-file recovery. C2 перенёс shadow rebuild в регионально
+partitioned projection с parity gate и atomic cutover. Следующий slice — C3
+OpenSearch blue-green rebuild.
 JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
@@ -1504,6 +1530,16 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.55.0 — 2026-11-04
+
+- завершён C2 CLI-only regional `address_search` shadow rebuild;
+- добавлены operation/region checkpoints, bounded batches и LIST partitions по
+  `region_code` без изменения canonical GAR tables;
+- indexes, integrity/parity, `build-only` recovery и atomic cutover проверены на
+  PostgreSQL 17, включая реальный partition-pruning plan;
+- build counters сохранены как benchmark gate; следующий slice — C3 OpenSearch
+  blue-green rebuild.
 
 ### 0.54.0 — 2026-11-04
 
