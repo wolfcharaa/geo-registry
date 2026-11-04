@@ -59,6 +59,6 @@ final class CliRuntimeModuleTest
         );
 
         Assert::same($exitCode, 0);
-        Assert::true(str_contains($output->fetch(), 'bindings=2 source_hash='));
+        Assert::true(str_contains($output->fetch(), 'bindings=6 source_hash='));
     }
 }

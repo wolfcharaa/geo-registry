@@ -35,6 +35,9 @@ use App\Module\AddressRegistry\UserInterface\Http\FindAddressById\FindAddressByI
 use App\Module\AddressRegistry\UserInterface\Http\SearchAddress\SearchAddressAction;
 use App\Module\AddressRegistry\UserInterface\Http\SearchAddress\SearchAddressPresenter;
 use App\Module\AddressRegistry\UserInterface\Http\SearchAddress\SearchAddressRequestMapper;
+use App\Module\AddressRegistry\UserInterface\Http\SuggestAddress\SuggestAddressAction;
+use App\Module\AddressRegistry\UserInterface\Http\SuggestAddress\SuggestAddressPresenter;
+use App\Module\AddressRegistry\UserInterface\Http\SuggestAddress\SuggestAddressRequestMapper;
 use App\UserInterface\Http\CorrelationMiddleware;
 use App\UserInterface\Http\RouterFactory;
 use Monolog\Logger;
@@ -196,6 +199,19 @@ final readonly class HttpRuntimeModule implements Module
                 'messageBus' => $messageBus,
                 'timeoutSeconds' => $httpConfig->timeoutSeconds,
             ]);
+        $suggestAddressRequestMapper = $dic
+            ->object(SuggestAddressRequestMapper::class)
+            ->arg('validator', $validator);
+        $suggestAddress = $dic
+            ->object(SuggestAddressAction::class)
+            ->args([
+                'requestMapper' => $suggestAddressRequestMapper,
+                'presenter' => $dic
+                    ->object(SuggestAddressPresenter::class)
+                    ->arg('documents', $suggestionPresenter),
+                'messageBus' => $messageBus,
+                'timeoutSeconds' => $httpConfig->timeoutSeconds,
+            ]);
         $routerFactory = $dic
             ->object(RouterFactory::class)
             ->args([
@@ -207,6 +223,7 @@ final readonly class HttpRuntimeModule implements Module
                 'correlationMiddleware' => $correlationMiddleware,
                 'findAddressById' => $findAddressById,
                 'searchAddress' => $searchAddress,
+                'suggestAddress' => $suggestAddress,
             ]);
 
         return $dic

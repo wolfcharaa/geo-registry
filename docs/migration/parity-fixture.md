@@ -1,8 +1,8 @@
 # Target-Owned Parity Fixture
 
-- Версия: `1`
-- SHA-256: `35cd4f6215519a5777613f5bdb8b6ea8665a2a3335535a71c2c2f7ec57cf122c`
-- Source: `app/tests/Fixture/Database/address-registry-v1.sql`
+- Версия: `2`
+- SHA-256: `af1ed6992f1c772ae23985c71e06f33e4bbf66f05a647524986dc92e4e2a15b8`
+- Source: `app/tests/Fixture/Database/address-registry-v2.sql`
 - Scope: deterministic integration data, не production seed
 
 ## Назначение
@@ -23,9 +23,9 @@ OpenSearch adapters, `find-by-id`, search ranking и staged suggest без по�
 | Дом | `10` / `770005` | `10` / `780005` | UUID lookup и полный hierarchy path |
 
 Объект `770006` (`ул. Старая`) присутствует в canonical tables как неактивный,
-но намеренно отсутствует в `address_search`. Для улиц и домов существуют
-отдельные `adm` и `mun` документы. Это позволяет проверять hierarchy selection,
-не смешивая её с региональной фильтрацией.
+но намеренно отсутствует в `address_search`. Для всех активных уровней существуют
+отдельные `adm` и `mun` документы. Это позволяет проверять staged hierarchy
+selection и региональную фильтрацию на одной projection.
 
 ## Lifecycle
 

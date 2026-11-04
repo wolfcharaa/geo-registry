@@ -10,8 +10,8 @@ use Throwable;
 
 final class AddressRegistryParityFixture
 {
-    public const VERSION = '1';
-    public const CHECKSUM = '35cd4f6215519a5777613f5bdb8b6ea8665a2a3335535a71c2c2f7ec57cf122c';
+    public const VERSION = '2';
+    public const CHECKSUM = 'af1ed6992f1c772ae23985c71e06f33e4bbf66f05a647524986dc92e4e2a15b8';
 
     private const STATEMENT_SEPARATOR = "\n-- fixture-statement\n";
 
@@ -58,7 +58,7 @@ SQL);
 
     private static function source(): string
     {
-        $sql = file_get_contents(dirname(__DIR__, 2) . '/Fixture/Database/address-registry-v1.sql');
+        $sql = file_get_contents(dirname(__DIR__, 2) . '/Fixture/Database/address-registry-v2.sql');
         if (!is_string($sql)) {
             throw new RuntimeException('Unable to read the address registry parity fixture.');
         }

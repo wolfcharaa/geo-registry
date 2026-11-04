@@ -24,7 +24,7 @@ final class AddressRegistryParityFixtureIntegrationTest
             IntegrationDatabase::runMigrationCommand($dsn, 'migrate:up', ['--force-yes' => true]);
             AddressRegistryParityFixture::load($pool);
 
-            Assert::same(AddressRegistryParityFixture::VERSION, '1');
+            Assert::same(AddressRegistryParityFixture::VERSION, '2');
             Assert::same(AddressRegistryParityFixture::checksum(), AddressRegistryParityFixture::CHECKSUM);
 
             $counts = $pool->query(<<<'SQL'
@@ -39,8 +39,8 @@ SQL)->fetchRow();
             Assert::notNull($counts);
             Assert::same((int) ($counts['canonical_objects'] ?? -1), 11);
             Assert::same((int) ($counts['active_objects'] ?? -1), 10);
-            Assert::same((int) ($counts['search_documents'] ?? -1), 14);
-            Assert::same((int) ($counts['indexed_documents'] ?? -1), 14);
+            Assert::same((int) ($counts['search_documents'] ?? -1), 20);
+            Assert::same((int) ($counts['indexed_documents'] ?? -1), 20);
             Assert::same((int) ($counts['municipal_nodes'] ?? -1), 10);
 
             $regionalHierarchy = [];

@@ -1,6 +1,6 @@
 # Архитектура Geo Registry
 
-- Версия документа: `0.4.0`
+- Версия документа: `0.5.0`
 - Обновлено: `2026-11-04`
 - Статус: `Target architecture; scaffold is transitional`
 - План миграции: [migration/implementation-roadmap.md](migration/implementation-roadmap.md)
@@ -43,9 +43,11 @@ boundary, а не четвёртым business layer. Обязательный `D
 
 Сейчас `app/src/Bootstrap.php` запускает application-owned Thesis DIC module
 для отдельного `HttpRuntime`. Первые vertical slices
-`AddressRegistry/FindAddressById` и `AddressRegistry/SearchAddress` проходят
-через transport DTO, MessageBus, capability-owned ports и AMPHP PostgreSQL
-adapters. `RouterFactory` также содержит
+`AddressRegistry/FindAddressById`, `AddressRegistry/SearchAddress` и staged
+`AddressRegistry/SuggestAddress` проходят через transport DTO, MessageBus,
+capability-owned ports и AMPHP PostgreSQL adapters. Suggest parent orchestration
+вызывает context/administrative/thoroughfare scenarios только через nested
+MessageBus dispatch. `RouterFactory` также содержит
 демонстрационные health, Nominatim и OpenSearch routes, напрямую использующие
 concrete adapters. Они остаются разрешённым scaffold, но не являются эталоном
 для новых business scenarios. Независимые `HttpRuntime`, `CliRuntime` и
@@ -58,6 +60,8 @@ run/control/status lifecycle.
   operational contract;
 - `POST /api/addresses/find-by-id` как первый текущий business contract;
 - `GET /api/addresses/search` как текущий region-aware business contract;
+- `POST /api/addresses/suggest` как текущий staged region-aware business
+  contract;
 - `GET /geocode` и `GET /search` как временные integration probes;
 - typed runtime/integration settings из одного immutable environment snapshot;
 - HTTP resource lifecycle через Thesis DIC disposer-ы.

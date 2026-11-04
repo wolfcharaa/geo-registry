@@ -1,13 +1,13 @@
 openapi: 3.1.0
 info:
   title: Geo Registry HTTP API
-  version: 0.3.0
+  version: 0.4.0
   summary: Contract baseline for the Spiral-to-AMPHP migration
   description: |
-    Health, FindAddressById, and SearchAddress describe the current AMPHP
-    runtime. Remaining address operations are the accepted migration contract
-    and are not routed by the target runtime yet. The `x-migration-status`
-    extension makes that distinction machine-readable.
+    Health, FindAddressById, SearchAddress, and SuggestAddress describe the
+    current AMPHP runtime. Remaining address operations are the accepted
+    migration contract and are not routed by the target runtime yet. The
+    `x-migration-status` extension makes that distinction machine-readable.
 servers:
   - url: http://127.0.0.1:8080
     description: Local development runtime
@@ -170,8 +170,8 @@ paths:
       operationId: suggestAddresses
       tags: [Addresses]
       summary: Progress through an address hierarchy
-      description: Accepted legacy contract; target AMPHP routing is planned for V3.
-      x-migration-status: planned
+      description: Current AMPHP V3 contract backed by nested MessageBus capabilities and a regional PostgreSQL read path.
+      x-migration-status: current
       x-postman-folder: Addresses
       x-postman-request: Suggest City
       requestBody:
@@ -560,13 +560,13 @@ components:
     SuggestSuccess:
       value:
         success: true
-        count: 1
+        count: 2
         query:
           exact: ''
           suggest: Тестоград
           stage: administrative_area
           hierarchy: mun
-          parent_id: 770001
+          parent_id: null
           count: 5
         suggestions:
           - value: г. Тестоград
@@ -586,13 +586,36 @@ components:
                 district: {object_id: 770002, name: Центральный}
               next_stage: thoroughfare
               ready_for_search: false
+          - value: г. Тестоград
+            unrestricted_value: г. Тестоград
+            data:
+              fias_id: 00000000-0000-4000-8000-000000780003
+              fias_uuid: 00000000-0000-4000-8000-000000780003
+              object_id: 780003
+              object_guid: 00000000-0000-4000-8000-000000780003
+              name: Тестоград
+              hierarchy_type: mun
+              level: 5
+              district: Центральный
+              context:
+                parent_id: 780003
+                hierarchy: mun
+                district: {object_id: 780002, name: Центральный}
+              next_stage: thoroughfare
+              ready_for_search: false
         meta: {endpoint: suggest, contract_version: 2, stage: administrative_area}
 
     InvalidStage:
       value:
         success: false
         count: 0
-        query: {}
+        query:
+          exact: ''
+          suggest: Общая
+          stage: unknown
+          hierarchy: mun
+          parent_id: null
+          count: 5
         suggestions: []
         meta: {endpoint: suggest, contract_version: 2}
         error: Unsupported suggestion stage.
@@ -603,10 +626,11 @@ components:
         success: false
         count: 0
         query:
+          exact: ''
           suggest: Общая
           stage: thoroughfare
           hierarchy: mun
-          context: {parent_id: 999999999}
+          parent_id: 999999999
           count: 5
         suggestions: []
         meta: {endpoint: suggest, contract_version: 2}
@@ -617,7 +641,13 @@ components:
       value:
         success: false
         count: 0
-        query: {}
+        query:
+          exact: ''
+          suggest: Тестоград
+          stage: administrative_area
+          hierarchy: mun
+          parent_id: null
+          count: 5
         suggestions: []
         meta: {endpoint: suggest, contract_version: 2}
         error: Suggestion service unavailable

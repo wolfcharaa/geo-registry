@@ -1,8 +1,8 @@
 # План переноса Geo Registry со Spiral на AMPHP
 
 - Статус: `Architecture agreed; implementation roadmap active`
-- Версия документа: `0.2.0`
-- Обновлено: `2026-11-01`
+- Версия документа: `0.3.0`
+- Обновлено: `2026-11-04`
 - Исходное приложение: `phpfiasgeocoder`
 - Целевое приложение: `geo-registry`
 - Детальный порядок работ: [implementation-roadmap.md](implementation-roadmap.md)
@@ -383,12 +383,12 @@ heartbeat, recovery/control plane и worker CLI вынесены в отдель
 | Сценарий | Ownership | Runtime | Исходный контракт | Статус |
 | --- | --- | --- | --- | --- |
 | Health live/ready | Application | HTTP | `/health/live`, `/health/ready` | Foundation |
-| FindAddressById | Core Capability | HTTP sync | `gar.address.find_by_id` | Not started |
-| SearchAddress | Core Capability | HTTP sync | `gar.address.search` | Not started |
-| SuggestAddress | Core Capability | HTTP sync | `gar.address.suggest` | Not started |
-| ResolveSuggestionContext | Core Capability | nested sync | `gar.address.resolve_suggestion_context` | Not started |
-| SuggestAdministrativeArea | Core Capability | nested sync | `gar.address.suggest_administrative_area` | Not started |
-| SuggestThoroughfare | Core Capability | nested sync | `gar.address.suggest_thoroughfare` | Not started |
+| FindAddressById | Core Capability | HTTP sync | `gar.address.find_by_id` | Done |
+| SearchAddress | Core Capability | HTTP sync | `gar.address.search` | Done |
+| SuggestAddress | Core Capability | HTTP sync | `gar.address.suggest` | Done |
+| ResolveSuggestionContext | Core Capability | nested sync | `gar.address.resolve_suggestion_context` | Done |
+| SuggestAdministrativeArea | Core Capability | nested sync | `gar.address.suggest_administrative_area` | Done |
+| SuggestThoroughfare | Core Capability | nested sync | `gar.address.suggest_thoroughfare` | Done |
 | ImportGarXml | Core Capability | CLI/worker | `gar.import` | Not started |
 | BuildAddressSearch | Core Capability | CLI/worker | `gar.address_search.build` | Not started |
 | BootstrapGar | Core Capability | CLI/worker | `gar.bootstrap` | Not started |
@@ -432,12 +432,12 @@ console работают через новую composition без бизнес-�
 
 ### Phase 2 — Database Foundation И Первый Vertical Slice
 
-- [ ] перенести/подключить migrations;
-- [ ] подготовить `address_search` fixture или restore path;
-- [ ] перенести typed address documents и presenter;
-- [ ] реализовать `FindAddressById` целиком:
+- [x] перенести/подключить migrations;
+- [x] подготовить `address_search` fixture или restore path;
+- [x] перенести typed address documents и presenter;
+- [x] реализовать `FindAddressById` целиком:
   `HTTP -> Message -> Handler -> Port -> Amp PostgreSQL Adapter -> Result`;
-- [ ] перенести focused tests и Postman request;
+- [x] перенести focused tests и Postman request;
 - [ ] сравнить Spiral и AMPHP response на одном dataset.
 
 Готовность: первый business endpoint достиг contract parity без Spiral types и
@@ -445,12 +445,12 @@ blocking I/O в HTTP path.
 
 ### Phase 3 — PostgreSQL Search И Suggest
 
-- [ ] перенести query parser;
-- [ ] реализовать PostgreSQL `SearchAddress`;
-- [ ] реализовать staged `SuggestAddress` и nested capabilities;
-- [ ] перенести scenario/port error mapping;
-- [ ] перенести parser, handler, presenter и HTTP tests;
-- [ ] выполнить Postman parity без OpenSearch.
+- [x] перенести query parser;
+- [x] реализовать PostgreSQL `SearchAddress`;
+- [x] реализовать staged `SuggestAddress` и nested capabilities;
+- [x] перенести scenario/port error mapping;
+- [x] перенести parser, handler, presenter и HTTP tests;
+- [x] выполнить Postman parity без OpenSearch.
 
 Готовность: PostgreSQL backend полностью обслуживает основной HTTP API и остаётся
 корректным fallback.

@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; V2 SearchAddress complete, V3 SuggestAddress next`
-- Версия документа: `0.50.0`
+- Статус: `Active; V3 SuggestAddress complete, V4 ReverseGeocode next`
+- Версия документа: `0.51.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -183,9 +183,9 @@ Library, application foundation и database fixture tracks можно вести
 - Accepted: OpenAPI 3.1 YAML является structural source, sanitized Postman v2.1
   collection — executable companion, а synthetic environment использует G3
   fixture вместо исходных имён, IDs и координат.
-- Boundary: health operations, `FindAddressById` и `SearchAddress` отражают
-  текущий AMPHP runtime; остальные address operations помечены `planned` до
-  своего V-slice.
+- Boundary: health operations, `FindAddressById`, `SearchAddress` и
+  `SuggestAddress` отражают текущий AMPHP runtime; остальные address operations
+  помечены `planned` до своего V-slice.
 - Gate: Contract suite проверяет parsing, schema references, response examples,
   operationId/method/path coverage и отсутствие legacy/secret values.
 - Artifact: [HTTP contract baseline](../api/http-contract-baseline.md).
@@ -194,6 +194,8 @@ Library, application foundation и database fixture tracks можно вести
 
 - Accepted: synthetic fixture v1 с регионами 77/78, одинаковыми названиями
   района, города, улицы и дома, а также `adm`/`mun` hierarchy variants.
+- State: V3 поднял fixture до v2, добавив municipal projection documents для
+  региона, района и города; UUID/ID synthetic identity сохранена.
 - Coverage: stable UUID lookup, active/inactive selection, regional path,
   nationwide ambiguity, search documents и deterministic empty/not-found data.
 - Artifact: [parity-fixture.md](parity-fixture.md), SQL source с закреплённым
@@ -1233,15 +1235,31 @@ GAR import.
 
 ### V3 — Staged `SuggestAddress`
 
-- [ ] Реализовать `ResolveSuggestionContext`,
+- [x] Реализовать `ResolveSuggestionContext`,
   `SuggestAdministrativeArea`, `SuggestThoroughfare` и parent orchestration.
-- [ ] Выполнять nested scenarios через MessageBus context, не внедрять handlers.
-- [ ] Реализовать региональную read-model partition и query path.
-- [ ] Покрыть city/district/street transitions, invalid parent и empty result.
-- [ ] Добавить `POST /api/addresses/suggest` в OpenAPI/Postman/MODULE.md.
+- [x] Выполнять nested scenarios через MessageBus context, не внедрять handlers.
+- [x] Реализовать региональный сегмент read-model query path; физический LIST
+  partition cutover и shadow rebuild сохранить за C2.
+- [x] Покрыть city/district/street transitions, invalid parent и empty result.
+- [x] Добавить `POST /api/addresses/suggest` в OpenAPI/Postman/MODULE.md.
 
 Готовность: suggest ищет только в вычисленном регионе, возвращает явный
 `next_stage`, а PostgreSQL query plan не сканирует весь read model.
+
+- State: V3 закрыт `2026-11-04`; `suggestAddresses` переведён в `current`, а
+  bindings parent/nested capabilities компилируются в explicit registry.
+- Parent handler вызывает nested scenarios только через
+  `MessageContextInterface::ask()`, сохраняя scope, correlation и cancellation.
+- Первый administrative stage допускает глобальный поиск; после выбора parent
+  resolver вычисляет `regionCode`, и materialized candidate set ограничивается
+  им до fuzzy ranking без online `DISTINCT`.
+- Физические LIST partitions, shadow rebuild, parity check и cutover не
+  дублируются в HTTP slice и остаются exit gate C2.
+- Fast gate: Testo `50 tests / 231 assertions`, PHPStan max, Deptrac
+  `0 violations / 0 uncovered`, registry `6 bindings`; Contract gate:
+  `8 tests / 197 assertions`; Integration gate на PHP 8.4/PostgreSQL 17:
+  `9 tests / 62 assertions`.
+- Следующий vertical slice — V4 `ReverseGeocode` через Nominatim.
 
 ## Wave 5 — Optional Online Features
 
@@ -1412,14 +1430,17 @@ direct runtime bootstrap сохранён для совместимости. D1 
 содержит изолированный Yiisoft migration graph и PDO PostgreSQL adapter, все 21
 исходные migration и target-owned forward migrations проходят apply-from-zero и
 полный rollback на PostgreSQL 17/PostGIS.
-D2 добавил target-owned fixture v1 с regional ambiguity, checksum и быстрым
-reset. G1 закрепил `AddressRegistry` как business owner, G2 сохранил разрешённый
+D2 добавил target-owned fixture с regional ambiguity, checksum и быстрым reset;
+V3 расширил его до v2 municipal administrative documents. G1 закрепил
+`AddressRegistry` как business owner, G2 сохранил разрешённый
 публичный HTTP contract в OpenAPI/Postman и включил отдельный coverage gate. V1
 реализовал первый source-verifiable scenario `FindAddressById`: current HTTP
 route, typed MessageBus query/result, AMPHP PostgreSQL reader и все четыре Testo
 suites. V2 добавил current `SearchAddress`, региональный predicate, FTS/trigram
 ranking, alias evidence и compatibility fallback без nationwide `DISTINCT`.
-Следующий HTTP slice — V3 staged `SuggestAddress`. JSON stdout,
+V3 реализовал current staged `SuggestAddress`, nested MessageBus orchestration
+и региональный candidate path. Следующий HTTP slice — V4 `ReverseGeocode`.
+JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
 последний package-polish slice после стабилизации фактической A3 composition.
@@ -1428,6 +1449,20 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.51.0 — 2026-11-04
+
+- завершён V3 staged `SuggestAddress` с parent orchestration и тремя nested
+  capabilities через MessageBus context;
+- добавлен current POST route, Symfony transport validation и стабильные
+  `400`/`422`/`503` outcomes;
+- PostgreSQL reader вычисляет parent region и ограничивает следующие stages до
+  ranking без nationwide `DISTINCT`;
+- parity fixture v2 добавляет municipal projection documents для всех
+  административных стадий в двух синтетических регионах;
+- physical partition/shadow cutover явно сохранён за C2;
+- MODULE, OpenAPI и Postman синхронизированы; следующий slice — V4
+  `ReverseGeocode`.
 
 ### 0.50.0 — 2026-11-04
 
