@@ -33,6 +33,7 @@ app/bin/worker                         managed worker entrypoint
 app/src/Bootstrap.php                  composition root
 app/src/Application/                   process runtimes и DIC modules
 app/src/Config/                        environment contract
+app/src/Database/Migration/            история схемы application PostgreSQL
 app/src/Infrastructure/Postgres/       async application DB pool
 app/src/Infrastructure/Nominatim/      async geocoding client
 app/src/Infrastructure/OpenSearch/     native async REST client and factory
@@ -44,7 +45,10 @@ Makefile                               стабильный интерфейс �
 ```
 
 PostgreSQL приложения и встроенная база Nominatim используют разные services и
-volumes. Их миграции, backup и reset нельзя объединять.
+volumes. Их миграции, backup и reset нельзя объединять. Application database
+требует расширения `postgis`, `hstore` и `pg_trgm`; development и integration
+используют multi-architecture образ CargoSense, собранный из Dockerfile
+официального PostGIS image и закреплённый digest-ом.
 
 ## HTTP endpoints
 
@@ -148,9 +152,10 @@ make test-integration
 make integration-down
 ```
 
-`make test-integration` сам собирает PHP runner, ждёт health обоих сервисов и
-всегда выполняет cleanup через shell trap. Отдельные `integration-up/down` нужны
-для диагностики и ручного запуска тестов.
+`make test-integration` сам собирает PHP runner, ждёт health обоих сервисов,
+проверяет применение и полный rollback всех migrations на пустой базе и всегда
+выполняет cleanup через shell trap. Отдельные `integration-up/down` нужны для
+диагностики и ручного запуска тестов.
 
 По умолчанию они доступны только на loopback-портах `55432` и `59200`.
 Параллельный запуск можно изолировать через `INTEGRATION_PROJECT_NAME`,
@@ -159,9 +164,11 @@ make integration-down
 `docker compose -f docker/compose/integration/compose.yaml --profile integration`.
 
 `config/.env` игнорируется Git. Значения из `.env.example` предназначены только
-для локальной разработки. Образ `mediagis/nominatim` является community image;
-для production следует закрепить проверенный digest или собрать Nominatim из
-официального release.
+для локальной разработки. Образы
+[`CargoSense/docker-postgis`](https://github.com/CargoSense/docker-postgis) и
+`mediagis/nominatim` являются community images. PostGIS уже закреплён digest-ом;
+для production следует отдельно проверить его provenance/SBOM. Nominatim нужно
+закрепить проверенным digest-ом или собрать из официального release.
 
 ## Лицензия
 

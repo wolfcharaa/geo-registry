@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; D1 migration history continuity next`
-- Версия документа: `0.44.0`
+- Статус: `Active; D1 complete, G2/G3 parity fixture gates next`
+- Версия документа: `0.45.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -32,8 +32,8 @@ architecture gates, integration profile и worker runtime.
 `phpfiasgeocoder` содержит четыре публичных address routes, 21 migration, 18
 PHPUnit tests, executable Postman collection и сценарии поиска, подсказок,
 импорта, построения read model, reverse geocode и enrichment. Его Composer
-package имеет лицензию `proprietary`, поэтому перенос исходных файлов в MIT
-repository заблокирован до явного решения о provenance.
+package имеет лицензию `proprietary`; владелец исходного кода отдельно разрешил
+перенос всех 21 migration в MIT repository, что закрывает G0 для этого набора.
 
 ### Исходная MessageBus
 
@@ -113,16 +113,16 @@ line с `0.1.0`; Git repository topology определяется gate G4:
 
 | Gate | Что должно быть подтверждено | Что блокирует | Статус |
 | --- | --- | --- | --- |
-| G0 Provenance | Право переноса под MIT либо clean-room реализация только по наблюдаемым контрактам | Копирование исходных PHP/SQL/test файлов | `Blocking` |
+| G0 Provenance | Право переноса под MIT либо clean-room реализация только по наблюдаемым контрактам | Копирование исходных PHP/SQL/test файлов | `Accepted` |
 | G1 Module name | `AddressRegistry` принят как окончательное имя | Создание module namespace и `MODULE.md` | `Open` |
 | G2 Contract baseline | Зафиксированы Postman collection, OpenAPI draft, representative responses и ошибки | Первый HTTP parity slice | `Open` |
 | G3 Parity dataset | Определён маленький deterministic PostgreSQL dataset с регионами и hierarchy cases | Search/Suggest parity | `Open` |
 | G4 Package workspace | Два соседних Git repository: `MessageBusAsync` и `MessageBusAsyncWorker`; history v6 не изменяется | Реализация MessageBus 0.1.0 | `Accepted` |
 | G5 Cutover data | Выбраны full re-import либо проверенный dump/restore path | Production cutover | `Deferred` |
 
-До закрытия G0 разрешены clean-room foundation, package design, target-owned
-tests, OpenAPI по публично подтверждённому контракту и новая реализация. Нельзя
-копировать proprietary implementation только потому, что она доступна локально.
+За пределами явно разрешённых 21 migration G0 продолжает требовать отдельного
+подтверждения либо clean-room реализацию. Доступность proprietary implementation
+локально сама по себе не разрешает перенос остальных исходных файлов.
 
 ## Карта Зависимостей
 
@@ -131,7 +131,8 @@ G4 ──> L1 MessageBus core ──> L2 registry/codecs ──> L3 async produc
                                                     └── L4 worker package
 L2 + L4 ──> L5 final Thesis DIC modules (deferred package polish)
 G1 ──> A1 quality/docs ──> A2 DIC/runtime roots ──> A3 bus integration
-G0 + G2 + G3 ──> D1 migration continuity ──> D2 parity fixtures
+G0 ──> D1 migration continuity
+D1 + G2 + G3 ──> D2 parity fixtures
 
 L2 + A3 + D2
   └── V1 FindAddressById ──> V2 PostgreSQL Search ──> V3 Suggest
@@ -150,6 +151,18 @@ Library, application foundation и database fixture tracks можно вести
 готовности MessageBus registry/composition и соответствующей data fixture.
 
 ## Принятые Gate-Решения
+
+### G0 — Provenance Для Истории Схемы
+
+- User answer: `2026-11-04` — подтверждено право прямого переноса всех 21
+  migration из proprietary `phpfiasgeocoder` в MIT `geo-registry` с сохранением
+  PHP, SQL и FQCN.
+- Accepted scope: только migration source и необходимая совместимость с текущим
+  Yiisoft API; это решение не распространяется автоматически на остальной код,
+  tests и документацию исходного приложения.
+- State: 21 migration перенесена с исходными identifiers и SQL semantics;
+  compatibility edits ограничены typed-вызовом quoter и проверкой строковых
+  metadata keys, генерируемый SQL не изменён.
 
 ### G4 — Package Workspace
 
@@ -1068,17 +1081,17 @@ artifact воспроизводим, три runtime graph компилируют
 ### D1 — Migration Continuity
 
 - [x] Подключить `yiisoft/db-migration` и PostgreSQL adapter только в CliRuntime.
-- [ ] Сохранить migration identifiers и history continuity всех 21 migrations.
+- [x] Сохранить migration identifiers и history continuity всех 21 migrations.
 - [x] Отделить application PostgreSQL от Nominatim PostgreSQL.
-- [ ] Добавить migrations-from-zero integration test и schema validation.
-- [ ] Добавлять исправления только новыми migrations, не переписывая применённую
+- [x] Добавить migrations-from-zero integration test и schema validation.
+- [x] Добавлять исправления только новыми migrations, не переписывая применённую
   историю.
 
 Готовность: пустая база детерминированно доходит до current schema; HTTP graph не
 содержит Yiisoft/PDO/native pgsql batch services.
 
-- State: CLI composition закрыта `2026-11-04`; перенос 21 migration source
-  остаётся заблокирован G0 provenance gate.
+- State: D1 закрыт `2026-11-04`; G0 принят явным подтверждением владельца
+  исходного кода, после чего все 21 migration перенесены в application namespace.
 - `yiisoft/db-migration 2.2` и `yiisoft/db-pgsql 2.0` подключены прямыми
   production dependencies; PHP image содержит `pdo_pgsql`.
 - Application-owned `MigrationCliModule` экспортирует `migrate:create`, `up`,
@@ -1090,6 +1103,15 @@ artifact воспроизводим, три runtime graph компилируют
   credentials и volumes; migration commands не получают Nominatim connection.
 - Parameterless migrations создаются neutral `Yiisoft\Injector\Injector` без
   PSR-11 bridge. HTTP/worker modules не импортируют migration module.
+- `MigrationHistoryContract` и unit fixture фиксируют точный chronological class
+  list, revertibility всех 21 migrations и 18 transactional markers.
+- Integration fixture на пустой PostgreSQL 17 применяет всю историю через
+  реальный `CliRuntime`, проверяет ключевые tables/indexes и расширения
+  `postgis`/`hstore`/`pg_trgm`, затем выполняет полный rollback.
+- Development и integration используют ARM64/AMD64 CargoSense PostGIS 17/3.6
+  image, собранный из official PostGIS Alpine Dockerfile и закреплённый digest-ом.
+- Новая policy: уже перенесённые migration identifiers и SQL не редактируются;
+  будущие изменения схемы оформляются только последующими migration classes.
 
 ### D2 — Target-Owned Parity Fixture
 
@@ -1303,18 +1325,30 @@ correlation/telemetry interceptors и реальный `WorkerRuntime` с Postgr
 consumer/control plane; nested dispatch/cancellation доказаны target-owned
 Scenario test. Worker library и `app/bin/worker` теперь
 поддерживают managed `Dic::run()` provider lifecycle с гарантированным teardown;
-direct runtime bootstrap сохранён для совместимости. D1 добавил в CLI root
-изолированный Yiisoft migration graph и PDO PostgreSQL adapter. Следующий
-незаблокированный application slice — D1 history continuity после разрешения
-G0 provenance gate. JSON stdout,
+direct runtime bootstrap сохранён для совместимости. D1 завершён: CLI root
+содержит изолированный Yiisoft migration graph и PDO PostgreSQL adapter, все 21
+migration проходят apply-from-zero и полный rollback на PostgreSQL 17/PostGIS.
+Следующий database slice D2 ждёт решений G2 и G3 по contract baseline и parity
+dataset. JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
 последний package-polish slice после стабилизации фактической A3 composition.
 Вопросы с вариантами открываются только для реально отсутствующего в v6 и
-dependency baseline поведения. G0 и G1 остаются gates только для application
-source.
+dependency baseline поведения. G0 закрыт только для 21 migration; G1 остаётся
+gate для application module source.
 
 ## История Документа
+
+### 0.45.0 — 2026-11-04
+
+- G0 закрыт явным разрешением владельца на перенос 21 migration в MIT project;
+- сохранены все identifiers, chronological history, revertibility и
+  transactional policy исходной схемы;
+- real PostgreSQL/PostGIS integration gate доказал apply-from-zero, schema
+  contract и полный rollback;
+- PostGIS 17/3.6 development/integration image закреплён multi-architecture
+  CargoSense digest-ом;
+- D1 закрыт, следующий database slice D2 ожидает G2/G3.
 
 ### 0.44.0 — 2026-11-04
 

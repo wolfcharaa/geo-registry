@@ -41,7 +41,7 @@ services:
       retries: 5
 
   postgres:
-    image: postgres:17-alpine
+    image: ghcr.io/cargosense/postgis:17-3.6-alpine@sha256:03374f4feb0267d755a9d81cc834f8a129f9a99734dd0a029f0bceb3f5689361
     environment:
       POSTGRES_DB: "${POSTGRES_DB:-app}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-local-app-only}"
