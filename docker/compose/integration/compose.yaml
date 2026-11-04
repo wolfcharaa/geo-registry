@@ -16,6 +16,8 @@ services:
       INTEGRATION_OPENSEARCH_URL: "http://opensearch:9200"
     volumes:
       - ../../../app:/app
+      - ../../../../library/MessageBusAsync:/library/MessageBusAsync:ro
+      - ../../../../library/MessageBusAsyncWorker:/library/MessageBusAsyncWorker:ro
     depends_on:
       postgres:
         condition: service_healthy

@@ -81,7 +81,7 @@ return static function (DeptracConfig $config): void {
                 ClassLikeConfig::create('^Symfony\\Component\\Validator\\'),
             ),
             $migrationTooling = Layer::withName('Migration Tooling')->collectors(
-                ClassLikeConfig::create('^Yiisoft\\Db\\Migration\\'),
+                ClassLikeConfig::create('^Yiisoft\\(?:Db\\|Injector\\)'),
             ),
         )
         ->rulesets(
@@ -173,6 +173,7 @@ return static function (DeptracConfig $config): void {
                 $validator,
             ),
             Ruleset::forLayer($database)->accesses(
+                $configLayer,
                 $postgres,
                 $migrationTooling,
             ),

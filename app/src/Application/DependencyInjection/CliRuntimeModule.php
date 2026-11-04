@@ -12,6 +12,7 @@ use App\Application\Runtime\CliRuntime;
 use App\Config\ConsoleConfig;
 use App\Config\EnvironmentSnapshot;
 use App\Config\LoggingConfig;
+use App\Config\PostgresConfig;
 use App\Infrastructure\Logging\StdoutLoggerFactory;
 use Monolog\Logger;
 use Symfony\Component\Console\Application;
@@ -60,6 +61,9 @@ final readonly class CliRuntimeModule implements Module
                 'compiler' => $registryCompiler,
             ]);
         $application->call('addCommand', [$registryCheck]);
+        $application->call('addCommands', [
+            $dic->import(new MigrationCliModule(PostgresConfig::fromEnvironment($this->environment))),
+        ]);
 
         return $dic
             ->object(CliRuntime::class)

@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; D1 migration continuity next`
-- Версия документа: `0.43.0`
+- Статус: `Active; D1 migration history continuity next`
+- Версия документа: `0.44.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -1067,15 +1067,29 @@ artifact воспроизводим, три runtime graph компилируют
 
 ### D1 — Migration Continuity
 
-- [ ] Подключить `yiisoft/db-migration` и PostgreSQL adapter только в CliRuntime.
+- [x] Подключить `yiisoft/db-migration` и PostgreSQL adapter только в CliRuntime.
 - [ ] Сохранить migration identifiers и history continuity всех 21 migrations.
-- [ ] Отделить application PostgreSQL от Nominatim PostgreSQL.
+- [x] Отделить application PostgreSQL от Nominatim PostgreSQL.
 - [ ] Добавить migrations-from-zero integration test и schema validation.
 - [ ] Добавлять исправления только новыми migrations, не переписывая применённую
   историю.
 
 Готовность: пустая база детерминированно доходит до current schema; HTTP graph не
 содержит Yiisoft/PDO/native pgsql batch services.
+
+- State: CLI composition закрыта `2026-11-04`; перенос 21 migration source
+  остаётся заблокирован G0 provenance gate.
+- `yiisoft/db-migration 2.2` и `yiisoft/db-pgsql 2.0` подключены прямыми
+  production dependencies; PHP image содержит `pdo_pgsql`.
+- Application-owned `MigrationCliModule` экспортирует `migrate:create`, `up`,
+  `down`, `new`, `history`, `redo` и безопасно маркированный `mark` command.
+- Команды используют application `DATABASE_DSN`; Amp config преобразуется в
+  PDO DSN без помещения credentials в DSN string. Connection остаётся lazy и
+  не открывается при построении CLI graph или вызове `list`.
+- Application PostgreSQL и Nominatim используют разные Compose services,
+  credentials и volumes; migration commands не получают Nominatim connection.
+- Parameterless migrations создаются neutral `Yiisoft\Injector\Injector` без
+  PSR-11 bridge. HTTP/worker modules не импортируют migration module.
 
 ### D2 — Target-Owned Parity Fixture
 
@@ -1283,15 +1297,16 @@ L4 завершён. Незаблокированная часть A1 закры
 Testo, Deptrac и real PostgreSQL/OpenSearch integration job; MODULE.md ждёт G1,
 а contract/release smoke — G2. A2 получил typed settings и первый независимый
 `HttpRuntime` Thesis DIC root с container-owned PostgreSQL lifecycle и отдельный
-`CliRuntime` с исполняемым Symfony Console entrypoint; следующий slice —
-реальный `WorkerRuntime` теперь содержит `QueueWorkerRunner`, PostgreSQL
-consumer/control plane, registry scope bridge и job correlation boundary. A3
-подключил path-pinned core/worker packages, explicit registry source, fast
-compile gate, correlation/telemetry interceptors; nested dispatch/cancellation
-доказаны target-owned Scenario test. Worker library и `app/bin/worker` теперь
+`CliRuntime` с исполняемым Symfony Console entrypoint. A3 подключил path-pinned
+core/worker packages, explicit registry source, fast compile gate,
+correlation/telemetry interceptors и реальный `WorkerRuntime` с PostgreSQL
+consumer/control plane; nested dispatch/cancellation доказаны target-owned
+Scenario test. Worker library и `app/bin/worker` теперь
 поддерживают managed `Dic::run()` provider lifecycle с гарантированным teardown;
-direct runtime bootstrap сохранён для совместимости. Следующий
-незаблокированный application slice — D1 migration continuity. JSON stdout,
+direct runtime bootstrap сохранён для совместимости. D1 добавил в CLI root
+изолированный Yiisoft migration graph и PDO PostgreSQL adapter. Следующий
+незаблокированный application slice — D1 history continuity после разрешения
+G0 provenance gate. JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
 последний package-polish slice после стабилизации фактической A3 composition.
@@ -1300,6 +1315,14 @@ dependency baseline поведения. G0 и G1 остаются gates толь
 source.
 
 ## История Документа
+
+### 0.44.0 — 2026-11-04
+
+- Yiisoft migration 2.2 и PostgreSQL 2.0 подключены только к `CliRuntime`;
+- CLI получил семь `migrate:*` commands с lazy PDO connection к application DB;
+- PHP image дополнен `pdo_pgsql`, а Nominatim database остаётся вне migration
+  composition;
+- D1 frontier переведён на сохранение 21 history identifiers после G0 gate.
 
 ### 0.43.0 — 2026-11-04
 

@@ -128,10 +128,16 @@ make doctor   # проверить Compose
 make check    # formatter + strict PHPStan + Deptrac + fast Testo
 make architecture-check # отдельно проверить направления зависимостей
 app/bin/console list # показать CLI commands
+app/bin/console migrate:new --all # показать неприменённые migrations
+app/bin/console migrate:up --force-yes # применить migrations к application PostgreSQL
 app/bin/worker list  # показать worker run/control/status commands
 make smoke    # проверить запущенный HTTP service
 make down     # остановить без удаления volumes
 ```
+
+Команды `migrate:*` входят только в `CliRuntime` и используют `DATABASE_DSN`.
+Они работают через blocking PDO и не включаются в HTTP/worker DIC graphs. База
+Nominatim остаётся отдельным service и этими командами не изменяется.
 
 Ephemeral PostgreSQL и OpenSearch для будущей Integration suite запускаются
 отдельным Compose project и не используют development data volumes:

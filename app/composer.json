@@ -7,6 +7,8 @@
         "php": "^8.4.12",
         "ext-json": "*",
         "ext-pcntl": "*",
+        "ext-pdo": "*",
+        "ext-pdo_pgsql": "*",
         "ext-pgsql": "*",
         "amphp/http-client": "^5.3",
         "amphp/http-server": "^3.4",
@@ -17,7 +19,9 @@
         "romanfedorskij/message-bus-async": "^0.1",
         "romanfedorskij/message-bus-async-worker": "^0.1",
         "symfony/console": "^8.1",
-        "thesis/dic": "^0.5.3"
+        "thesis/dic": "^0.5.3",
+        "yiisoft/db-migration": "^2.2",
+        "yiisoft/db-pgsql": "^2.0"
     },
     "require-dev": {
         "deptrac/deptrac": "^4.7",

@@ -31,7 +31,13 @@ final class CliRuntimeModuleTest
         );
 
         Assert::same($exitCode, 0);
-        Assert::true(str_contains($output->fetch(), 'geo-registry-test'));
+        $console = $output->fetch();
+
+        Assert::true(str_contains($console, 'geo-registry-test'));
+        Assert::true(str_contains($console, 'migrate:up'));
+        Assert::true(str_contains($console, 'migrate:down'));
+        Assert::true(str_contains($console, 'migrate:history'));
+        Assert::true(str_contains($console, 'migrate:mark'));
     }
 
     public function testItCompilesTheExplicitMessageBusRegistry(): void

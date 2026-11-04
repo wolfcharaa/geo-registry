@@ -20,4 +20,6 @@ parameters:
     reportPossiblyNonexistentConstantArrayOffset: true
     reportPossiblyNonexistentGeneralArrayOffset: true
     reportUnsafeArrayStringKeyCasting: detect
-    tmpDir: var/phpstan
+    # Keep compiled analyser state outside the bind-mounted source tree so host
+    # and Docker runs cannot reuse cache entries with incompatible paths.
+    tmpDir: /tmp/geo-registry-phpstan
