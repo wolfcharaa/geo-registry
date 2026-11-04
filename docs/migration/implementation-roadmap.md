@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; managed worker bootstrap next`
-- Версия документа: `0.42.0`
+- Статус: `Active; D1 migration continuity next`
+- Версия документа: `0.43.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -974,7 +974,7 @@ network I/O, optional outage даёт `degraded`, process-specific resources н�
 - [x] Добавить telemetry interceptor поверх существующего pipeline contract.
 - [x] Включить registry compile в fast gate.
 - [ ] Включить registry compile в release gate после принятия G2.
-- [ ] Подключить worker executable к managed DIC lifecycle без `Dic::build()` и
+- [x] Подключить worker executable к managed DIC lifecycle без `Dic::build()` и
   утечки process resources.
 - [x] Доказать nested dispatch и cancellation через representative target-owned
   test, не перенося business scenario раньше data foundation.
@@ -1040,10 +1040,28 @@ artifact воспроизводим, три runtime graph компилируют
   PHP serialization или неизвестный-message fallback не добавлены.
 - Fast gate: PHPStan max, Deptrac `0 violations / 0 uncovered`, три DIC graph,
   registry compile и Testo `29 tests / 91 assertions`.
-- `BootstrapResolver` worker package пока требует уже построенный runtime.
-  Application не использует `Dic::build()`, потому что он не предоставляет
-  managed teardown; следующий library atom добавляет lifecycle-aware provider
-  contract с backward compatibility для прямого `WorkerRuntime`.
+- На границе A3.R3 `BootstrapResolver` ещё требовал уже построенный runtime;
+  application не использовал `Dic::build()` без managed teardown. Разрыв закрыт
+  следующим A3.R4 lifecycle-aware provider contract.
+
+#### A3.R4 — Managed Worker Executable
+
+- State: executable lifecycle закрыт `2026-11-04`; A3 остаётся partial только
+  из-за G2-dependent release registry gate.
+- Worker library добавил `WorkerRuntimeProviderInterface`; все run, control и
+  status commands выполняют operation внутри provider callback. Старый direct
+  `WorkerRuntime` bootstrap сохранён как backward-compatible путь.
+- `BootstrapResolver::resolve()` не выпускает managed runtime за пределы
+  lifecycle; `run()` поддерживает direct и managed bootstrap формы.
+- Application `ApplicationWorkerRuntimeProvider` оборачивает реальный
+  `WorkerRuntimeModule` в `Dic::run()`, поэтому PostgreSQL pool и scoped
+  services закрываются на success и failure.
+- `app/bin/worker` использует стандартный `config/message_bus_worker.php` и на
+  Symfony Console 8.1 экспортирует worker run/control/status/schema surface.
+- Worker library gates: PHPUnit `31 tests / 141 assertions`, PHPStan max;
+  application fast gate: Testo `31 tests / 102 assertions`, PHPStan max,
+  Deptrac `0 violations / 0 uncovered`, registry compile и три DIC graph.
+- Следующий незаблокированный application slice — D1 migration continuity.
 
 ## Wave 3 — Database Foundation И Первый HTTP Slice
 
@@ -1270,10 +1288,11 @@ Testo, Deptrac и real PostgreSQL/OpenSearch integration job; MODULE.md ждёт
 consumer/control plane, registry scope bridge и job correlation boundary. A3
 подключил path-pinned core/worker packages, explicit registry source, fast
 compile gate, correlation/telemetry interceptors; nested dispatch/cancellation
-доказаны target-owned Scenario test. Следующий atom расширяет worker bootstrap
-contract для managed `Dic::run()` lifecycle: `Dic::build()` с утечкой pool не
-используется. JSON stdout, HTTP request/correlation и worker job lifecycle уже
-находятся в application shell.
+доказаны target-owned Scenario test. Worker library и `app/bin/worker` теперь
+поддерживают managed `Dic::run()` provider lifecycle с гарантированным teardown;
+direct runtime bootstrap сохранён для совместимости. Следующий
+незаблокированный application slice — D1 migration continuity. JSON stdout,
+HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
 последний package-polish slice после стабилизации фактической A3 composition.
 Вопросы с вариантами открываются только для реально отсутствующего в v6 и
@@ -1281,6 +1300,16 @@ dependency baseline поведения. G0 и G1 остаются gates толь
 source.
 
 ## История Документа
+
+### 0.43.0 — 2026-11-04
+
+- worker library получил backward-compatible managed runtime provider contract;
+- все worker CLI operations удерживают runtime внутри provider lifecycle;
+- приложение добавило `ApplicationWorkerRuntimeProvider`, стандартный bootstrap
+  и executable `app/bin/worker` без `Dic::build()`;
+- Symfony Console 8.1 command surface проверена application-side smoke test;
+- A3 оставлен partial только по G2-dependent release gate, frontier переведён
+  на D1 migration continuity.
 
 ### 0.42.0 — 2026-11-04
 

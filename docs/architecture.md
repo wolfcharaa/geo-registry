@@ -274,6 +274,11 @@ control, PostgreSQL control plane, JSON envelope serializer и
 нулём business bindings использует пустой explicit codec registry, а не
 fallback serialization.
 
+`app/bin/worker` использует library `WorkerRuntimeProviderInterface` и держит
+run/control/status operation целиком внутри application `Dic::run()`. Поэтому
+container scope, PostgreSQL pool и disposers живут ровно время CLI operation;
+`Dic::build()` и runtime, выведенный за пределы managed lifecycle, запрещены.
+
 At-least-once delivery означает, что crash после business effect и до ack может
 повторить handler. Side-effecting scenarios обязаны явно выбрать idempotency,
 deduplication или безопасный повтор и покрыть это contract test.

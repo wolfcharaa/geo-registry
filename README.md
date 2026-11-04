@@ -29,6 +29,7 @@ make logs SERVICE=nominatim
 app/                                   сердце приложения: код, тесты, Composer
 app/bin/server.php                     HTTP entrypoint
 app/bin/console                        CLI entrypoint
+app/bin/worker                         managed worker entrypoint
 app/src/Bootstrap.php                  composition root
 app/src/Application/                   process runtimes и DIC modules
 app/src/Config/                        environment contract
@@ -92,11 +93,13 @@ fiber-aware ожидание I/O, никаких Guzzle/PSR-18 adapters и сг�
 ## Контейнер приложения
 
 `app/src/Bootstrap.php` запускает application-owned Thesis DIC module отдельного
-`HttpRuntime`; PostgreSQL pool закрывается disposer-ом контейнера. Следующие
-независимые root exports — `CliRuntime`, уже доступный через `app/bin/console`,
-и будущий worker. MessageBus сохраняет neutral resolver/scope contracts, поэтому
-application container не становится service locator внутри handlers. Внутренний
-контейнер Testo не является runtime-контейнером приложения.
+`HttpRuntime`; PostgreSQL pool закрывается disposer-ом контейнера. Независимый
+`CliRuntime` доступен через `app/bin/console`, а реальный `WorkerRuntime` — через
+`app/bin/worker`. Worker executable выполняет run/control/status operation
+внутри managed `Dic::run()` lifecycle, поэтому pool и scopes закрываются при
+успехе и исключении. MessageBus сохраняет neutral resolver/scope contracts,
+поэтому application container не становится service locator внутри handlers.
+Внутренний контейнер Testo не является runtime-контейнером приложения.
 
 ## Статический анализ и тесты
 
@@ -125,6 +128,7 @@ make doctor   # проверить Compose
 make check    # formatter + strict PHPStan + Deptrac + fast Testo
 make architecture-check # отдельно проверить направления зависимостей
 app/bin/console list # показать CLI commands
+app/bin/worker list  # показать worker run/control/status commands
 make smoke    # проверить запущенный HTTP service
 make down     # остановить без удаления volumes
 ```

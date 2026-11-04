@@ -2330,7 +2330,7 @@
             "dist": {
                 "type": "path",
                 "url": "../../library/MessageBusAsyncWorker",
-                "reference": "ceb5047151a5c469a52b2b25d3dbc151336a72af"
+                "reference": "3ff4ce112fde1dd66447f00b8ffa1875748b18ed"
             },
             "require": {
                 "amphp/amp": "^3.1",
