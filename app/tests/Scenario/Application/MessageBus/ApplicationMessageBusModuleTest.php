@@ -18,6 +18,11 @@ use Fedor\MessageBus\Execution\ExecutionOptions;
 use Fedor\MessageBus\Message\Command;
 use Fedor\MessageBus\Message\Query;
 use Fedor\MessageBus\MessageBus;
+use Monolog\Handler\TestHandler;
+use Monolog\Logger;
+use Monolog\LogRecord;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Testo\Assert;
 use Testo\Test;
 use Thesis\Dic;
@@ -32,10 +37,12 @@ final class ApplicationMessageBusModuleTest
     {
         $trace = new ScenarioTrace();
         $correlationContext = new CorrelationContext();
+        $logHandler = new TestHandler();
+        $logger = new Logger('message-bus-test', [$logHandler]);
 
         Dic::run(
-            new ScenarioMessageBusModule($trace, $correlationContext),
-            static function (MessageBus $messageBus) use ($trace, $correlationContext): void {
+            new ScenarioMessageBusModule($trace, $correlationContext, $logger),
+            static function (MessageBus $messageBus) use ($trace, $correlationContext, $logHandler): void {
                 $correlationContext->run(
                     new CorrelationIds(
                         requestId: 'request-1',
@@ -68,6 +75,19 @@ final class ApplicationMessageBusModuleTest
                 Assert::same($trace->scopesDisposed, 1);
                 Assert::same($trace->disposedError, null);
                 Assert::same($correlationContext->current(), null);
+                $records = $logHandler->getRecords();
+                Assert::same(array_map(
+                    static fn(LogRecord $record): mixed => $record->context['event'] ?? null,
+                    $records,
+                ), [
+                    'message.execution.started',
+                    'message.execution.started',
+                    'message.execution.completed',
+                    'message.execution.completed',
+                ]);
+                foreach ($records as $record) {
+                    Assert::false(array_key_exists('message', $record->context));
+                }
             },
         );
     }
@@ -78,7 +98,7 @@ final class ApplicationMessageBusModuleTest
         $correlationContext = new CorrelationContext();
 
         Dic::run(
-            new ScenarioMessageBusModule($trace, $correlationContext),
+            new ScenarioMessageBusModule($trace, $correlationContext, new NullLogger()),
             static function (MessageBus $messageBus) use ($trace, $correlationContext): void {
                 $error = null;
                 try {
@@ -107,6 +127,7 @@ final readonly class ScenarioMessageBusModule implements Module
     public function __construct(
         private ScenarioTrace $trace,
         private CorrelationContext $correlationContext,
+        private LoggerInterface $logger,
     ) {}
 
     /** @return Ref<MessageBus> */
@@ -114,6 +135,7 @@ final readonly class ScenarioMessageBusModule implements Module
     {
         $trace = $dic->value($this->trace);
         $correlationContext = $dic->value($this->correlationContext);
+        $logger = $dic->value($this->logger);
         $scope = $dic
             ->object(ScenarioScope::class)
             ->arg('trace', $trace)
@@ -148,6 +170,7 @@ final readonly class ScenarioMessageBusModule implements Module
                 flows: MessageBusRegistrySource::empty()->flows,
             ),
             $correlationContext,
+            $logger,
             [
                 ScenarioRootCommandHandler::class => $rootHandler,
                 ScenarioNestedQueryHandler::class => $nestedHandler,

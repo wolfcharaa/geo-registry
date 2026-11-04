@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "9985258fc66be84c822de29c2b70e26f",
+    "content-hash": "4d0590d0ef340188c4ff96e0fc3a4b95",
     "packages": [
         {
             "name": "amphp/amp",
@@ -932,16 +932,16 @@
         },
         {
             "name": "amphp/postgres",
-            "version": "v2.2.1",
+            "version": "v2.2.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/amphp/postgres.git",
-                "reference": "b68c4d5929d0ec1701781dbbb0bb81dd8d0a42d7"
+                "reference": "147d6e284fd0d2bd2f4a62b23942b34b23830b73"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/amphp/postgres/zipball/b68c4d5929d0ec1701781dbbb0bb81dd8d0a42d7",
-                "reference": "b68c4d5929d0ec1701781dbbb0bb81dd8d0a42d7",
+                "url": "https://api.github.com/repos/amphp/postgres/zipball/147d6e284fd0d2bd2f4a62b23942b34b23830b73",
+                "reference": "147d6e284fd0d2bd2f4a62b23942b34b23830b73",
                 "shasum": ""
             },
             "require": {
@@ -992,7 +992,7 @@
             ],
             "support": {
                 "issues": "https://github.com/amphp/postgres/issues",
-                "source": "https://github.com/amphp/postgres/tree/v2.2.1"
+                "source": "https://github.com/amphp/postgres/tree/v2.2.2"
             },
             "funding": [
                 {
@@ -1000,7 +1000,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-02-25T04:47:18+00:00"
+            "time": "2026-11-04T04:04:15+00:00"
         },
         {
             "name": "amphp/process",
@@ -2319,6 +2319,66 @@
                 }
             ],
             "description": "Async-first PHP message bus with typed local dispatch and durable producer contracts",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "romanfedorskij/message-bus-async-worker",
+            "version": "0.1.0",
+            "dist": {
+                "type": "path",
+                "url": "../../library/MessageBusAsyncWorker",
+                "reference": "ceb5047151a5c469a52b2b25d3dbc151336a72af"
+            },
+            "require": {
+                "amphp/amp": "^3.1",
+                "amphp/postgres": "^2.2.1",
+                "php": "^8.4.12",
+                "psr/clock": "^1.0",
+                "romanfedorskij/message-bus-async": "^0.1",
+                "symfony/console": "^7.4 || ^8.1"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^2.3",
+                "phpunit/phpunit": "^12.0"
+            },
+            "bin": [
+                "bin/message-bus-worker"
+            ],
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Fedor\\MessageBus\\Worker\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Fedor\\MessageBus\\Worker\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "analyse": [
+                    "phpstan analyse --level=max src tests integration-tests"
+                ],
+                "test": [
+                    "phpunit --do-not-cache-result"
+                ],
+                "test:integration": [
+                    "phpunit --configuration phpunit.integration.xml.dist --do-not-cache-result"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "romanfedorskij",
+                    "email": "markaryanroma@mail.ru"
+                }
+            ],
+            "description": "Optional worker runtime for romanfedorskij/message-bus-async",
             "transport-options": {
                 "symlink": true,
                 "relative": true

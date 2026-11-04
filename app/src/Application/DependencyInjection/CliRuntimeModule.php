@@ -11,6 +11,9 @@ use App\Application\Observability\CorrelationContext;
 use App\Application\Runtime\CliRuntime;
 use App\Config\ConsoleConfig;
 use App\Config\EnvironmentSnapshot;
+use App\Config\LoggingConfig;
+use App\Infrastructure\Logging\StdoutLoggerFactory;
+use Monolog\Logger;
 use Symfony\Component\Console\Application;
 use Thesis\Dic;
 use Thesis\Dic\Module;
@@ -28,15 +31,26 @@ final readonly class CliRuntimeModule implements Module
     public function configure(Dic $dic): Ref
     {
         $config = ConsoleConfig::fromEnvironment($this->environment);
+        $loggingConfig = LoggingConfig::fromEnvironment($this->environment);
         $application = $dic->object(
             Application::class,
             static fn(): Application => new Application($config->name, $config->version),
         );
         $registrySource = $dic->value($this->messageBusRegistry ?? MessageBusRegistrySource::empty());
         $correlationContext = $dic->object(CorrelationContext::class);
+        $loggerFactory = $dic
+            ->object(StdoutLoggerFactory::class)
+            ->arg('context', $correlationContext);
+        $logger = $dic
+            ->object(Logger::class, [$loggerFactory, 'create'])
+            ->args([
+                'config' => $dic->value($loggingConfig),
+                'runtime' => 'cli',
+            ]);
         $messageBus = $dic->import(new ApplicationMessageBusModule(
             $this->messageBusRegistry ?? MessageBusRegistrySource::empty(),
             $correlationContext,
+            $logger,
         ));
         $registryCompiler = $dic->object(ApplicationRegistryCompiler::class);
         $registryCheck = $dic

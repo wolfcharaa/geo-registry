@@ -42,7 +42,10 @@ final readonly class MessageBusRegistrySource
             [],
             [],
             new FlowRegistry(
-                FlowDefinition::sync('default')->middleware(CorrelationContextInterceptor::class),
+                FlowDefinition::sync('default')->middleware(
+                    CorrelationContextInterceptor::class,
+                    MessageBusTelemetryInterceptor::class,
+                ),
             ),
         );
     }

@@ -215,7 +215,7 @@ composition.
 | --- | --- | --- |
 | `HttpRuntime` | HTTP server, routes, request scopes, health | Только cooperative non-blocking |
 | `CliRuntime` | migrations, GAR import, projection build, admin commands | Blocking разрешён для CLI-only adapters |
-| `WorkerRuntime` | async queue consumption, job scopes, control lifecycle | Только cooperative non-blocking внутри job |
+| `WorkerRuntime` | PostgreSQL queue consumption, per-job MessageBus scope, worker control lifecycle | Только cooperative non-blocking внутри job |
 
 Каждый root получает один immutable environment snapshot и собственный graph.
 HTTP resources не импортируются в CLI/worker автоматически. Singleton pools и
@@ -260,6 +260,19 @@ Default sync flow включает application `CorrelationContextInterceptor`. 
 message/correlation identifiers берёт из immutable MessageBus envelope. Nested
 dispatch временно заменяет только message metadata и после завершения
 восстанавливает parent context.
+
+Следующий `MessageBusTelemetryInterceptor` пишет только bounded code metadata:
+event, message class, binding ID, duration и exception class. Message payload,
+headers и query data в telemetry log не попадают. Worker boundary заранее
+устанавливает `job_id` из queue row, после чего тот же interceptor pipeline
+работает без отдельного worker middleware API.
+
+Worker graph содержит реальный `PostgresMessageConsumer`, lease/cancellation
+control, PostgreSQL control plane, JSON envelope serializer и
+`QueueWorkerRunner`. Каждый job открывает отдельный Thesis scope; scoped worker
+передаёт тот же resolver в authoritative binding execution. Текущий baseline с
+нулём business bindings использует пустой explicit codec registry, а не
+fallback serialization.
 
 At-least-once delivery означает, что crash после business effect и до ack может
 повторить handler. Side-effecting scenarios обязаны явно выбрать idempotency,

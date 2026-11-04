@@ -15,6 +15,7 @@
         "amphp/postgres": "^2.2",
         "monolog/monolog": "^3.0",
         "romanfedorskij/message-bus-async": "^0.1",
+        "romanfedorskij/message-bus-async-worker": "^0.1",
         "symfony/console": "^8.1",
         "thesis/dic": "^0.5.3"
     },
@@ -43,6 +44,16 @@
                 "symlink": true,
                 "versions": {
                     "romanfedorskij/message-bus-async": "0.1.0"
+                }
+            }
+        },
+        {
+            "type": "path",
+            "url": "../../library/MessageBusAsyncWorker",
+            "options": {
+                "symlink": true,
+                "versions": {
+                    "romanfedorskij/message-bus-async-worker": "0.1.0"
                 }
             }
         }

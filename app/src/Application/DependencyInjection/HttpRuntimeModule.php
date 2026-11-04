@@ -53,10 +53,6 @@ final readonly class HttpRuntimeModule implements Module
         $openSearchConfig = OpenSearchConfig::fromEnvironment($this->environment);
 
         $correlationContext = $dic->object(CorrelationContext::class);
-        $messageBus = $dic->import(new ApplicationMessageBusModule(
-            $this->messageBusRegistry ?? MessageBusRegistrySource::empty(),
-            $correlationContext,
-        ));
         $loggerFactory = $dic
             ->object(StdoutLoggerFactory::class)
             ->arg('context', $correlationContext);
@@ -66,6 +62,11 @@ final readonly class HttpRuntimeModule implements Module
                 'config' => $dic->value($loggingConfig),
                 'runtime' => 'http',
             ]);
+        $messageBus = $dic->import(new ApplicationMessageBusModule(
+            $this->messageBusRegistry ?? MessageBusRegistrySource::empty(),
+            $correlationContext,
+            $logger,
+        ));
         $httpClient = $dic
             ->object(
                 HttpClient::class,

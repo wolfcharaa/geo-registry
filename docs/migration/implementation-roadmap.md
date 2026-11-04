@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; A3 scope bridge next`
-- Версия документа: `0.41.0`
+- Статус: `Active; managed worker bootstrap next`
+- Версия документа: `0.42.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -951,17 +951,16 @@ volumes.
 
 - [x] Разбить текущий `AppConfig` на immutable runtime/integration settings из
   одного environment snapshot.
-- [ ] Подключить Thesis DIC и создать независимые `HttpRuntime`, `CliRuntime`,
+- [x] Подключить Thesis DIC и создать независимые `HttpRuntime`, `CliRuntime`,
   `WorkerRuntime` root exports.
   - [x] `HttpRuntime` собирается application-owned Thesis DIC module;
   - [x] `CliRuntime` собирается отдельным Thesis DIC module;
-  - [ ] `WorkerRuntime`.
+  - [x] `WorkerRuntime` содержит queue runner, control plane и job scopes.
 - [x] Добавить Symfony Console application и `app/bin/console`.
 - [x] Вынести JSON logging, correlation context и graceful shutdown в
   application shell.
 - [x] Реализовать live/ready/startup registry с required/optional policy.
-- [ ] Проверить три DIC graph без внешних сервисов: HTTP и CLI graphs уже
-  покрыты, worker graph ожидает свой root.
+- [x] Проверить три DIC graph без внешних сервисов.
 
 Готовность: server и console запускаются из DIC composition; liveness не делает
 network I/O, optional outage даёт `degraded`, process-specific resources не
@@ -972,9 +971,11 @@ network I/O, optional outage даёт `degraded`, process-specific resources н�
 - [x] Подключить выпущенный либо path-pinned development build core package.
 - [x] Описать application flows и registry source явно, без runtime scanning.
 - [x] Добавить Thesis scope bridge и correlation interceptor seam.
-- [ ] Добавить telemetry interceptor поверх существующего pipeline contract.
+- [x] Добавить telemetry interceptor поверх существующего pipeline contract.
 - [x] Включить registry compile в fast gate.
 - [ ] Включить registry compile в release gate после принятия G2.
+- [ ] Подключить worker executable к managed DIC lifecycle без `Dic::build()` и
+  утечки process resources.
 - [x] Доказать nested dispatch и cancellation через representative target-owned
   test, не перенося business scenario раньше data foundation.
 
@@ -1018,8 +1019,31 @@ artifact воспроизводим, три runtime graph компилируют
   cancellation.
 - Fast gate: PHPStan max, Deptrac `0 violations / 0 uncovered`, registry compile
   и Testo `27 tests / 82 assertions`.
-- Следующий atom: telemetry interceptor и реальный `WorkerRuntime` composition
-  на path-pinned worker package; фиктивный worker root по-прежнему запрещён.
+- Continuation: telemetry interceptor и реальный `WorkerRuntime` закрыты
+  следующим A3.R3; фиктивный worker root не создавался.
+
+#### A3.R3 — Telemetry И Real Worker Graph
+
+- State: третий runtime graph закрыт `2026-11-04`; operational worker
+  executable ожидает managed bootstrap contract в worker library.
+- Path-pinned `romanfedorskij/message-bus-async-worker 0.1.0` подключён как
+  runtime dependency; core сохраняет отсутствие обратной worker dependency.
+- `WorkerRuntimeModule` собирает PostgreSQL consumer/lease control, worker
+  control gateway/runtime, JSON envelope serializer, `QueueWorkerRunner` и
+  отдельный per-job Thesis resolver scope.
+- Job boundary устанавливает message/correlation/job identifiers до исполнения
+  authoritative binding и гарантированно очищает fiber context после job.
+- Default sync flow добавил `MessageBusTelemetryInterceptor` после correlation:
+  start/complete/failure logs содержат только code metadata, duration и
+  exception class, без message payload.
+- Текущий нулевой business registry честно использует пустой codec registry;
+  PHP serialization или неизвестный-message fallback не добавлены.
+- Fast gate: PHPStan max, Deptrac `0 violations / 0 uncovered`, три DIC graph,
+  registry compile и Testo `29 tests / 91 assertions`.
+- `BootstrapResolver` worker package пока требует уже построенный runtime.
+  Application не использует `Dic::build()`, потому что он не предоставляет
+  managed teardown; следующий library atom добавляет lifecycle-aware provider
+  contract с backward compatibility для прямого `WorkerRuntime`.
 
 ## Wave 3 — Database Foundation И Первый HTTP Slice
 
@@ -1242,14 +1266,14 @@ Testo, Deptrac и real PostgreSQL/OpenSearch integration job; MODULE.md ждёт
 а contract/release smoke — G2. A2 получил typed settings и первый независимый
 `HttpRuntime` Thesis DIC root с container-owned PostgreSQL lifecycle и отдельный
 `CliRuntime` с исполняемым Symfony Console entrypoint; следующий slice —
-реальный `WorkerRuntime` одновременно с A3 package composition: worker root без
-`QueueWorkerRunner`, registry и scope bridge не создаётся как фиктивная
-заглушка. A3 уже подключил path-pinned core package, explicit application
-registry source, fast compile gate, Thesis scope bridge и correlation
-interceptor; nested dispatch/cancellation доказаны target-owned Scenario test.
-Следующий atom добавляет telemetry interceptor и собирает реальный worker root.
-JSON stdout, HTTP request/correlation lifecycle и graceful shutdown уже
-находятся в application shell; job fields будут seeded worker scopes.
+реальный `WorkerRuntime` теперь содержит `QueueWorkerRunner`, PostgreSQL
+consumer/control plane, registry scope bridge и job correlation boundary. A3
+подключил path-pinned core/worker packages, explicit registry source, fast
+compile gate, correlation/telemetry interceptors; nested dispatch/cancellation
+доказаны target-owned Scenario test. Следующий atom расширяет worker bootstrap
+contract для managed `Dic::run()` lifecycle: `Dic::build()` с утечкой pool не
+используется. JSON stdout, HTTP request/correlation и worker job lifecycle уже
+находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
 последний package-polish slice после стабилизации фактической A3 composition.
 Вопросы с вариантами открываются только для реально отсутствующего в v6 и
@@ -1257,6 +1281,17 @@ dependency baseline поведения. G0 и G1 остаются gates толь
 source.
 
 ## История Документа
+
+### 0.42.0 — 2026-11-04
+
+- path-pinned worker package подключён к application dependency graph;
+- собран третий реальный DIC root с PostgreSQL consumer/lease, worker control,
+  JSON serializer, queue runner и per-job service scope;
+- queue job boundary переносит message/correlation/job IDs и очищает context;
+- default flow дополнен safe telemetry interceptor без payload logging;
+- три runtime graph и Testo `29 tests / 91 assertions` проходят fast gate;
+- managed worker executable bootstrap выделен следующим library atom, чтобы не
+  использовать resource-leaking `Dic::build()`.
 
 ### 0.41.0 — 2026-11-04
 
