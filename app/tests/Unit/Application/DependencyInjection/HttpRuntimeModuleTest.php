@@ -20,7 +20,7 @@ final class HttpRuntimeModuleTest
         $runtimeClass = Dic::run(
             new HttpRuntimeModule(
                 new EnvironmentSnapshot([]),
-                MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_registry.php'),
+                MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_http.php'),
             ),
             static fn(HttpRuntime $runtime): string => $runtime::class,
         );

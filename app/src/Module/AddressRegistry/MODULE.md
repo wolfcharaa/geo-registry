@@ -1,6 +1,6 @@
 ---
 module: AddressRegistry
-version: 0.4.0
+version: 0.5.0
 updated: 2026-11-04
 language: ru
 ---
@@ -169,3 +169,40 @@ parent поиск служит глобальной входной стадие�
 
 - MessageBus: query `SuggestThoroughfare` через nested dispatch из
   `Capability/SuggestAddress`; собственного HTTP route нет.
+
+## Optional Reverse Geocode Feature
+
+### Поиск адреса по координатам — `Feature/ReverseGeocode`
+
+HTTP-клиент передаёт координаты, feature получает ближайшую location через
+Nominatim и вызывает публичный core-сценарий `SearchAddress` вложенным
+MessageBus dispatch. Совпавший GAR document имеет приоритет; если совпадения
+нет, transport возвращает отдельную Nominatim fallback suggestion с пустой GAR
+identity.
+
+**Правила**
+
+- `lat` и `lon` обязательны и ограничены географическими диапазонами; `num`
+  ограничен `1..20`, `hier` принимает `adm` или `mun`.
+- Raw JSON Nominatim нормализуется в `ReverseGeocodeLocation` внутри feature
+  adapter и не попадает в Capability или HTTP presenter.
+- GAR match выполняется только через public `SearchAddress`; handler не
+  инжектирует core handler и наследует cancellation текущего MessageBus scope.
+- Nominatim miss является успешным пустым результатом. HTTP/protocol/malformed
+  failures и timeout возвращаются как `503/geocoding_unavailable`.
+- Fallback location не создаёт `AddressDocument`: nullable GAR identity и
+  `search_backend=nominatim` формируются только transport presenter-ом.
+
+**Вход**
+
+- HTTP: `GET /api/addresses/reverse-geocode` через `ReverseGeocodeAction`;
+  внутри — query `ReverseGeocode`.
+- Postman: [HTTP-контракты модуля](../../../../docs/api/postman/geo-registry.postman_collection.json),
+  folder `Addresses`, requests `Reverse Geocode` и
+  `Reverse Geocode Missing Coordinates`.
+
+**Подключение/условие**
+
+- Feature binding объявлен только в `config/message_bus_http.php`. Базовый
+  `message_bus_registry.php` для CLI/worker его не содержит; удаление binding-а
+  из HTTP composition одновременно убирает handler и route.

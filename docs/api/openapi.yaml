@@ -276,8 +276,8 @@ paths:
       operationId: reverseGeocodeAddresses
       tags: [Addresses]
       summary: Resolve an address near coordinates
-      description: Accepted legacy contract; target AMPHP routing is planned for V4.
-      x-migration-status: planned
+      description: Resolve coordinates through Nominatim and normalize the location through the GAR search scenario.
+      x-migration-status: current
       x-postman-folder: Addresses
       x-postman-request: Reverse Geocode
       parameters:
@@ -305,6 +305,7 @@ paths:
               schema: {$ref: '#/components/schemas/AddressSuccessResponse'}
               examples:
                 found: {$ref: '#/components/examples/ReverseGeocodeSuccess'}
+                nominatimFallback: {$ref: '#/components/examples/ReverseGeocodeFallback'}
         '400':
           description: Coordinates are missing or malformed.
           content:
@@ -673,11 +674,11 @@ components:
               geo_lat: 55.750001
               geo_lon: 37.610001
               hierarchy_type: adm
-              level: 10
+              level: 8
               score: 1.0
               search_backend: postgres
               source: gar
-              source_id: 770005
+              source_id: null
               aliases: []
               alias_count: 0
               matched_alias: null
@@ -730,11 +731,41 @@ components:
               geo_lat: 55.750001
               geo_lon: 37.610001
               hierarchy_type: adm
-              level: 10
+              level: 8
               score: 1.0
               search_backend: postgres
               source: gar
+              source_id: null
+              aliases: []
+              alias_count: 0
+              matched_alias: null
+        meta: {endpoint: reverse-geocode}
+
+    ReverseGeocodeFallback:
+      value:
+        success: true
+        count: 1
+        query: {lat: 55.750001, lon: 37.610001, hierarchy: adm, limit: 1}
+        suggestions:
+          - value: Регион Альфа, Тестоград, Общая улица, 10
+            unrestricted_value: Регион Альфа, Тестоград, Общая улица, 10
+            data:
+              fias_id: null
+              fias_uuid: null
+              object_id: null
+              object_guid: null
+              postal_code: null
+              okato: null
+              oktmo: null
+              geo_lat: 55.750001
+              geo_lon: 37.610001
+              hierarchy_type: adm
+              level: null
+              score: null
+              search_backend: nominatim
+              source: nominatim
               source_id: 770005
+              source_type: way
               aliases: []
               alias_count: 0
               matched_alias: null
@@ -754,7 +785,7 @@ components:
       value:
         success: false
         count: 0
-        query: {}
+        query: {lat: 55.750001, lon: 37.610001, hierarchy: adm, limit: 1}
         suggestions: []
         meta: {endpoint: reverse-geocode}
         error: Geocoding service unavailable

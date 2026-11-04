@@ -12,6 +12,7 @@ use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressHandler;
 use App\Module\AddressRegistry\Capability\SuggestAddress\SuggestAddressHandler;
 use App\Module\AddressRegistry\Capability\SuggestAdministrativeArea\SuggestAdministrativeAreaHandler;
 use App\Module\AddressRegistry\Capability\SuggestThoroughfare\SuggestThoroughfareHandler;
+use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeHandler;
 use App\Module\AddressRegistry\Infrastructure\Postgres\PostgresAddressDocumentHydrator;
 use App\Module\AddressRegistry\Infrastructure\Postgres\PostgresAddressSuggestionReader;
 use App\Module\AddressRegistry\Infrastructure\Postgres\PostgresFindAddressByIdReader;
@@ -23,10 +24,15 @@ final class AddressRegistryMessageBusServices
 {
     /**
      * @param Ref<PostgresConnectionPool> $postgres
+     * @param Ref<object>|null $reverseGeocodeLocator
      * @return array<string, Ref<object>>
      */
-    public static function configure(Dic $dic, MessageBusRegistrySource $source, Ref $postgres): array
-    {
+    public static function configure(
+        Dic $dic,
+        MessageBusRegistrySource $source,
+        Ref $postgres,
+        ?Ref $reverseGeocodeLocator = null,
+    ): array {
         $findById = ($source->services[FindAddressByIdHandler::class] ?? null) === FindAddressByIdHandler::class;
         $search = ($source->services[SearchAddressHandler::class] ?? null) === SearchAddressHandler::class;
         $resolveSuggestionContext = ($source->services[ResolveSuggestionContextHandler::class] ?? null)
@@ -36,6 +42,8 @@ final class AddressRegistryMessageBusServices
             === SuggestAdministrativeAreaHandler::class;
         $suggestThoroughfare = ($source->services[SuggestThoroughfareHandler::class] ?? null)
             === SuggestThoroughfareHandler::class;
+        $reverseGeocode = ($source->services[ReverseGeocodeHandler::class] ?? null)
+            === ReverseGeocodeHandler::class;
         if (
             !$findById
             && !$search
@@ -43,6 +51,7 @@ final class AddressRegistryMessageBusServices
             && !$suggestAddress
             && !$suggestAdministrativeArea
             && !$suggestThoroughfare
+            && !$reverseGeocode
         ) {
             return [];
         }
@@ -96,6 +105,15 @@ final class AddressRegistryMessageBusServices
         if ($suggestAddress) {
             $services[SuggestAddressHandler::class] = $dic
                 ->object(SuggestAddressHandler::class)
+                ->canBeScoped();
+        }
+        if ($reverseGeocode) {
+            if ($reverseGeocodeLocator === null) {
+                throw new \LogicException('ReverseGeocode handler requires a composed locator.');
+            }
+            $services[ReverseGeocodeHandler::class] = $dic
+                ->object(ReverseGeocodeHandler::class)
+                ->arg('locator', $reverseGeocodeLocator)
                 ->canBeScoped();
         }
 

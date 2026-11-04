@@ -38,6 +38,25 @@ final readonly class NominatimClient
     }
 
     /** @return array<string, mixed> */
+    public function reverse(float $latitude, float $longitude, ?Cancellation $cancellation = null): array
+    {
+        $payload = $this->get('/reverse', [
+            'addressdetails' => 1,
+            'format' => 'jsonv2',
+            'lat' => $latitude,
+            'lon' => $longitude,
+            'zoom' => 18,
+        ], $cancellation);
+
+        if (array_is_list($payload)) {
+            throw new RuntimeException('Nominatim returned an unexpected reverse response.');
+        }
+
+        /** @var array<string, mixed> $payload */
+        return $payload;
+    }
+
+    /** @return array<string, mixed> */
     public function status(?Cancellation $cancellation = null): array
     {
         $payload = $this->get('/status', ['format' => 'json'], $cancellation);
@@ -51,7 +70,7 @@ final readonly class NominatimClient
     }
 
     /**
-     * @param array<string, int|string> $query
+     * @param array<string, float|int|string> $query
      * @return array<array-key, mixed>
      * @throws JsonException
      */

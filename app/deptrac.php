@@ -122,6 +122,7 @@ return static function (DeptracConfig $config): void {
                 $configLayer,
                 $scaffoldInfrastructure,
                 $moduleUserInterface,
+                $moduleFeature,
                 $ampCore,
                 $httpServer,
                 $postgres,
@@ -161,6 +162,8 @@ return static function (DeptracConfig $config): void {
                 $logging,
             ),
             Ruleset::forLayer($moduleFeature)->accesses(
+                $scaffoldInfrastructure,
+                $moduleUserInterface,
                 $moduleCapability,
                 $moduleInfrastructure,
                 $sharedKernel,

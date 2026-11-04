@@ -17,7 +17,7 @@ final class Bootstrap
         Dic::run(
             new HttpRuntimeModule(
                 EnvironmentSnapshot::capture(),
-                MessageBusRegistrySource::fromFile(dirname(__DIR__) . '/config/message_bus_registry.php'),
+                MessageBusRegistrySource::fromFile(dirname(__DIR__) . '/config/message_bus_http.php'),
             ),
             static fn(HttpRuntime $runtime) => $runtime->run(),
         );

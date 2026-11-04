@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; V3 SuggestAddress complete, V4 ReverseGeocode next`
-- Версия документа: `0.51.0`
+- Статус: `Active; V4 ReverseGeocode complete, V5 OpenSearch decorator next`
+- Версия документа: `0.52.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -1265,14 +1265,28 @@ GAR import.
 
 ### V4 — Reverse Geocode Через Nominatim
 
-- [ ] Оформить feature-local capability, port и typed Nominatim result.
-- [ ] Реализовать AMPHP client adapter с deadline/cancellation.
-- [ ] Выполнять GAR match через public `SearchAddress` contract.
-- [ ] Отделить Nominatim fallback location от core address document.
-- [ ] Проверить fake-server status, malformed JSON, timeout и cancellation.
+- [x] Оформить feature-local capability, port и typed Nominatim result.
+- [x] Реализовать AMPHP client adapter с deadline/cancellation.
+- [x] Выполнять GAR match через public `SearchAddress` contract.
+- [x] Отделить Nominatim fallback location от core address document.
+- [x] Проверить fake-server status, malformed JSON, timeout и cancellation.
 
 Готовность: feature отключается composition-ом, raw Nominatim payload не
 покидает adapter, outage отображается в typed error/result.
+
+- State: V4 закрыт `2026-11-04`; `reverseGeocodeAddresses` переведён в
+  `current`, а feature binding добавлен только в HTTP registry.
+- Nominatim adapter нормализует response до `ReverseGeocodeLocation`, сохраняет
+  cancellation/deadline и отображает protocol/malformed failures в typed
+  `ReverseGeocodeUnavailable`.
+- Parent handler вызывает core `SearchAddress` через
+  `MessageContextInterface::ask()`; при пустом GAR match fallback остаётся
+  отдельной feature location и не создаёт `AddressDocument`.
+- Fast gate: Testo `57 tests / 258 assertions`, PHPStan max, Deptrac
+  `0 violations / 0 uncovered`, core registry `6 bindings`, HTTP registry
+  `7 bindings`; Contract gate: `11 tests / 222 assertions`; Integration gate на
+  PHP 8.4/PostgreSQL 17/OpenSearch: `9 tests / 62 assertions`.
+- Следующий vertical slice — V5 optional OpenSearch decorator.
 
 ### V5 — OpenSearch Search Decorator
 
@@ -1439,7 +1453,9 @@ route, typed MessageBus query/result, AMPHP PostgreSQL reader и все четы
 suites. V2 добавил current `SearchAddress`, региональный predicate, FTS/trigram
 ranking, alias evidence и compatibility fallback без nationwide `DISTINCT`.
 V3 реализовал current staged `SuggestAddress`, nested MessageBus orchestration
-и региональный candidate path. Следующий HTTP slice — V4 `ReverseGeocode`.
+и региональный candidate path. V4 добавил current optional `ReverseGeocode`,
+typed Nominatim boundary и GAR match через public `SearchAddress`. Следующий
+online slice — V5 OpenSearch decorator.
 JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
@@ -1449,6 +1465,18 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.52.0 — 2026-11-04
+
+- завершён V4 optional `ReverseGeocode` с feature-local capability, port и
+  stable MessageBus binding;
+- raw Nominatim response изолирован в AMPHP adapter, deadline/cancellation и
+  typed outage покрыты fake HTTP client tests;
+- GAR normalization переиспользует public `SearchAddress`, а fallback location
+  не подменяет core `AddressDocument`;
+- отдельный HTTP registry подключает feature без импорта Nominatim в CLI/worker;
+- MODULE, OpenAPI и Postman синхронизированы; следующий slice — V5 OpenSearch
+  decorator.
 
 ### 0.51.0 — 2026-11-04
 

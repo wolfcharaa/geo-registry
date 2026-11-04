@@ -16,6 +16,7 @@ use App\Application\Health\HealthReport;
 use App\Application\Health\HealthStatus;
 use App\Infrastructure\Nominatim\NominatimClient;
 use App\Infrastructure\OpenSearch\OpenSearchClient;
+use App\Module\AddressRegistry\Feature\ReverseGeocode\UserInterface\Http\ReverseGeocodeAction;
 use App\Module\AddressRegistry\UserInterface\Http\FindAddressById\FindAddressByIdAction;
 use App\Module\AddressRegistry\UserInterface\Http\SearchAddress\SearchAddressAction;
 use App\Module\AddressRegistry\UserInterface\Http\SuggestAddress\SuggestAddressAction;
@@ -34,6 +35,7 @@ final readonly class RouterFactory
         private FindAddressByIdAction $findAddressById,
         private SearchAddressAction $searchAddress,
         private SuggestAddressAction $suggestAddress,
+        private ?ReverseGeocodeAction $reverseGeocode,
     ) {}
 
     public function create(HttpServer $server, ErrorHandler $errorHandler): Router
@@ -64,6 +66,13 @@ final readonly class RouterFactory
         $router->addRoute('POST', '/api/addresses/suggest', new ClosureRequestHandler(
             fn(Request $request): Response => $this->suggestAddress->handle($request),
         ));
+
+        $reverseGeocode = $this->reverseGeocode;
+        if ($reverseGeocode !== null) {
+            $router->addRoute('GET', '/api/addresses/reverse-geocode', new ClosureRequestHandler(
+                fn(Request $request): Response => $reverseGeocode->handle($request),
+            ));
+        }
 
         $router->addRoute('GET', '/geocode', new ClosureRequestHandler(
             fn(Request $request): Response => $this->geocode($request),

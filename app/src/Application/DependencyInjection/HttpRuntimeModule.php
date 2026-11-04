@@ -28,6 +28,11 @@ use App\Infrastructure\OpenSearch\OpenSearchClientFactory;
 use App\Infrastructure\OpenSearch\OpenSearchHealthCheck;
 use App\Infrastructure\Postgres\PostgresHealthCheck;
 use App\Infrastructure\Postgres\PostgresPoolFactory;
+use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeHandler;
+use App\Module\AddressRegistry\Feature\ReverseGeocode\Infrastructure\NominatimReverseGeocodeAdapter;
+use App\Module\AddressRegistry\Feature\ReverseGeocode\UserInterface\Http\ReverseGeocodeAction;
+use App\Module\AddressRegistry\Feature\ReverseGeocode\UserInterface\Http\ReverseGeocodePresenter;
+use App\Module\AddressRegistry\Feature\ReverseGeocode\UserInterface\Http\ReverseGeocodeRequestMapper;
 use App\Module\AddressRegistry\UserInterface\Http\AddressSuggestionPresenter;
 use App\Module\AddressRegistry\UserInterface\Http\FindAddressById\FindAddressByIdAction;
 use App\Module\AddressRegistry\UserInterface\Http\FindAddressById\FindAddressByIdPresenter;
@@ -89,12 +94,6 @@ final readonly class HttpRuntimeModule implements Module
                 ),
             )
             ->disposer(static fn(PostgresConnectionPool $pool) => $pool->close());
-        $messageBus = $dic->import(new ApplicationMessageBusModule(
-            $registrySource,
-            $correlationContext,
-            $logger,
-            AddressRegistryMessageBusServices::configure($dic, $registrySource, $postgres),
-        ));
         $nominatim = $dic
             ->object(NominatimClient::class)
             ->args([
@@ -103,6 +102,22 @@ final readonly class HttpRuntimeModule implements Module
                 'userAgent' => $httpConfig->userAgent,
                 'language' => $nominatimConfig->language,
             ]);
+        $reverseGeocodeEnabled = ($registrySource->services[ReverseGeocodeHandler::class] ?? null)
+            === ReverseGeocodeHandler::class;
+        $reverseGeocodeLocator = $reverseGeocodeEnabled
+            ? $dic->object(NominatimReverseGeocodeAdapter::class)->arg('client', $nominatim)
+            : null;
+        $messageBus = $dic->import(new ApplicationMessageBusModule(
+            $registrySource,
+            $correlationContext,
+            $logger,
+            AddressRegistryMessageBusServices::configure(
+                $dic,
+                $registrySource,
+                $postgres,
+                $reverseGeocodeLocator,
+            ),
+        ));
         $openSearchFactory = $dic
             ->object(OpenSearchClientFactory::class)
             ->arg('httpClient', $httpClient);
@@ -212,6 +227,20 @@ final readonly class HttpRuntimeModule implements Module
                 'messageBus' => $messageBus,
                 'timeoutSeconds' => $httpConfig->timeoutSeconds,
             ]);
+        $reverseGeocode = $reverseGeocodeEnabled
+            ? $dic
+                ->object(ReverseGeocodeAction::class)
+                ->args([
+                    'requestMapper' => $dic
+                        ->object(ReverseGeocodeRequestMapper::class)
+                        ->arg('validator', $validator),
+                    'presenter' => $dic
+                        ->object(ReverseGeocodePresenter::class)
+                        ->arg('documents', $suggestionPresenter),
+                    'messageBus' => $messageBus,
+                    'timeoutSeconds' => $httpConfig->timeoutSeconds,
+                ])
+            : null;
         $routerFactory = $dic
             ->object(RouterFactory::class)
             ->args([
@@ -224,6 +253,7 @@ final readonly class HttpRuntimeModule implements Module
                 'findAddressById' => $findAddressById,
                 'searchAddress' => $searchAddress,
                 'suggestAddress' => $suggestAddress,
+                'reverseGeocode' => $reverseGeocode,
             ]);
 
         return $dic

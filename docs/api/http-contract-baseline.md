@@ -1,6 +1,6 @@
 # HTTP Contract Baseline
 
-- Версия baseline: `0.4.0`
+- Версия baseline: `0.5.0`
 - Дата: `2026-11-04`
 - Structural source: [OpenAPI 3.1](openapi.yaml)
 - Executable companion: [Postman collection](postman/geo-registry.postman_collection.json)
@@ -14,10 +14,9 @@ Baseline фиксирует публичное поведение, разреш�
 двухрегиональным fixture проекта.
 
 Health operations, `POST /api/addresses/find-by-id`,
-`GET /api/addresses/search` и `POST /api/addresses/suggest` со статусом
-`x-migration-status: current` обслуживаются целевым AMPHP runtime. Остальные
-address operations со статусом `planned` являются целью следующих parity slices
-и пока не маршрутизируются.
+`GET /api/addresses/search`, `POST /api/addresses/suggest` и
+`GET /api/addresses/reverse-geocode` со статусом `x-migration-status: current`
+обслуживаются целевым AMPHP runtime.
 Переходные `/geocode` и `/search` не входят в публичный AddressRegistry contract.
 
 ## Правила Совместимости
@@ -39,10 +38,15 @@ address operations со статусом `planned` являются целью �
 - `region_code` — additive optional filter legacy search route. Региональный
   downstream path передаёт его явно; отсутствие сохраняет совместимый nationwide
   fallback без online `DISTINCT`.
+- Reverse geocode сначала получает typed location из Nominatim, затем вызывает
+  публичный `SearchAddress`. Если GAR match отсутствует, Nominatim location
+  возвращается отдельной suggestion с nullable GAR identity и
+  `search_backend=nominatim`; она не становится core address document.
 - Response examples не являются production data и сами по себе не доказывают
-  наличие route в target. Исполняемость `find-by-id`, `search` и `suggest`
+  наличие route в target. Исполняемость `find-by-id`, `search`, `suggest` и
+  `reverse-geocode`
   подтверждают handler/contract tests и карточки сценариев в `MODULE.md`;
-  остальные address examples остаются baseline для следующих slices.
+  последующие optional backend/data operations остаются следующими slices.
 
 ## Автоматическая Проверка
 
