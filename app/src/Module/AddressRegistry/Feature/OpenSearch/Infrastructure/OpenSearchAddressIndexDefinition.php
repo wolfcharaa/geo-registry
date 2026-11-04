@@ -7,9 +7,17 @@ namespace App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure;
 final class OpenSearchAddressIndexDefinition
 {
     /** @return array<string, mixed> */
-    public static function create(): array
-    {
+    public static function create(
+        int $numberOfShards = 1,
+        int $numberOfReplicas = 0,
+        string $refreshInterval = '1s',
+    ): array {
         return [
+            'settings' => [
+                'number_of_shards' => $numberOfShards,
+                'number_of_replicas' => $numberOfReplicas,
+                'refresh_interval' => $refreshInterval,
+            ],
             'mappings' => [
                 'dynamic' => 'strict',
                 'properties' => [

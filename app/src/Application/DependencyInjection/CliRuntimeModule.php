@@ -13,6 +13,7 @@ use App\Application\Runtime\CliRuntime;
 use App\Config\ConsoleConfig;
 use App\Config\EnvironmentSnapshot;
 use App\Config\LoggingConfig;
+use App\Config\OpenSearchConfig;
 use App\Config\PostgresConfig;
 use App\Infrastructure\Logging\StdoutLoggerFactory;
 use App\Infrastructure\Postgres\PostgresPoolFactory;
@@ -36,6 +37,7 @@ final readonly class CliRuntimeModule implements Module
         $config = ConsoleConfig::fromEnvironment($this->environment);
         $loggingConfig = LoggingConfig::fromEnvironment($this->environment);
         $postgresConfig = PostgresConfig::fromEnvironment($this->environment);
+        $openSearchConfig = OpenSearchConfig::fromEnvironment($this->environment);
         $source = $this->messageBusRegistry ?? MessageBusRegistrySource::empty();
         $application = $dic->object(
             Application::class,
@@ -83,6 +85,9 @@ final readonly class CliRuntimeModule implements Module
         ]);
         $application->call('addCommand', [
             $dic->import(new AddressSearchRebuildCliModule($postgresConfig)),
+        ]);
+        $application->call('addCommands', [
+            $dic->import(new OpenSearchProjectionCliModule($postgres, $config, $openSearchConfig)),
         ]);
 
         return $dic

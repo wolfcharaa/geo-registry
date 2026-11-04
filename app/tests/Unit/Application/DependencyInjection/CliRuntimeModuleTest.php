@@ -44,6 +44,8 @@ final class CliRuntimeModuleTest
         Assert::true(str_contains($console, 'migrate:mark'));
         Assert::true(str_contains($console, 'gar:import'));
         Assert::true(str_contains($console, 'gar:address-search:rebuild'));
+        Assert::true(str_contains($console, 'opensearch:reindex'));
+        Assert::true(str_contains($console, 'opensearch:index:cleanup'));
     }
 
     public function testItCompilesTheExplicitMessageBusRegistry(): void

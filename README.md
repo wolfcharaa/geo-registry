@@ -79,8 +79,9 @@ Readiness возвращает `unavailable`/`503` только при отка�
 `OPENSEARCH_SEARCH_ENABLED=1` подключает optional OpenSearch decorator: непустые
 валидные hits возвращаются с `search_backend=opensearch`, а empty/outage/
 malformed projection прозрачно использует PostgreSQL fallback. OpenSearch
-начинает с пустого индекса; перед включением feature индекс должен быть создан
-с текущим strict mapping. Его полный rebuild и alias cutover относятся к C3.
+projection строится командой `opensearch:reindex`: она создаёт versioned
+physical index, проверяет parity и атомарно переключает `OPENSEARCH_INDEX` как
+read alias. После первого успешного cutover online feature можно включить.
 
 ## Почему собственный OpenSearch client
 
@@ -94,7 +95,7 @@ fiber-aware ожидание I/O, никаких Guzzle/PSR-18 adapters и сг�
 Расширять его нужно вертикально по реальным потребностям:
 
 1. добавлять типизированные методы только для используемых API;
-2. отдельно реализовать NDJSON streaming для `_bulk`;
+2. держать NDJSON `_bulk` bounded по batch size и числу in-flight requests;
 3. retry разрешать только для явно идемпотентных операций;
 4. AWS SigV4, mTLS и observability оформлять decorators/interceptors;
 5. передавать уже поддерживаемый клиентом `Cancellation` из будущих долгих
@@ -140,6 +141,8 @@ make architecture-check # отдельно проверить направлен
 app/bin/console list # показать CLI commands
 app/bin/console migrate:new --all # показать неприменённые migrations
 app/bin/console migrate:up --force-yes # применить migrations к application PostgreSQL
+app/bin/console opensearch:reindex --help # blue-green rebuild и alias cutover
+app/bin/console opensearch:index:cleanup --help # подтверждённая очистка inactive index
 app/bin/worker list  # показать worker run/control/status commands
 make smoke    # проверить запущенный HTTP service
 make down     # остановить без удаления volumes

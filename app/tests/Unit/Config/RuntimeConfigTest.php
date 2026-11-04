@@ -36,6 +36,12 @@ final class RuntimeConfigTest
             'OPENSEARCH_URL' => 'https://search.example:9200',
             'OPENSEARCH_INDEX' => 'addresses',
             'OPENSEARCH_SEARCH_ENABLED' => 'true',
+            'OPENSEARCH_TIMEOUT_SECONDS' => '90',
+            'OPENSEARCH_NUMBER_OF_SHARDS' => '3',
+            'OPENSEARCH_NUMBER_OF_REPLICAS' => '1',
+            'OPENSEARCH_BULK_NUMBER_OF_REPLICAS' => '0',
+            'OPENSEARCH_REFRESH_INTERVAL' => '2s',
+            'OPENSEARCH_BULK_REFRESH_INTERVAL' => '-1',
         ]);
 
         $http = HttpServerConfig::fromEnvironment($environment);
@@ -47,6 +53,7 @@ final class RuntimeConfigTest
 
         Assert::same($console->name, 'geo-registry-test');
         Assert::same($console->version, 'test');
+        Assert::same($console->userAgent, 'geo-registry/test');
         Assert::same($http->listen, '0.0.0.0:9000');
         Assert::same($http->timeoutSeconds, 3.5);
         Assert::same($logging->service, 'geo-registry-test');
@@ -58,6 +65,12 @@ final class RuntimeConfigTest
         Assert::same($openSearch->url, 'https://search.example:9200');
         Assert::same($openSearch->index, 'addresses');
         Assert::same($openSearch->searchEnabled, true);
+        Assert::same($openSearch->timeoutSeconds, 90.0);
+        Assert::same($openSearch->numberOfShards, 3);
+        Assert::same($openSearch->numberOfReplicas, 1);
+        Assert::same($openSearch->bulkNumberOfReplicas, 0);
+        Assert::same($openSearch->refreshInterval, '2s');
+        Assert::same($openSearch->bulkRefreshInterval, '-1');
     }
 
     #[ExpectException(InvalidArgumentException::class)]
@@ -73,6 +86,22 @@ final class RuntimeConfigTest
     {
         OpenSearchConfig::fromEnvironment(new EnvironmentSnapshot([
             'OPENSEARCH_SEARCH_ENABLED' => 'sometimes',
+        ]));
+    }
+
+    #[ExpectException(InvalidArgumentException::class)]
+    public function testOpenSearchRejectsAnInvalidRefreshInterval(): void
+    {
+        OpenSearchConfig::fromEnvironment(new EnvironmentSnapshot([
+            'OPENSEARCH_REFRESH_INTERVAL' => 'immediately',
+        ]));
+    }
+
+    #[ExpectException(InvalidArgumentException::class)]
+    public function testOpenSearchRejectsAnUnsafeIndexAlias(): void
+    {
+        OpenSearchConfig::fromEnvironment(new EnvironmentSnapshot([
+            'OPENSEARCH_INDEX' => 'Unsafe Alias',
         ]));
     }
 

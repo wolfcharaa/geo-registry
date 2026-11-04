@@ -1,6 +1,6 @@
 # Архитектура Geo Registry
 
-- Версия документа: `0.5.0`
+- Версия документа: `0.6.0`
 - Обновлено: `2026-11-04`
 - Статус: `Target architecture; scaffold is transitional`
 - План миграции: [migration/implementation-roadmap.md](migration/implementation-roadmap.md)
@@ -336,9 +336,9 @@ migrations, backup, restore и volumes. Приложение не выполня
 Nominatim database.
 
 Canonical GAR/address tables остаются source of truth. Search/suggest online
-path использует rebuildable region-aware read model. Текущая переходная
-`address_search` получила вычисляемый `region_code` и индекс отдельной forward
-migration; C2 заменит её partitioned projection после benchmark/parity gate.
+path использует rebuildable region-aware read model. C2 перестраивает
+`address_search` как LIST-partitioned projection после integrity/parity gate и
+атомарно переключает active table.
 После определения региона downstream context передаёт `regionCode` явно и не
 выполняет nationwide `DISTINCT`; отсутствие региона разрешено только как legacy
 HTTP compatibility fallback.
@@ -347,8 +347,10 @@ OpenSearch индекс строится из canonical/read-model data и пе�
 versioned physical index + alias только после успешной загрузки и parity check.
 OpenSearch outage не меняет canonical state и при принятой optional policy даёт
 readiness `degraded`, а не liveness failure. Online decorator выключен по
-умолчанию и включается `OPENSEARCH_SEARCH_ENABLED=1`; до C3 оператор отвечает за
-наличие индекса с текущим strict mapping.
+умолчанию и включается `OPENSEARCH_SEARCH_ENABLED=1`. C3 выполняет build одним
+AMPHP CLI process с bounded NDJSON concurrency; HTTP/per-item failure оставляет
+старый alias активным. Предыдущие и failed physical indexes удаляются только
+отдельной cleanup command с точным подтверждением и active-target guard.
 
 Nominatim используется через application-owned typed client/feature port.
 Community Docker image допустим в development; production image/digest и data

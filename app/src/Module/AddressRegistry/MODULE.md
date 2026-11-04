@@ -1,6 +1,6 @@
 ---
 module: AddressRegistry
-version: 0.8.0
+version: 0.9.0
 updated: 2026-11-04
 language: ru
 ---
@@ -366,12 +366,94 @@ PostgreSQL остаётся fallback и источником истины.
   попадает в warning log.
 - Per-request cancellation передаётся OpenSearch client-у и не подменяется
   fallback-вызовом.
-- Typed client operations V5 ограничены create/delete index, index document,
-  refresh и search. Streaming `_bulk` и alias cutover остаются за C3.
+- Typed client operations включают mapping/index lifecycle, bounded `_bulk`,
+  settings, refresh, count, search и atomic alias operations. HTTP и каждый
+  bulk item проверяются отдельно; неявного retry нет.
 
 **Подключение/условие**
 
 - Decorator собирается только в `HttpRuntimeModule`; CLI и worker продолжают
   получать PostgreSQL `SearchAddressPort`.
-- Индекс должен быть создан с `OpenSearchAddressIndexDefinition`; до отдельного
-  C3 rebuild включение feature остаётся операторским решением.
+- Read alias и versioned physical indexes создаёт CLI rebuild ниже; включение
+  online feature после успешного первого cutover остаётся операторским решением.
+
+### Blue-green перестройка projection — `Feature/OpenSearch/Capability/RebuildProjection`
+
+Оператор строит новый physical index из активной региональной
+`address_search`, проверяет его и только затем переключает стабильный read
+alias. Команда сохраняет имя `opensearch:reindex` из проверенной версии 6, но
+выполняет конкурентную загрузку fiber-ами одного AMPHP CLI process без
+`proc_open` worker-ов.
+
+**Правила**
+
+- PostgreSQL читается из одной repeatable-read read-only snapshot; документы
+  обходятся стабильным курсором `(region_code, id)`.
+- Document ID имеет вид `region_code:hierarchy_type:object_id`, поэтому повтор
+  того же batch идемпотентен по identity. Команда сама retry не выполняет.
+- `--batch-size` ограничивает один NDJSON payload диапазоном `1..10000`, а
+  `--concurrency` — число in-flight `_bulk` requests диапазоном `1..32`.
+- Target получает имя `<alias>-v<UTC timestamp>`, strict mapping и отдельные
+  bulk refresh/replica settings. После загрузки восстанавливаются normal
+  settings и выполняется refresh.
+- Source count, число подтверждённых bulk items и physical target count должны
+  совпасть. Только после этого одна `_aliases` operation удаляет прежние alias
+  bindings и добавляет новый.
+- Ошибка до cutover не меняет active alias. Неуспешный target сохраняется для
+  диагностики и явной cleanup operation; предыдущий успешный index также не
+  удаляется автоматически.
+- Если transport оборвался уже во время `_aliases`, исход атомарной operation
+  считается неоднозначным: команда требует сначала проверить текущий alias и
+  не разрешает слепой retry.
+- `--no-alias-switch` завершает verified build без cutover.
+
+**Параметры запуска**
+
+- `--batch-size` — документов в одном `_bulk`, default `1000`.
+- `--concurrency` — максимум in-flight requests, default `4`.
+- `--no-alias-switch` — проверить target, но не переключать alias.
+
+**Справка**
+
+```shell
+docker/compose/dev.sh run --rm --no-deps app php bin/console opensearch:reindex --help
+php bin/console opensearch:reindex --help
+```
+
+**Результат запуска**
+
+Команда печатает target, source/indexed/target counters, факт alias switch,
+предыдущие physical indexes и elapsed milliseconds. Ошибка возвращает exit
+code `1`, сообщает сохранённый target и не меняет текущий search.
+
+**Подключение/условие**
+
+- `OpenSearchProjectionCliModule` подключён только к `CliRuntimeModule`; HTTP
+  использует тот же native client, но не получает rebuild capability.
+- Перед запуском применяются migrations и завершена C2 перестройка
+  `address_search`; каждая строка обязана иметь `region_code` в `1..99`.
+
+### Очистка physical index — `Feature/OpenSearch/Capability/CleanupProjection`
+
+Оператор отдельно удаляет старый успешный или неудачный physical index. Rebuild
+намеренно не объединён с удалением, чтобы rollback оставался доступным после
+cutover.
+
+**Правила**
+
+- Команда принимает только index с versioned prefix текущего configured alias.
+- `--confirm` должен дословно совпасть с `--index`.
+- Physical index, на который сейчас указывает read alias, удалить нельзя.
+- Отсутствующий, чужой, неподтверждённый или active index даёт exit code `1` и
+  не меняет OpenSearch state.
+
+**Вход**
+
+```shell
+php bin/console opensearch:index:cleanup \
+  --index=places-v20261104123456789 \
+  --confirm=places-v20261104123456789
+```
+
+Собственного HTTP route, Postman request или MessageBus binding у обеих CLI
+операций нет.

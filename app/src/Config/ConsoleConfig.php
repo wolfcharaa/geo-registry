@@ -11,12 +11,16 @@ final readonly class ConsoleConfig
     public function __construct(
         public string $name,
         public string $version,
+        public string $userAgent,
     ) {
         if (trim($this->name) === '') {
             throw new InvalidArgumentException('APP_NAME must be a non-empty string.');
         }
         if (trim($this->version) === '') {
             throw new InvalidArgumentException('APP_VERSION must be a non-empty string.');
+        }
+        if (trim($this->userAgent) === '') {
+            throw new InvalidArgumentException('APP_USER_AGENT must be a non-empty string.');
         }
     }
 
@@ -25,6 +29,7 @@ final readonly class ConsoleConfig
         return new self(
             name: $environment->string('APP_NAME', 'geo-registry'),
             version: $environment->string('APP_VERSION', '0.1.0-dev'),
+            userAgent: $environment->string('APP_USER_AGENT', 'geo-registry/0.1'),
         );
     }
 }

@@ -7,7 +7,7 @@ namespace App\Infrastructure\OpenSearch;
 use RuntimeException;
 use Throwable;
 
-final class OpenSearchException extends RuntimeException
+class OpenSearchException extends RuntimeException
 {
     /** @param array<array-key, mixed>|string|null $response */
     public function __construct(

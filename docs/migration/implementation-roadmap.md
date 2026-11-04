@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; C2 regional read model complete, C3 OpenSearch rebuild next`
-- Версия документа: `0.55.0`
+- Статус: `Active; C3 OpenSearch rebuild complete, W1 application worker runtime next`
+- Версия документа: `0.56.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -1386,14 +1386,40 @@ online queries читают только выбранный регион.
 
 ### C3 — OpenSearch Blue-Green Rebuild
 
-- [ ] Реализовать NDJSON bulk streaming с bounded in-flight requests.
-- [ ] Проверять HTTP и per-item bulk errors без неявного retry.
-- [ ] Строить versioned physical index и выполнять parity check.
-- [ ] Переключать alias атомарно только после успешной загрузки.
-- [ ] Удалять старый index отдельной подтверждённой cleanup operation.
+- [x] Реализовать NDJSON bulk streaming с bounded in-flight requests.
+- [x] Проверять HTTP и per-item bulk errors без неявного retry.
+- [x] Строить versioned physical index и выполнять parity check.
+- [x] Переключать alias атомарно только после успешной загрузки.
+- [x] Удалять старый index отдельной подтверждённой cleanup operation.
 
 Готовность: failure до alias switch не влияет на текущий search; retry разрешён
 только после отдельной классификации идемпотентности.
+
+Реализовано:
+
+- `opensearch:reindex` читает одну repeatable-read PostgreSQL snapshot курсором
+  `(region_code, id)` и строит deterministic document identity
+  `region_code:hierarchy_type:object_id`.
+- Один AMPHP CLI process держит не больше `--concurrency` NDJSON `_bulk`
+  requests; batch payload ограничен `--batch-size`. Process fan-out версии 6 не
+  перенесён.
+- Native client проверяет HTTP status, размер bulk response и каждый item.
+  Неявного retry нет; при failure остальные in-flight requests отменяются,
+  active alias не меняется, versioned target сохраняется для диагностики.
+- Transport failure во время самой atomic `_aliases` operation маркируется как
+  ambiguous outcome и требует read-back alias перед любым ручным retry.
+- Bulk refresh/replica settings заменяются normal settings перед refresh.
+  Source count, подтверждённые items и physical target count образуют parity
+  gate для одной atomic `_aliases` operation.
+- `opensearch:index:cleanup` принимает только versioned prefix configured alias,
+  требует точного `--confirm` и отказывает для active target. Rebuild не удаляет
+  previous или failed indexes автоматически.
+- Real integration test выполняет C2 regional build, успешный C3 cutover,
+  item-level mapping failure без смены alias, повторный успешный cutover и
+  cleanup guards на PostgreSQL 17/OpenSearch 3.9.
+- Fast gate: Testo `76 tests / 347 assertions`, PHPStan max, Deptrac
+  `0 violations / 0 uncovered`; Contract gate: `11 tests / 222 assertions`;
+  Integration gate: `12 tests / 143 assertions`.
 
 ## Wave 7 — Durable Workers И Enrichment
 
@@ -1519,8 +1545,9 @@ typed Nominatim boundary и GAR match через public `SearchAddress`. V5 по
 optional OpenSearch decorator с PostgreSQL fallback и real regional mapping
 gate. C1 добавил CLI-only XMLReader/COPY importer с operation checkpoints и
 проверенным partial-file recovery. C2 перенёс shadow rebuild в регионально
-partitioned projection с parity gate и atomic cutover. Следующий slice — C3
-OpenSearch blue-green rebuild.
+partitioned projection с parity gate и atomic cutover. C3 добавил native async
+OpenSearch blue-green rebuild, atomic alias cutover и отдельную cleanup
+operation. Следующий slice — W1 application worker runtime.
 JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
@@ -1530,6 +1557,19 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.56.0 — 2026-11-04
+
+- завершён C3 CLI-only blue-green rebuild OpenSearch projection;
+- добавлены repeatable-read source snapshot, regional document IDs и bounded
+  concurrent NDJSON `_bulk` без implicit retry;
+- HTTP/per-item failures и exact source/index/target parity блокируют alias
+  switch, versioned target сохраняется для диагностики;
+- atomic alias cutover сохраняет previous index, отдельная cleanup command
+  требует точного подтверждения и запрещает удаление active target;
+- Fast gate: Testo `76 tests / 347 assertions`, PHPStan max, Deptrac
+  `0 violations / 0 uncovered`; Integration gate на PostgreSQL 17/OpenSearch
+  3.9: `12 tests / 143 assertions`; следующий slice — W1 worker runtime.
 
 ### 0.55.0 — 2026-11-04
 
