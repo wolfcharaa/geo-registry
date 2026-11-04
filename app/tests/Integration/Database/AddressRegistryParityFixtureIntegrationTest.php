@@ -24,7 +24,7 @@ final class AddressRegistryParityFixtureIntegrationTest
             IntegrationDatabase::runMigrationCommand($dsn, 'migrate:up', ['--force-yes' => true]);
             AddressRegistryParityFixture::load($pool);
 
-            Assert::same(AddressRegistryParityFixture::VERSION, '2');
+            Assert::same(AddressRegistryParityFixture::VERSION, '3');
             Assert::same(AddressRegistryParityFixture::checksum(), AddressRegistryParityFixture::CHECKSUM);
 
             $counts = $pool->query(<<<'SQL'
@@ -42,6 +42,25 @@ SQL)->fetchRow();
             Assert::same((int) ($counts['search_documents'] ?? -1), 20);
             Assert::same((int) ($counts['indexed_documents'] ?? -1), 20);
             Assert::same((int) ($counts['municipal_nodes'] ?? -1), 10);
+
+            $regionalKeys = [];
+            $result = $pool->query(<<<'SQL'
+SELECT DISTINCT region_code, left(okato, 2) AS okato_prefix
+FROM address_search
+WHERE object_id IN (770005, 780005)
+ORDER BY region_code
+SQL);
+            while (($row = $result->fetchRow()) !== null) {
+                $regionalKeys[] = [
+                    'region_code' => (int) ($row['region_code'] ?? 0),
+                    'okato_prefix' => $row['okato_prefix'] ?? null,
+                ];
+            }
+
+            Assert::same($regionalKeys, [
+                ['region_code' => 77, 'okato_prefix' => '45'],
+                ['region_code' => 78, 'okato_prefix' => '40'],
+            ]);
 
             $regionalHierarchy = [];
             $result = $pool->query(<<<'SQL'

@@ -43,7 +43,7 @@ SQL)->fetchRow();
         $pool->query('CREATE SCHEMA public');
     }
 
-    /** @param array<string, bool> $options */
+    /** @param array<string, bool|int|string> $options */
     public static function runMigrationCommand(string $dsn, string $command, array $options): void
     {
         $output = new BufferedOutput();

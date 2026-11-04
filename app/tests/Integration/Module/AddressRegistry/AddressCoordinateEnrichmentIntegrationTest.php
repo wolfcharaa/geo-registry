@@ -108,11 +108,11 @@ final class AddressCoordinateEnrichmentIntegrationTest
         foreach (['adm', 'mun'] as $hierarchy) {
             $postgres->execute(<<<'SQL'
 INSERT INTO address_search (
-    object_id, object_guid, address_string, hierarchy_type, level, postal_code,
+    object_id, region_code, object_guid, address_string, hierarchy_type, level, postal_code,
     okato, oktmo, geo_lat, geo_lon, geocoded_at, address_source
 ) VALUES (
-    :object_id, CAST(:object_guid AS uuid), :address, :hierarchy, 8, '770001',
-    '77001000000', '77001001000', NULL, NULL, NULL, 'gar'
+    :object_id, 77, CAST(:object_guid AS uuid), :address, :hierarchy, 8, '770001',
+    '45001000000', '77001001000', NULL, NULL, NULL, 'gar'
 )
 SQL, [
                 'object_id' => $objectId,

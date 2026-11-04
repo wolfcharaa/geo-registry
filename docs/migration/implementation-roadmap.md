@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; R1 executable gate ready, representative execution pending`
-- Версия документа: `0.59.0`
+- Статус: `Active; local R1 preparation continues, full-data execution deferred to data server`
+- Версия документа: `0.60.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -119,7 +119,7 @@ line с `0.1.0`; Git repository topology определяется gate G4:
 | G2 Contract baseline | Зафиксированы Postman collection, OpenAPI draft, representative responses и ошибки | Первый HTTP parity slice | `Accepted` |
 | G3 Parity dataset | Определён маленький deterministic PostgreSQL dataset с регионами и hierarchy cases | Search/Suggest parity | `Accepted` |
 | G4 Package workspace | Два соседних Git repository: `MessageBusAsync` и `MessageBusAsyncWorker`; history v6 не изменяется | Реализация MessageBus 0.1.0 | `Accepted` |
-| G5 Cutover data | Выбраны full re-import либо проверенный dump/restore path | Production cutover | `Deferred` |
+| G5 Cutover data | Выбраны full re-import либо проверенный dump/restore path | Production cutover | `Deferred to data server` |
 
 За пределами явно разрешённых 21 migration и публичных HTTP contract artifacts
 G0 продолжает требовать отдельного подтверждения либо clean-room реализацию.
@@ -194,8 +194,9 @@ Library, application foundation и database fixture tracks можно вести
 
 - Accepted: synthetic fixture v1 с регионами 77/78, одинаковыми названиями
   района, города, улицы и дома, а также `adm`/`mun` hierarchy variants.
-- State: V3 поднял fixture до v2, добавив municipal projection documents для
-  региона, района и города; UUID/ID synthetic identity сохранена.
+- State: V3 добавил municipal projection documents для региона, района и
+  города; fixture v3 дополнительно разнёс GAR regions `77/78` и префиксы ОКАТО
+  `45/40`. UUID/ID synthetic identity сохранена.
 - Coverage: stable UUID lookup, active/inactive selection, regional path,
   nationwide ambiguity, search documents и deterministic empty/not-found data.
 - Artifact: [parity-fixture.md](parity-fixture.md), SQL source с закреплённым
@@ -1220,9 +1221,10 @@ GAR import.
 - Typed query/criteria/result/match contracts используют общий
   `AddressDocument`, `AddressHierarchy` и alias evidence; binding
   `address-registry.search-address.v1` компилируется explicit registry.
-- Forward migration добавляет вычисляемый `address_search.region_code` и индекс,
-  не меняя canonical GAR tables; C2 сохраняет ответственность за partitioned
-  read model и shadow cutover.
+- Forward migration сохраняет `address_search.region_code` как явный ключ из
+  активной административной GAR hierarchy и индексирует его, не меняя canonical
+  GAR tables; C2 сохраняет ответственность за partitioned read model и shadow
+  cutover. Префикс ОКАТО как источник региона запрещён.
 - Региональный вызов применяет predicate до ranking. Nullable region остаётся
   только additive legacy HTTP fallback и также не использует `DISTINCT`.
 - Ranking объединяет Russian FTS, exact/trigram score с порогом `0.3`, level и
@@ -1600,7 +1602,10 @@ direct runtime bootstrap сохранён для совместимости. D1 
 исходные migration и target-owned forward migrations проходят apply-from-zero и
 полный rollback на PostgreSQL 17/PostGIS.
 D2 добавил target-owned fixture с regional ambiguity, checksum и быстрым reset;
-V3 расширил его до v2 municipal administrative documents. G1 закрепил
+V3 расширил его municipal administrative documents, а fixture v3 отделил GAR
+`REGIONCODE` от префикса ОКАТО. Корректирующая migration сохраняет исторический
+identifier старого перехода, переводит regional key в явное поле и выполняет
+set-based backfill из активной административной hierarchy. G1 закрепил
 `AddressRegistry` как business owner, G2 сохранил разрешённый
 публичный HTTP contract в OpenAPI/Postman и включил отдельный coverage gate. V1
 реализовал первый source-verifiable scenario `FindAddressById`: current HTTP
@@ -1616,10 +1621,13 @@ gate. C1 добавил CLI-only XMLReader/COPY importer с operation checkpoint
 partitioned projection с parity gate и atomic cutover. C3 добавил native async
 OpenSearch blue-green rebuild, atomic alias cutover и отдельную cleanup
 operation. W1 application worker runtime и W2 coordinate enrichment
-реализованы. R1 получил pinned strict Postman runner и operator runbook; фактический
-full Nominatim/import/rebuild/legacy comparison и gate старых RoadRunner queues
-остаются release execution. E1 Data.Mos/OSM extensions остаются deferred до
-отдельного подтверждения scope.
+реализованы. R1 получил pinned strict Postman runner и operator runbook;
+фактический full Nominatim/import/rebuild/legacy comparison и gate старых
+RoadRunner queues остаются release execution на сервере с полным GAR archive.
+До этого локально продолжаются schema, synthetic integration и contract slices.
+Прямой restore legacy `address_search.dump` не считается готовым data path:
+после canonical restore/import обязателен C2 rebuild с региональной parity. E1
+Data.Mos/OSM extensions остаются deferred до отдельного подтверждения scope.
 JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
@@ -1629,6 +1637,19 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.60.0 — 2026-11-04
+
+- исправлен transitional regional key: `address_search.region_code` больше не
+  вычисляется из несовместимого префикса ОКАТО, а backfill-ится из активной
+  `administrative_reestr_hierarchy` отдельной migration;
+- parity fixture v3 использует GAR regions `77/78` при ОКАТО `45.../40...` и
+  доказывает независимость классификаторов в regional search/suggest;
+- локальный этап закреплён за schema, synthetic integration и документацией;
+  full restore, C2/C3 rebuild, plans, benchmark и release parity перенесены на
+  сервер с полным dataset;
+- прямое включение legacy `address_search.dump` без staging/backfill или C2
+  rebuild parity исключено из поддержанного cutover path.
 
 ### 0.59.0 — 2026-11-04
 

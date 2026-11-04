@@ -1,8 +1,8 @@
 # Target-Owned Parity Fixture
 
-- Версия: `2`
-- SHA-256: `af1ed6992f1c772ae23985c71e06f33e4bbf66f05a647524986dc92e4e2a15b8`
-- Source: `app/tests/Fixture/Database/address-registry-v2.sql`
+- Версия: `3`
+- SHA-256: `5aa5118b7ab7e183d46a24b2f34fc79dc397838c20ae7483952f3ad54c455f73`
+- Source: `app/tests/Fixture/Database/address-registry-v3.sql`
 - Scope: deterministic integration data, не production seed
 
 ## Назначение
@@ -26,6 +26,11 @@ OpenSearch adapters, `find-by-id`, search ranking и staged suggest без по�
 но намеренно отсутствует в `address_search`. Для всех активных уровней существуют
 отдельные `adm` и `mun` документы. Это позволяет проверять staged hierarchy
 selection и региональную фильтрацию на одной projection.
+
+`address_search.region_code` задаётся явно из административной иерархии:
+`77` для региона Альфа и `78` для региона Бета. ОКАТО намеренно начинается с
+`45` и `40` соответственно. Такое несовпадение фиксирует реальный инвариант:
+региональный ключ GAR нельзя вычислять из префикса ОКАТО.
 
 ## Lifecycle
 

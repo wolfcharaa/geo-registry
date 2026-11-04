@@ -1,6 +1,6 @@
 ---
 module: AddressRegistry
-version: 0.11.0
+version: 0.12.0
 updated: 2026-11-04
 language: ru
 ---
@@ -132,6 +132,9 @@ exit code `1`.
 - Shadow parent разделён `PARTITION BY LIST(region_code)`; unique/primary keys
   включают partition key. Региональный predicate online query обеспечивает
   partition pruning до ranking.
+- `region_code` берётся только из активной административной GAR hierarchy
+  (`AS_ADM_HIERARCHY.REGIONCODE`). ОКАТО остаётся отдельным классификатором и
+  не используется для вычисления partition key.
 - После build создаются read indexes, выполняется `ANALYZE`, затем проверяются
   завершённость source checkpoints, пропущенные documents, duplicates и
   некорректные region codes. Cutover запрещён при любой ошибке parity.
@@ -143,6 +146,9 @@ exit code `1`.
 - После успешного switch прежняя physical table удаляется; если процесс
   завершится между commit и cleanup, новый active parent уже однозначно выбран,
   а оставшаяся previous table не участвует в read path.
+- После partition cutover откат migration к прежнему вычисляемому из ОКАТО
+  столбцу запрещён: обратный data path требует отдельного restore/rebuild, а не
+  schema-only `migrate:down`.
 - Время build, scanned/written rows и physical row count сохраняются как
   benchmark baseline. Canonical GAR partitioning остаётся запрещённым без
   отдельного production-like сравнения этого baseline и query plans.
@@ -216,6 +222,10 @@ evidence совпавшего alias и применяет детерминиро
   административное представление от муниципального.
 - Переданный `region_code` ограничивает projection до ranking; региональный
   downstream path не использует online nationwide `DISTINCT`.
+- Региональный ключ строки хранится явно и совпадает с активной
+  административной GAR hierarchy; префикс ОКАТО не является его fallback.
+- Строка без подтверждённого GAR `region_code` не попадает в региональную
+  выдачу и должна быть восстановлена управляемым rebuild, а не эвристикой.
 - Отсутствие `region_code` сохраняет только legacy nationwide fallback.
 - Exact match, Russian FTS, trigram с порогом `0.3`, level и стабильные
   tie-breakers определяют порядок.
@@ -249,6 +259,9 @@ HTTP-клиент последовательно выбирает админис
   успешным `200`.
 - После определения parent все downstream reads получают его `region_code` и
   ограничивают projection до ranking.
+- Parent context и `address_search` используют один региональный классификатор
+  `AS_ADM_HIERARCHY.REGIONCODE`, поэтому ОКАТО не может направить следующую
+  стадию в другую physical partition.
 - Сценарий только читает PostgreSQL. Timeout/storage failure возвращается как
   `503/suggest_unavailable`; автоматического retry и частичного состояния нет.
 
@@ -277,6 +290,8 @@ fallback-регионом, чтобы следующая стадия не ис�
 
 - Совпасть должны и `parent_id`, и `hierarchy`; inactive hierarchy node не
   образует context.
+- Регион context берётся из активной административной GAR hierarchy; ОКАТО и
+  ОКТМО не подменяют отсутствующий `REGIONCODE`.
 - Результат только читается и не требует транзакции.
 - Storage failure прерывает весь parent-сценарий; ручной read-only повтор
   безопасен.

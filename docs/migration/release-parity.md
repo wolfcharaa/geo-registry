@@ -86,6 +86,13 @@ make worker-up
 `GAR_SOURCE` — абсолютный host path к согласованному release или его
 representative subset. Каталог монтируется только на время blocking CLI import:
 
+Поддержанный release path загружает canonical GAR и затем перестраивает
+`address_search`: её `region_code` берётся из активной административной
+иерархии, а не из ОКАТО. Legacy `address_search.dump` не содержит этот явный
+ключ и не может быть включён напрямую. Его использование потребует отдельной
+staging/backfill/parity процедуры; до её реализации выбирается canonical
+restore/import и C2 rebuild ниже.
+
 ```shell
 docker/compose/dev.sh run --rm --no-deps \
   --volume "${GAR_SOURCE}:/data/gar:ro" \
