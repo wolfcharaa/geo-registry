@@ -46,7 +46,8 @@ final readonly class WorkerRuntimeModule implements Module
         $loggingConfig = LoggingConfig::fromEnvironment($this->environment);
         $postgresConfig = PostgresConfig::fromEnvironment($this->environment);
         $registrySource = $this->messageBusRegistry ?? MessageBusRegistrySource::empty();
-        $registry = (new ApplicationRegistryCompiler())->compile($registrySource);
+        $codecs = $this->messageCodecs ?? new MessageCodecRegistry([]);
+        $registry = (new ApplicationRegistryCompiler($codecs))->compile($registrySource);
 
         $correlationContext = $dic->object(CorrelationContext::class);
         $loggerFactory = $dic
@@ -77,6 +78,8 @@ final readonly class WorkerRuntimeModule implements Module
             $correlationContext,
             $logger,
             $addressRegistryServices,
+            $postgres,
+            $codecs,
         ));
         $consumer = $dic
             ->object(PostgresMessageConsumer::class)
@@ -106,7 +109,7 @@ final readonly class WorkerRuntimeModule implements Module
             ]);
         $serializer = $dic
             ->object(JsonEnvelopeSerializer::class)
-            ->arg('codecs', $dic->value($this->messageCodecs ?? new MessageCodecRegistry([])));
+            ->arg('codecs', $dic->value($codecs));
         $providers = (new ThesisMessageBusServiceProviders(
             MessageBusServiceMap::from($registrySource, $registry),
             $correlationContext,

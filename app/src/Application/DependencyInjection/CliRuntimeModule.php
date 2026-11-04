@@ -17,6 +17,7 @@ use App\Config\OpenSearchConfig;
 use App\Config\PostgresConfig;
 use App\Infrastructure\Logging\StdoutLoggerFactory;
 use App\Infrastructure\Postgres\PostgresPoolFactory;
+use Fedor\MessageBus\Codec\MessageCodecRegistry;
 use Monolog\Logger;
 use Symfony\Component\Console\Application;
 use Thesis\Dic;
@@ -29,6 +30,7 @@ final readonly class CliRuntimeModule implements Module
     public function __construct(
         private EnvironmentSnapshot $environment,
         private ?MessageBusRegistrySource $messageBusRegistry = null,
+        private ?MessageCodecRegistry $messageCodecs = null,
     ) {}
 
     /** @return Ref<CliRuntime> */
@@ -39,6 +41,7 @@ final readonly class CliRuntimeModule implements Module
         $postgresConfig = PostgresConfig::fromEnvironment($this->environment);
         $openSearchConfig = OpenSearchConfig::fromEnvironment($this->environment);
         $source = $this->messageBusRegistry ?? MessageBusRegistrySource::empty();
+        $codecs = $this->messageCodecs ?? new MessageCodecRegistry([]);
         $application = $dic->object(
             Application::class,
             static fn(): Application => new Application($config->name, $config->version),
@@ -68,8 +71,12 @@ final readonly class CliRuntimeModule implements Module
             $correlationContext,
             $logger,
             AddressRegistryMessageBusServices::configure($dic, $source, $postgres),
+            $postgres,
+            $codecs,
         ));
-        $registryCompiler = $dic->object(ApplicationRegistryCompiler::class);
+        $registryCompiler = $dic
+            ->object(ApplicationRegistryCompiler::class)
+            ->arg('codecs', $dic->value($codecs));
         $registryCheck = $dic
             ->object(MessageBusRegistryCheckCommand::class)
             ->args([

@@ -15,6 +15,8 @@ make config
 make build
 make install
 make up
+make migrate
+make worker-up
 make logs SERVICE=nominatim
 ```
 
@@ -112,6 +114,12 @@ fiber-aware ожидание I/O, никаких Guzzle/PSR-18 adapters и сг�
 поэтому application container не становится service locator внутри handlers.
 Внутренний контейнер Testo не является runtime-контейнером приложения.
 
+Durable delivery использует application PostgreSQL. Migration создаёт общую
+queue table и worker control plane; runtime DDL при старте не выполняется.
+`address_async` обслуживает physical queue `address`, `runtime_async` — queue
+`runtime`. Оба worker service находятся в opt-in Compose profile `worker`,
+поэтому обычный `make up` не запускает их до применения migrations.
+
 ## Статический анализ и тесты
 
 `app/phpstan.neon` включает `phpstan-strict-rules`, bleeding edge и дополнительные
@@ -144,6 +152,14 @@ app/bin/console migrate:up --force-yes # применить migrations к applic
 app/bin/console opensearch:reindex --help # blue-green rebuild и alias cutover
 app/bin/console opensearch:index:cleanup --help # подтверждённая очистка inactive index
 app/bin/worker list  # показать worker run/control/status commands
+make worker-up       # применить migrations и запустить address/runtime workers
+make worker-status   # показать persisted status обоих workers
+make worker-pause    # перестать брать новые jobs
+make worker-resume   # возобновить claims
+make worker-drain    # завершить текущие jobs и остановиться
+make worker-restart  # запросить restart через control plane
+make worker-logs     # следить за логами обоих worker services
+make worker-down     # остановить оба worker services
 make smoke    # проверить запущенный HTTP service
 make down     # остановить без удаления volumes
 ```

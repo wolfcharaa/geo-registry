@@ -2,6 +2,7 @@ SHELL := /bin/sh
 
 COMPOSE := docker/compose/dev.sh
 INTEGRATION_COMPOSE := docker/compose/integration.sh
+WORKER_CLI := $(COMPOSE) run --rm --no-deps app php bin/worker
 
 export HOST_UID ?= $(shell id -u)
 export HOST_GID ?= $(shell id -g)
@@ -35,6 +36,44 @@ down: ## Stop services without deleting persistent data
 
 restart: down up ## Restart the development stack
 .PHONY: restart
+
+migrate: guard-user ## Apply application database migrations
+	$(COMPOSE) run --rm --no-deps app php bin/console migrate:up --force-yes
+.PHONY: migrate
+
+worker-up: guard-user ## Migrate and start both durable worker services
+	$(COMPOSE) up --detach --no-build postgres
+	$(MAKE) migrate
+	$(COMPOSE) --profile worker up --detach --no-build worker-address worker-runtime
+.PHONY: worker-up
+
+worker-down: ## Stop both durable worker services
+	$(COMPOSE) --profile worker stop worker-address worker-runtime
+.PHONY: worker-down
+
+worker-logs: ## Follow both durable worker service logs
+	$(COMPOSE) --profile worker logs --follow worker-address worker-runtime
+.PHONY: worker-logs
+
+worker-status: guard-user ## Show durable worker and child status
+	$(WORKER_CLI) worker:status --group=geo-registry --children
+.PHONY: worker-status
+
+worker-pause: guard-user ## Pause new claims for both workers
+	$(WORKER_CLI) worker:pause --group=geo-registry --reason="make worker-pause"
+.PHONY: worker-pause
+
+worker-resume: guard-user ## Resume claims for both workers
+	$(WORKER_CLI) worker:resume --group=geo-registry --reason="make worker-resume"
+.PHONY: worker-resume
+
+worker-drain: guard-user ## Drain both workers after their current jobs
+	$(WORKER_CLI) worker:drain --group=geo-registry --reason="make worker-drain"
+.PHONY: worker-drain
+
+worker-restart: guard-user ## Request a supervised restart for both workers
+	$(WORKER_CLI) worker:restart --group=geo-registry --reason="make worker-restart"
+.PHONY: worker-restart
 
 logs: ## Follow logs; set SERVICE=app to filter
 	$(COMPOSE) logs --follow $(SERVICE)

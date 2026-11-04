@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 use App\Application\DependencyInjection\CliRuntimeModule;
 use App\Application\MessageBus\MessageBusRegistrySource;
+use App\Application\MessageBus\MessageCodecRegistryLoader;
 use App\Application\Runtime\CliRuntime;
 use App\Config\EnvironmentSnapshot;
 use Thesis\Dic;
@@ -15,6 +16,7 @@ exit(Dic::run(
     new CliRuntimeModule(
         EnvironmentSnapshot::capture(),
         MessageBusRegistrySource::fromFile(dirname(__DIR__) . '/config/message_bus_registry.php'),
+        MessageCodecRegistryLoader::fromFile(dirname(__DIR__) . '/config/message_bus_codecs.php'),
     ),
     static fn(CliRuntime $runtime): int => $runtime->run(),
 ));

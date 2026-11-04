@@ -1,6 +1,6 @@
 # Архитектура Geo Registry
 
-- Версия документа: `0.6.0`
+- Версия документа: `0.7.0`
 - Обновлено: `2026-11-04`
 - Статус: `Target architecture; scaffold is transitional`
 - План миграции: [migration/implementation-roadmap.md](migration/implementation-roadmap.md)
@@ -90,9 +90,10 @@ app/
 │   └── worker
 ├── config/
 │   ├── di/
+│   ├── message_bus_codecs.php
 │   ├── message_bus_http.php
 │   ├── message_bus_registry.php
-│   └── message_bus_runtime.php
+│   └── message_bus_worker.php
 ├── src/
 │   ├── Application/
 │   │   ├── Http/
@@ -271,8 +272,16 @@ chain. PHP serialization не используется.
 
 Application-owned `ApplicationMessageBusModule` компилирует registry до сборки
 runtime graph, проверяет каждую handler/context/strategy/interceptor service
-reference по explicit service map и экспортирует один `MessageBus`. HTTP и CLI
-roots владеют этим export; произвольный runtime container lookup отсутствует.
+reference по explicit service map и экспортирует один `MessageBus`. Все три
+roots получают один application-owned codec registry. Если graph содержит
+async binding без stable alias и versioned codec либо alias указывает на другой
+message class, compilation завершается ошибкой до запуска process.
+
+HTTP, CLI и worker producer-side composition подключает native AMPHP
+`PostgresQueueGateway`, `JsonEnvelopeSerializer`, clock и
+`QueueExecutionStrategy`. Sync dispatch не обращается к queue; async handler
+binding сериализуется только explicit codec-ом и сохраняется в общей таблице
+`message_bus__queue_jobs`.
 
 Один root dispatch открывает scope; nested dispatch переиспользует его. Worker
 открывает новый scope на каждую job и исполняет только authoritative binding из
@@ -295,8 +304,17 @@ Worker graph содержит реальный `PostgresMessageConsumer`, lease/
 control, PostgreSQL control plane, JSON envelope serializer и
 `QueueWorkerRunner`. Каждый job открывает отдельный Thesis scope; scoped worker
 передаёт тот же resolver в authoritative binding execution. Текущий baseline с
-нулём business bindings использует пустой explicit codec registry, а не
-fallback serialization.
+нулём production async bindings использует пустой explicit codec registry, а
+не fallback serialization. `address_async` закреплён за
+`postgres/address`, `runtime_async` — за `postgres/runtime`; первый реальный
+binding добавляется только вместе со своим capability slice и codec-ом.
+
+Application PostgreSQL schema владеет queue table и семью worker-control
+tables. Они создаются обычной target-owned migration, а не runtime DDL из
+worker executable. Development Compose держит два opt-in services по одному на
+physical queue. Оба входят в control group `geo-registry`; pause/resume/drain/
+restart проходят через persisted control commands, а SIGTERM использует
+cooperative graceful shutdown.
 
 `app/bin/worker` использует library `WorkerRuntimeProviderInterface` и держит
 run/control/status operation целиком внутри application `Dic::run()`. Поэтому
@@ -306,6 +324,11 @@ container scope, PostgreSQL pool и disposers живут ровно время C
 At-least-once delivery означает, что crash после business effect и до ack может
 повторить handler. Side-effecting scenarios обязаны явно выбрать idempotency,
 deduplication или безопасный повтор и покрыть это contract test.
+
+Blocking GAR import и тяжёлый address/OpenSearch rebuild не являются
+`address_async` handlers: по принятой runtime boundary они остаются в
+`CliRuntime`. Их постановка в queue потребует отдельного process-isolation
+решения, а не скрытого запуска blocking adapter внутри AMPHP worker.
 
 ## Cancellation И Ошибки
 

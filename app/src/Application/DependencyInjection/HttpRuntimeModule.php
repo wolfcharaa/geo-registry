@@ -45,6 +45,7 @@ use App\Module\AddressRegistry\UserInterface\Http\SuggestAddress\SuggestAddressP
 use App\Module\AddressRegistry\UserInterface\Http\SuggestAddress\SuggestAddressRequestMapper;
 use App\UserInterface\Http\CorrelationMiddleware;
 use App\UserInterface\Http\RouterFactory;
+use Fedor\MessageBus\Codec\MessageCodecRegistry;
 use Monolog\Logger;
 use Symfony\Component\Validator\Validation;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
@@ -58,6 +59,7 @@ final readonly class HttpRuntimeModule implements Module
     public function __construct(
         private EnvironmentSnapshot $environment,
         private ?MessageBusRegistrySource $messageBusRegistry = null,
+        private ?MessageCodecRegistry $messageCodecs = null,
     ) {}
 
     /** @return Ref<HttpRuntime> */
@@ -69,6 +71,7 @@ final readonly class HttpRuntimeModule implements Module
         $nominatimConfig = NominatimConfig::fromEnvironment($this->environment);
         $openSearchConfig = OpenSearchConfig::fromEnvironment($this->environment);
         $registrySource = $this->messageBusRegistry ?? MessageBusRegistrySource::empty();
+        $codecs = $this->messageCodecs ?? new MessageCodecRegistry([]);
 
         $correlationContext = $dic->object(CorrelationContext::class);
         $loggerFactory = $dic
@@ -131,6 +134,8 @@ final readonly class HttpRuntimeModule implements Module
                 openSearchIndex: $openSearchConfig->searchEnabled ? $openSearchConfig->index : null,
                 logger: $openSearchConfig->searchEnabled ? $logger : null,
             ),
+            $postgres,
+            $codecs,
         ));
         $startupState = $dic->object(StartupState::class);
         $postgresHealth = $dic

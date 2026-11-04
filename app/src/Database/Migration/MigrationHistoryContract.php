@@ -34,6 +34,7 @@ final class MigrationHistoryContract
         M261104000000AddAddressSearchRegionCode::class,
         M261104010000CreateGarImportOperations::class,
         M261104020000CreateAddressSearchRebuildOperations::class,
+        M261104030000CreateMessageBusRuntime::class,
     ];
 
     private function __construct() {}

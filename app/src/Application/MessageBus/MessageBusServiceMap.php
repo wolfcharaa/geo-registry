@@ -7,6 +7,7 @@ namespace App\Application\MessageBus;
 use Fedor\MessageBus\Context\DefaultMessageContextFactory;
 use Fedor\MessageBus\Context\MessageContextFactoryInterface;
 use Fedor\MessageBus\Execution\HandlerExecutionStrategyInterface;
+use Fedor\MessageBus\Execution\QueueExecutionStrategy;
 use Fedor\MessageBus\Execution\SequentialExecutionStrategy;
 use Fedor\MessageBus\Interceptor\InterceptorInterface;
 use Fedor\MessageBus\Registry\CompiledMessageRegistry;
@@ -22,6 +23,7 @@ final readonly class MessageBusServiceMap
     {
         $this->types = array_replace([
             DefaultMessageContextFactory::class => DefaultMessageContextFactory::class,
+            QueueExecutionStrategy::class => QueueExecutionStrategy::class,
             SequentialExecutionStrategy::class => SequentialExecutionStrategy::class,
             CorrelationContextInterceptor::class => CorrelationContextInterceptor::class,
             MessageBusTelemetryInterceptor::class => MessageBusTelemetryInterceptor::class,

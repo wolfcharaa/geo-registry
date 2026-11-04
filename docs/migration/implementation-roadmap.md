@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; C3 OpenSearch rebuild complete, W1 application worker runtime next`
-- Версия документа: `0.56.0`
+- Статус: `Active; W1 application worker runtime complete, W2 coordinate enrichment next`
+- Версия документа: `0.57.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -1425,15 +1425,42 @@ online queries читают только выбранный регион.
 
 ### W1 — Application Worker Runtime
 
-- [ ] Подключить совместимые core/worker packages `0.1.x`.
-- [ ] Создать queue/worker-control migrations и WorkerRuntime composition.
-- [ ] Добавить отдельный Compose worker service и operational commands.
-- [ ] Зарегистрировать `address_async` и `runtime_async` bindings.
-- [ ] Проверить enqueue, consume, retry, reject, stale recovery, idempotency и
+- [x] Подключить совместимые core/worker packages `0.1.x`.
+- [x] Создать queue/worker-control migrations и WorkerRuntime composition.
+- [x] Добавить отдельные Compose worker services и operational commands.
+- [x] Зарегистрировать `address_async` и `runtime_async` flow/transport
+  boundaries; реальные durable bindings добавляются только вместе со своим
+  vertical slice.
+- [x] Проверить enqueue, consume, retry, reject, stale recovery, idempotency и
   graceful shutdown на real PostgreSQL.
 
 Готовность: producer и worker собраны из одной revision, durable transitions
 наблюдаемы, registry mismatch блокирует запуск.
+
+Реализовано:
+
+- Target-owned migration создаёт общую queue table и семь worker-control
+  tables из schema contract packages; apply-from-zero и полный rollback входят
+  в migration continuity gate.
+- `HttpRuntime`, `CliRuntime` и `WorkerRuntime` используют один explicit codec
+  registry. Async binding без stable alias/versioned codec отклоняется при
+  compilation graph build до запуска process.
+- `ApplicationMessageBusModule` подключает native AMPHP
+  `PostgresQueueGateway`, JSON envelope serializer и queue execution strategy;
+  worker исполняет authoritative binding из той же registry source.
+- `address_async` использует `postgres/address`, `runtime_async` —
+  `postgres/runtime`. Два opt-in Compose services имеют отдельные worker IDs и
+  общий control group; Makefile экспортирует migrate/up/down/logs/status и
+  pause/resume/drain/restart operations.
+- Production binding не выдуман ради инфраструктурного slice: GAR import и
+  тяжёлый rebuild по Decision 14.3 остаются CLI-only, а первый реальный
+  `runtime_async` contract создаётся в W2 вместе с idempotent effect.
+- Application-owned real PostgreSQL fixture проверяет enqueue/consume/ack,
+  retry, non-retryable reject, stale lease recovery, idempotent control command
+  и graceful stop до следующего claim.
+- Fast gate: Testo `77 tests / 350 assertions`, PHPStan max, Deptrac
+  `0 violations / 0 uncovered`; Integration gate на PostgreSQL 17/OpenSearch
+  3.9: `13 tests / 170 assertions`.
 
 ### W2 — Coordinate Enrichment
 
@@ -1547,7 +1574,8 @@ gate. C1 добавил CLI-only XMLReader/COPY importer с operation checkpoint
 проверенным partial-file recovery. C2 перенёс shadow rebuild в регионально
 partitioned projection с parity gate и atomic cutover. C3 добавил native async
 OpenSearch blue-green rebuild, atomic alias cutover и отдельную cleanup
-operation. Следующий slice — W1 application worker runtime.
+operation. W1 application worker runtime завершён; следующий slice — W2
+coordinate enrichment.
 JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
@@ -1557,6 +1585,17 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.57.0 — 2026-11-04
+
+- завершён W1 application worker runtime на совместимых core/worker `0.1.x`;
+- добавлены target-owned queue/control migrations, единый codec registry и
+  native PostgreSQL producer во все runtime graphs;
+- зарегистрированы `address_async`/`runtime_async` boundaries и два opt-in
+  Compose worker services с operational Make commands;
+- real PostgreSQL fixture доказал enqueue/consume/ack, retry/reject, stale
+  recovery, idempotent control и graceful stop; следующий slice — W2 coordinate
+  enrichment.
 
 ### 0.56.0 — 2026-11-04
 
@@ -1569,7 +1608,8 @@ contract artifacts, но не implementation code.
   требует точного подтверждения и запрещает удаление active target;
 - Fast gate: Testo `76 tests / 347 assertions`, PHPStan max, Deptrac
   `0 violations / 0 uncovered`; Integration gate на PostgreSQL 17/OpenSearch
-  3.9: `12 tests / 143 assertions`; следующий slice — W1 worker runtime.
+  3.9: `12 tests / 143 assertions`; после него W1 добавил application worker
+  runtime.
 
 ### 0.55.0 — 2026-11-04
 

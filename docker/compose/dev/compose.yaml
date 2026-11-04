@@ -48,6 +48,74 @@ services:
       timeout: 3s
       retries: 5
 
+  worker-address:
+    profiles: [worker]
+    build:
+      context: ../../..
+      dockerfile: docker/php/Dockerfile
+    init: true
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    working_dir: /app
+    command:
+      - php
+      - bin/worker
+      - worker:run
+      - --transport=postgres
+      - --queue=address
+      - --flow=address_async
+      - --worker-id=geo-registry-address
+      - --worker-name=geo-registry-address
+      - --worker-group=geo-registry
+    environment:
+      APP_NAME: "${APP_NAME:-geo-registry}"
+      COMPOSER_HOME: /tmp/composer
+      DATABASE_DSN: "${DATABASE_DSN:-host=postgres port=5432 user=app password=local-app-only db=app application_name=geo-registry-worker-address}"
+      DATABASE_POOL_SIZE: "${DATABASE_POOL_SIZE:-10}"
+      LOG_FORMAT: "${LOG_FORMAT:-console}"
+    volumes:
+      - ../../../app:/app
+      - ../../../../library/MessageBusAsync:/library/MessageBusAsync:ro
+      - ../../../../library/MessageBusAsyncWorker:/library/MessageBusAsyncWorker:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 40s
+
+  worker-runtime:
+    profiles: [worker]
+    build:
+      context: ../../..
+      dockerfile: docker/php/Dockerfile
+    init: true
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    working_dir: /app
+    command:
+      - php
+      - bin/worker
+      - worker:run
+      - --transport=postgres
+      - --queue=runtime
+      - --flow=runtime_async
+      - --worker-id=geo-registry-runtime
+      - --worker-name=geo-registry-runtime
+      - --worker-group=geo-registry
+    environment:
+      APP_NAME: "${APP_NAME:-geo-registry}"
+      COMPOSER_HOME: /tmp/composer
+      DATABASE_DSN: "${DATABASE_DSN:-host=postgres port=5432 user=app password=local-app-only db=app application_name=geo-registry-worker-runtime}"
+      DATABASE_POOL_SIZE: "${DATABASE_POOL_SIZE:-10}"
+      LOG_FORMAT: "${LOG_FORMAT:-console}"
+    volumes:
+      - ../../../app:/app
+      - ../../../../library/MessageBusAsync:/library/MessageBusAsync:ro
+      - ../../../../library/MessageBusAsyncWorker:/library/MessageBusAsyncWorker:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 40s
+
   postgres:
     image: ghcr.io/cargosense/postgis:17-3.6-alpine@sha256:03374f4feb0267d755a9d81cc834f8a129f9a99734dd0a029f0bceb3f5689361
     environment:

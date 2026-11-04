@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace App\Application\DependencyInjection;
 
+use Amp\Postgres\PostgresConnectionPool;
 use App\Application\MessageBus\ApplicationRegistryCompiler;
 use App\Application\MessageBus\MessageBusRegistrySource;
 use App\Application\MessageBus\MessageBusServiceMap;
 use App\Application\Observability\CorrelationContext;
+use Fedor\MessageBus\Clock\SystemClock;
+use Fedor\MessageBus\Codec\MessageCodecRegistry;
+use Fedor\MessageBus\Envelope\JsonEnvelopeSerializer;
 use Fedor\MessageBus\Integration\Thesis\ThesisServiceResolver;
 use Fedor\MessageBus\Integration\Thesis\ThesisServiceScopeFactory;
 use Fedor\MessageBus\MessageBus;
+use Fedor\MessageBus\Queue\Postgres\PostgresQueueGateway;
 use Psr\Log\LoggerInterface;
 use Thesis\Dic;
 use Thesis\Dic\Module;
@@ -23,18 +28,21 @@ final readonly class ApplicationMessageBusModule implements Module
      * @param Ref<CorrelationContext> $correlationContext
      * @param Ref<LoggerInterface> $logger
      * @param array<string, Ref<object>> $serviceOverrides
+     * @param Ref<PostgresConnectionPool>|null $postgres
      */
     public function __construct(
         private MessageBusRegistrySource $source,
         private Ref $correlationContext,
         private Ref $logger,
         private array $serviceOverrides = [],
+        private ?Ref $postgres = null,
+        private ?MessageCodecRegistry $messageCodecs = null,
     ) {}
 
     /** @return Ref<MessageBus> */
     public function configure(Dic $dic): Ref
     {
-        $registry = (new ApplicationRegistryCompiler())->compile($this->source);
+        $registry = (new ApplicationRegistryCompiler($this->messageCodecs))->compile($this->source);
         $providers = (new ThesisMessageBusServiceProviders(
             MessageBusServiceMap::from($this->source, $registry),
             $this->correlationContext,
@@ -50,12 +58,26 @@ final readonly class ApplicationMessageBusModule implements Module
             ->object(ThesisServiceScopeFactory::class)
             ->arg('resolver', $dic->scoped($resolver));
 
+        $arguments = [
+            'registry' => $dic->value($registry),
+            'scopeFactory' => $scopeFactory,
+        ];
+        if ($this->postgres !== null) {
+            $codecs = $this->messageCodecs ?? new MessageCodecRegistry([]);
+            $arguments += [
+                'envelopeSerializer' => $dic
+                    ->object(JsonEnvelopeSerializer::class)
+                    ->arg('codecs', $dic->value($codecs)),
+                'clock' => $dic->object(SystemClock::class),
+                'queueProvider' => $dic
+                    ->object(PostgresQueueGateway::class)
+                    ->arg('postgres', $this->postgres),
+            ];
+        }
+
         return $dic
             ->object(MessageBus::class)
-            ->args([
-                'registry' => $dic->value($registry),
-                'scopeFactory' => $scopeFactory,
-            ]);
+            ->args($arguments);
     }
 
 }

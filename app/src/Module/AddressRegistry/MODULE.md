@@ -1,6 +1,6 @@
 ---
 module: AddressRegistry
-version: 0.9.0
+version: 0.10.0
 updated: 2026-11-04
 language: ru
 ---
@@ -17,6 +17,29 @@ Canonical GAR tables остаются источником истины, а onli
 application-owned `address_search` и связанные иерархии через capability ports.
 Модуль также владеет состоянием CLI-операций импорта и перестройки производной
 региональной projection. Эти blocking adapters доступны только в CLI runtime.
+
+## Async Runtime Boundary
+
+Application registry объявляет две durable точки подключения:
+
+- `address_async` → `postgres/address` для будущих неблокирующих фоновых
+  address-сценариев;
+- `runtime_async` → `postgres/runtime` для runtime enrichment events.
+
+Это transport boundaries, а не пустые business capabilities. В текущей версии
+production async binding отсутствует: первый `runtime_async` event/handler
+добавляется целиком в W2 вместе со stable alias, binding ID, versioned JSON
+codec, idempotency policy и PostgreSQL integration test. Async binding без codec
+не позволяет собрать ни producer, ни worker graph.
+
+GAR import, региональная `address_search` rebuild и OpenSearch rebuild остаются
+прямыми CLI-only операциями. Они используют blocking COPY/PDO либо долгий
+operator-controlled lifecycle и не могут быть подключены к `address_async` без
+отдельного решения о process isolation.
+
+Queue/control tables принадлежат application migration history, а worker
+lifecycle — `Application/Worker`. Модуль владеет только message/handler/effect
+будущего сценария; он не импортирует consumer loop или control plane.
 
 - **Postman collection:** [HTTP-контракты модуля](../../../../docs/api/postman/geo-registry.postman_collection.json).
 

@@ -50,6 +50,14 @@ SELECT
     to_regclass('public.gar_import_files')::text AS import_files,
     to_regclass('public.address_search_rebuild_operations')::text AS rebuild_operations,
     to_regclass('public.address_search_rebuild_regions')::text AS rebuild_regions,
+    to_regclass('public.message_bus__queue_jobs')::text AS queue_jobs,
+    to_regclass('public.message_bus__worker_control_commands')::text AS worker_commands,
+    to_regclass('public.message_bus__worker_desired_state')::text AS worker_desired_state,
+    to_regclass('public.message_bus__worker_instances')::text AS worker_instances,
+    to_regclass('public.message_bus__worker_child_instances')::text AS worker_children,
+    to_regclass('public.message_bus__worker_control_command_deliveries')::text AS worker_deliveries,
+    to_regclass('public.message_bus__worker_control_command_acknowledgements')::text AS worker_acknowledgements,
+    to_regclass('public.message_bus__worker_control_command_audit')::text AS worker_audit,
     (
         SELECT is_generated
         FROM information_schema.columns
@@ -73,6 +81,17 @@ SQL)->fetchRow();
             Assert::same($schema['import_files'] ?? null, 'gar_import_files');
             Assert::same($schema['rebuild_operations'] ?? null, 'address_search_rebuild_operations');
             Assert::same($schema['rebuild_regions'] ?? null, 'address_search_rebuild_regions');
+            Assert::same($schema['queue_jobs'] ?? null, 'message_bus__queue_jobs');
+            Assert::same($schema['worker_commands'] ?? null, 'message_bus__worker_control_commands');
+            Assert::same($schema['worker_desired_state'] ?? null, 'message_bus__worker_desired_state');
+            Assert::same($schema['worker_instances'] ?? null, 'message_bus__worker_instances');
+            Assert::same($schema['worker_children'] ?? null, 'message_bus__worker_child_instances');
+            Assert::same($schema['worker_deliveries'] ?? null, 'message_bus__worker_control_command_deliveries');
+            Assert::same(
+                $schema['worker_acknowledgements'] ?? null,
+                'message_bus__worker_control_command_acknowledgements',
+            );
+            Assert::same($schema['worker_audit'] ?? null, 'message_bus__worker_control_command_audit');
 
             $extensions = [];
             $result = $pool->query(

@@ -6,6 +6,13 @@ namespace App\Tests\Unit\Application\MessageBus;
 
 use App\Application\MessageBus\ApplicationRegistryCompiler;
 use App\Application\MessageBus\MessageBusRegistrySource;
+use Fedor\MessageBus\Attribute\CommandHandler;
+use Fedor\MessageBus\Attribute\MessageAlias;
+use Fedor\MessageBus\Codec\MessageCodecRegistry;
+use Fedor\MessageBus\Flow\FlowDefinition;
+use Fedor\MessageBus\Flow\FlowRegistry;
+use Fedor\MessageBus\Message\Command;
+use Fedor\MessageBus\Registry\RegistryCompilationException;
 use InvalidArgumentException;
 use stdClass;
 use Testo\Assert;
@@ -43,4 +50,30 @@ final class MessageBusRegistrySourceTest
     {
         new MessageBusRegistrySource([stdClass::class, stdClass::class], []);
     }
+
+    #[ExpectException(RegistryCompilationException::class)]
+    public function testItRejectsAnAsyncBindingWithoutAnExplicitCodec(): void
+    {
+        $source = new MessageBusRegistrySource(
+            [MissingCodecHandler::class],
+            [MissingCodecHandler::class => MissingCodecHandler::class],
+            new FlowRegistry(FlowDefinition::async('async')->transport('postgres', 'runtime')),
+        );
+
+        (new ApplicationRegistryCompiler(new MessageCodecRegistry([])))->compile($source);
+    }
+}
+
+#[MessageAlias('geo-registry.test.missing-codec.v1')]
+final readonly class MissingCodecCommand implements Command {}
+
+#[CommandHandler(
+    message: MissingCodecCommand::class,
+    flow: 'async',
+    bindingId: 'geo-registry.test.missing-codec.v1',
+    contextAware: false,
+)]
+final class MissingCodecHandler
+{
+    public function __invoke(MissingCodecCommand $command): void {}
 }
