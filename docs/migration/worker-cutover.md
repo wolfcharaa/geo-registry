@@ -1,0 +1,103 @@
+# Переключение Durable Workers
+
+- Статус: `Procedure ready; execution requires release approval`
+- Обновлено: `2026-11-04`
+- Владелец решения: application release operator
+
+Документ задаёт проверяемый переход со старых RoadRunner/BoltDB queues на
+application-owned PostgreSQL queue. Он не является разрешением менять production
+state и не подтверждает, что legacy queues уже пусты.
+
+## Контракты Переключения
+
+| Контур | Старый runtime | Новый runtime | Правило |
+| --- | --- | --- | --- |
+| Coordinate enrichment | RoadRunner `runtime` | PostgreSQL `runtime_async` → `runtime` | Alias `gar.address_coordinates.resolved` и binding `gar.address_coordinates.update` сохраняются |
+| GAR/background jobs | RoadRunner `gar` | CLI-only operations; `address` зарезервирована для будущих bindings | Jobs не переносятся автоматически между хранилищами |
+
+Legacy storage находится в файлах, заданных `RR_JOBS_RUNTIME_FILE` и
+`RR_JOBS_GAR_FILE`; проверенная конфигурация по умолчанию использует
+`app/runtime/rr/jobs-runtime.db` и `app/runtime/rr/jobs-gar.db`. Эти файлы нельзя
+удалять, обнулять или переиспользовать как PostgreSQL queue.
+
+## Preconditions
+
+Перед release window должны быть зафиксированы:
+
+1. одна revision приложения для HTTP producer и worker;
+2. успешные `make check`, `make contract`, `make test-integration`;
+3. применённая migration с `message_bus__queue_jobs` и worker-control tables;
+4. существующий OpenSearch alias/target, если включается
+   `OPENSEARCH_COORDINATE_UPDATES_ENABLED=1`;
+5. snapshot/backup application PostgreSQL и сохранённые legacy BoltDB files;
+6. способ получить counts/status старых `runtime` и `gar` queues средствами
+   старого deployment. Новый репозиторий намеренно не открывает их напрямую.
+
+## Cutover
+
+1. Остановить или перевести в maintenance старые HTTP producers, чтобы после
+   начала drain в RoadRunner queues не появлялись новые jobs.
+2. Записать timestamp, revision, status и остаток обеих legacy queues.
+3. Оставить старые RoadRunner consumers включёнными до нулевого остатка.
+   Неуспешные jobs разобрать явно: завершить, отменить с причиной либо оставить
+   rollback evidence. `gar` jobs должны завершиться в старом runtime и не
+   копируются в новый `address` transport.
+4. Повторно подтвердить нулевой остаток `runtime` и `gar`, остановить legacy
+   consumers и сохранить read-only копию BoltDB files.
+5. Применить target migrations командой `make migrate`, затем запустить workers
+   через `make worker-up` и проверить `make worker-status`.
+6. Переключить AMPHP HTTP producer той же revision. Только после готовности
+   OpenSearch alias включать optional coordinate updater.
+7. Выполнить reverse-geocode probe для адреса без координат и подтвердить:
+   queue job `succeeded`, PostgreSQL заполнен, OpenSearch либо обновлён, либо
+   зафиксирован bounded warning без retry canonical effect.
+8. Проверить `make worker-restart`, затем убедиться, что новый instance снова
+   принимает jobs и старый отмечен stopped.
+
+Шаг 4 закрывает последний W2 release gate. До появления evidence checkbox
+legacy queue drain в roadmap остаётся незавершённым.
+
+## Drain И Planned Restart
+
+- `make worker-pause` прекращает новые claims, но не прерывает текущий job.
+- `make worker-resume` возвращает paused workers к обработке.
+- `make worker-drain` завершает текущие jobs и останавливает consumers до
+  следующего process start.
+- `make worker-restart` создаёт persisted restart request; supervisor должен
+  поднять новый process после специального exit code.
+- `make worker-status` и `make worker-logs` являются обязательной проверкой
+  результата каждой control operation.
+
+SIGTERM использует cooperative graceful stop. Принудительное завершение до
+истечения grace period разрешено только как incident action: lease recovery
+вернёт stale job в pending, поэтому handler effects обязаны оставаться
+идемпотентными.
+
+## Rollback
+
+1. Остановить новый HTTP producer, чтобы PostgreSQL queue перестала расти.
+2. Выполнить `make worker-drain`; не удалять pending/running/failed queue rows и
+   не выполнять migration down.
+3. Если возвращается старый HTTP runtime, восстановить его вместе с сохранёнными
+   BoltDB files. Новые PostgreSQL jobs остаются замороженными до повторного
+   forward cutover: wire-level перенос между transports не выполняется.
+4. OpenSearch можно отключить независимо через
+   `OPENSEARCH_COORDINATE_UPDATES_ENABLED=0`; PostgreSQL coordinates остаются
+   canonical и не откатываются.
+5. После устранения причины снова развернуть одну target revision, запустить
+   workers и дать им обработать сохранённые PostgreSQL jobs.
+
+Schema rollback допустим только после отдельного data-retention решения и
+подтверждения отсутствия нужных queue/control records.
+
+## Evidence Закрытия
+
+- release/revision и границы maintenance window;
+- before/after counts старых `runtime` и `gar` queues;
+- checksum или immutable location сохранённых BoltDB copies;
+- `make worker-status` до и после restart;
+- counts PostgreSQL queue по status и отсутствие неожиданного retry роста;
+- результат reverse-geocode probe и canonical coordinates;
+- состояние OpenSearch projection либо зафиксированный optional outage;
+- решение о конце rollback window и только затем — отдельное разрешение на
+  удаление legacy storage.

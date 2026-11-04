@@ -14,11 +14,13 @@ use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressCriteria;
 use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressHandler;
 use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressMatch;
 use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressPort;
+use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\MissingAddressCoordinatesPublisher;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocode;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeHandler;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeLocation;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodePort;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeResult;
+use Fedor\MessageBus\Context\MessageContextInterface;
 use Fedor\MessageBus\MessageBus;
 use Psr\Log\NullLogger;
 use Testo\Assert;
@@ -51,6 +53,7 @@ final class ReverseGeocodeScenarioTest
         Assert::same($port->searchCriteria->limit, 3);
         Assert::same(count($result->matches), 1);
         Assert::same($result->fallbackLocation, null);
+        Assert::same($port->publishedObjectIds, [770005]);
     }
 
     public function testItKeepsNominatimFallbackOutsideTheCoreAddressDocument(): void
@@ -69,6 +72,22 @@ final class ReverseGeocodeScenarioTest
         Assert::notNull($result->fallbackLocation);
         Assert::same($result->fallbackLocation->sourceType, 'way');
         Assert::same($result->fallbackLocation->sourceId, 770005);
+        Assert::same($port->publishedObjectIds, []);
+    }
+
+    public function testItDoesNotPublishCoordinatesAlreadyStoredOnTheAddress(): void
+    {
+        $port = new RecordingReverseGeocodePort(withMatch: true, documentHasCoordinates: true);
+
+        Dic::run(
+            new ReverseGeocodeScenarioModule($port),
+            static fn(MessageBus $messageBus): ReverseGeocodeResult => $messageBus->ask(new ReverseGeocode(
+                latitude: 55.750001,
+                longitude: 37.610001,
+            )),
+        );
+
+        Assert::same($port->publishedObjectIds, []);
     }
 }
 
@@ -84,7 +103,7 @@ final readonly class ReverseGeocodeScenarioModule implements Module
         $services = [
             ReverseGeocodeHandler::class => $dic
                 ->object(ReverseGeocodeHandler::class)
-                ->arg('locator', $port)
+                ->args(['locator' => $port, 'coordinates' => $port])
                 ->canBeScoped(),
             SearchAddressHandler::class => $dic
                 ->object(SearchAddressHandler::class)
@@ -108,14 +127,23 @@ final readonly class ReverseGeocodeScenarioModule implements Module
     }
 }
 
-final class RecordingReverseGeocodePort implements ReverseGeocodePort, SearchAddressPort
+final class RecordingReverseGeocodePort implements
+    ReverseGeocodePort,
+    SearchAddressPort,
+    MissingAddressCoordinatesPublisher
 {
     /** @var list<array{float, float}> */
     public array $coordinates = [];
 
     public ?SearchAddressCriteria $searchCriteria = null;
 
-    public function __construct(private readonly bool $withMatch) {}
+    /** @var list<int> */
+    public array $publishedObjectIds = [];
+
+    public function __construct(
+        private readonly bool $withMatch,
+        private readonly bool $documentHasCoordinates = false,
+    ) {}
 
     public function locate(
         float $latitude,
@@ -152,8 +180,8 @@ final class RecordingReverseGeocodePort implements ReverseGeocodePort, SearchAdd
                 postalCode: '770001',
                 okato: '77001000000',
                 oktmo: '77001001000',
-                latitude: 55.750001,
-                longitude: 37.610001,
+                latitude: $this->documentHasCoordinates ? 55.750001 : null,
+                longitude: $this->documentHasCoordinates ? 37.610001 : null,
                 source: 'gar',
                 sourceId: null,
                 dataMosGlobalId: null,
@@ -169,5 +197,16 @@ final class RecordingReverseGeocodePort implements ReverseGeocodePort, SearchAdd
             aliases: [],
             matchedAlias: null,
         )];
+    }
+
+    public function publishIfMissing(
+        AddressDocument $document,
+        ReverseGeocodeLocation $location,
+        MessageContextInterface $context,
+    ): void {
+        $context->cancellation()->throwIfRequested();
+        if ($document->latitude === null || $document->longitude === null) {
+            $this->publishedObjectIds[] = $document->objectId;
+        }
     }
 }

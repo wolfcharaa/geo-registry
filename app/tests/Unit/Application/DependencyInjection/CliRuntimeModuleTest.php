@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Application\DependencyInjection;
 
 use App\Application\DependencyInjection\CliRuntimeModule;
 use App\Application\MessageBus\MessageBusRegistrySource;
+use App\Application\MessageBus\MessageCodecRegistryLoader;
 use App\Application\Runtime\CliRuntime;
 use App\Config\EnvironmentSnapshot;
 use Symfony\Component\Console\Input\ArrayInput;
@@ -27,6 +28,7 @@ final class CliRuntimeModuleTest
                     'APP_VERSION' => 'test',
                 ]),
                 MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_registry.php'),
+                MessageCodecRegistryLoader::fromFile(dirname(__DIR__, 4) . '/config/message_bus_codecs.php'),
             ),
             static fn(CliRuntime $runtime): int => $runtime->run(
                 new ArrayInput(['command' => 'list', '--no-ansi' => true]),
@@ -55,6 +57,7 @@ final class CliRuntimeModuleTest
             new CliRuntimeModule(
                 new EnvironmentSnapshot([]),
                 MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_registry.php'),
+                MessageCodecRegistryLoader::fromFile(dirname(__DIR__, 4) . '/config/message_bus_codecs.php'),
             ),
             static fn(CliRuntime $runtime): int => $runtime->run(
                 new ArrayInput(['command' => 'message-bus:registry:check', '--no-ansi' => true]),
@@ -63,6 +66,6 @@ final class CliRuntimeModuleTest
         );
 
         Assert::same($exitCode, 0);
-        Assert::true(str_contains($output->fetch(), 'bindings=6 source_hash='));
+        Assert::true(str_contains($output->fetch(), 'bindings=7 source_hash='));
     }
 }

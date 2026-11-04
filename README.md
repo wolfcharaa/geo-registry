@@ -120,6 +120,14 @@ queue table и worker control plane; runtime DDL при старте не вып
 `runtime`. Оба worker service находятся в opt-in Compose profile `worker`,
 поэтому обычный `make up` не запускает их до применения migrations.
 
+Reverse geocode публикует `gar.address_coordinates.resolved`, только когда
+Nominatim сопоставлен с GAR document без полных координат. Runtime worker
+идемпотентно заполняет все представления объекта в `address_search`; duplicate
+delivery не перезаписывает уже сохранённые координаты. Необязательное точечное
+обновление OpenSearch включается отдельно через
+`OPENSEARCH_COORDINATE_UPDATES_ENABLED=1`: его отказ логируется, но не отменяет
+canonical PostgreSQL effect. Повтор события может восстановить проекцию.
+
 ## Статический анализ и тесты
 
 `app/phpstan.neon` включает `phpstan-strict-rules`, bleeding edge и дополнительные
@@ -163,6 +171,10 @@ make worker-down     # остановить оба worker services
 make smoke    # проверить запущенный HTTP service
 make down     # остановить без удаления volumes
 ```
+
+Порядок перехода со старых RoadRunner/BoltDB queues и rollback описан в
+[worker-cutover.md](docs/migration/worker-cutover.md). Файлы старых queues нельзя
+удалять до подтверждённого нулевого остатка и завершения rollback window.
 
 Команды `migrate:*` входят только в `CliRuntime` и используют `DATABASE_DSN`.
 Они работают через blocking PDO и не включаются в HTTP/worker DIC graphs. База

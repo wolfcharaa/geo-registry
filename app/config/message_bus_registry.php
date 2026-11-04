@@ -11,6 +11,7 @@ use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressHandler;
 use App\Module\AddressRegistry\Capability\SuggestAddress\SuggestAddressHandler;
 use App\Module\AddressRegistry\Capability\SuggestAdministrativeArea\SuggestAdministrativeAreaHandler;
 use App\Module\AddressRegistry\Capability\SuggestThoroughfare\SuggestThoroughfareHandler;
+use App\Module\AddressRegistry\Feature\CoordinateEnrichment\Capability\UpdateAddressCoordinatesHandler;
 use Fedor\MessageBus\Flow\FlowDefinition;
 use Fedor\MessageBus\Flow\FlowRegistry;
 
@@ -22,6 +23,7 @@ return new MessageBusRegistrySource(
         SuggestAddressHandler::class,
         SuggestAdministrativeAreaHandler::class,
         SuggestThoroughfareHandler::class,
+        UpdateAddressCoordinatesHandler::class,
     ],
     services: [
         FindAddressByIdHandler::class => FindAddressByIdHandler::class,
@@ -30,6 +32,7 @@ return new MessageBusRegistrySource(
         SuggestAddressHandler::class => SuggestAddressHandler::class,
         SuggestAdministrativeAreaHandler::class => SuggestAdministrativeAreaHandler::class,
         SuggestThoroughfareHandler::class => SuggestThoroughfareHandler::class,
+        UpdateAddressCoordinatesHandler::class => UpdateAddressCoordinatesHandler::class,
     ],
     flows: new FlowRegistry(
         FlowDefinition::sync('default')->middleware(

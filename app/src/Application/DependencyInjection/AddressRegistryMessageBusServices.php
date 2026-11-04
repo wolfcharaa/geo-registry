@@ -12,10 +12,15 @@ use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressHandler;
 use App\Module\AddressRegistry\Capability\SuggestAddress\SuggestAddressHandler;
 use App\Module\AddressRegistry\Capability\SuggestAdministrativeArea\SuggestAdministrativeAreaHandler;
 use App\Module\AddressRegistry\Capability\SuggestThoroughfare\SuggestThoroughfareHandler;
+use App\Module\AddressRegistry\Feature\CoordinateEnrichment\Capability\UpdateAddressCoordinatesHandler;
+use App\Module\AddressRegistry\Feature\CoordinateEnrichment\Infrastructure\NullAddressCoordinatesProjectionUpdater;
+use App\Module\AddressRegistry\Feature\CoordinateEnrichment\Infrastructure\OpenSearchAddressCoordinatesProjectionUpdater;
+use App\Module\AddressRegistry\Feature\CoordinateEnrichment\Infrastructure\PostgresAddressCoordinatesUpdater;
 use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\OpenSearchAddressSearchQueryFactory;
 use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\OpenSearchAddressSearchResultMapper;
 use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\OpenSearchSearchAddressDecorator;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeHandler;
+use App\Module\AddressRegistry\Feature\ReverseGeocode\Infrastructure\RuntimeAddressCoordinatesPublisher;
 use App\Module\AddressRegistry\Infrastructure\Postgres\PostgresAddressDocumentHydrator;
 use App\Module\AddressRegistry\Infrastructure\Postgres\PostgresAddressSuggestionReader;
 use App\Module\AddressRegistry\Infrastructure\Postgres\PostgresFindAddressByIdReader;
@@ -29,6 +34,7 @@ final class AddressRegistryMessageBusServices
      * @param Ref<PostgresConnectionPool> $postgres
      * @param Ref<object>|null $reverseGeocodeLocator
      * @param Ref<object>|null $openSearch
+     * @param Ref<object>|null $coordinateOpenSearch
      * @param Ref<object>|null $logger
      * @return array<string, Ref<object>>
      */
@@ -39,6 +45,8 @@ final class AddressRegistryMessageBusServices
         ?Ref $reverseGeocodeLocator = null,
         ?Ref $openSearch = null,
         ?string $openSearchIndex = null,
+        ?Ref $coordinateOpenSearch = null,
+        ?string $coordinateOpenSearchIndex = null,
         ?Ref $logger = null,
     ): array {
         $findById = ($source->services[FindAddressByIdHandler::class] ?? null) === FindAddressByIdHandler::class;
@@ -52,6 +60,8 @@ final class AddressRegistryMessageBusServices
             === SuggestThoroughfareHandler::class;
         $reverseGeocode = ($source->services[ReverseGeocodeHandler::class] ?? null)
             === ReverseGeocodeHandler::class;
+        $updateAddressCoordinates = ($source->services[UpdateAddressCoordinatesHandler::class] ?? null)
+            === UpdateAddressCoordinatesHandler::class;
         if (
             !$findById
             && !$search
@@ -60,6 +70,7 @@ final class AddressRegistryMessageBusServices
             && !$suggestAdministrativeArea
             && !$suggestThoroughfare
             && !$reverseGeocode
+            && !$updateAddressCoordinates
         ) {
             return [];
         }
@@ -137,7 +148,41 @@ final class AddressRegistryMessageBusServices
             }
             $services[ReverseGeocodeHandler::class] = $dic
                 ->object(ReverseGeocodeHandler::class)
-                ->arg('locator', $reverseGeocodeLocator)
+                ->args([
+                    'locator' => $reverseGeocodeLocator,
+                    'coordinates' => $dic
+                        ->object(RuntimeAddressCoordinatesPublisher::class)
+                        ->arg('logger', $logger ?? throw new \LogicException(
+                            'ReverseGeocode coordinate publisher requires a logger.',
+                        )),
+                ])
+                ->canBeScoped();
+        }
+        if ($updateAddressCoordinates) {
+            $projection = $dic->object(NullAddressCoordinatesProjectionUpdater::class);
+            if ($coordinateOpenSearch !== null) {
+                if ($coordinateOpenSearchIndex === null || $logger === null) {
+                    throw new \LogicException('OpenSearch coordinate updater requires an index and logger.');
+                }
+                $projection = $dic
+                    ->object(OpenSearchAddressCoordinatesProjectionUpdater::class)
+                    ->args([
+                        'client' => $coordinateOpenSearch,
+                        'index' => $coordinateOpenSearchIndex,
+                        'logger' => $logger,
+                    ]);
+            }
+            $services[UpdateAddressCoordinatesHandler::class] = $dic
+                ->object(UpdateAddressCoordinatesHandler::class)
+                ->args([
+                    'coordinates' => $dic
+                        ->object(PostgresAddressCoordinatesUpdater::class)
+                        ->arg('postgres', $postgres),
+                    'projection' => $projection,
+                    'logger' => $logger ?? throw new \LogicException(
+                        'Address coordinate updater requires a logger.',
+                    ),
+                ])
                 ->canBeScoped();
         }
 

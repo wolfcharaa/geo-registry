@@ -1,6 +1,6 @@
 # Архитектура Geo Registry
 
-- Версия документа: `0.7.0`
+- Версия документа: `0.8.0`
 - Обновлено: `2026-11-04`
 - Статус: `Target architecture; scaffold is transitional`
 - План миграции: [migration/implementation-roadmap.md](migration/implementation-roadmap.md)
@@ -303,11 +303,13 @@ headers и query data в telemetry log не попадают. Worker boundary з
 Worker graph содержит реальный `PostgresMessageConsumer`, lease/cancellation
 control, PostgreSQL control plane, JSON envelope serializer и
 `QueueWorkerRunner`. Каждый job открывает отдельный Thesis scope; scoped worker
-передаёт тот же resolver в authoritative binding execution. Текущий baseline с
-нулём production async bindings использует пустой explicit codec registry, а
-не fallback serialization. `address_async` закреплён за
-`postgres/address`, `runtime_async` — за `postgres/runtime`; первый реальный
-binding добавляется только вместе со своим capability slice и codec-ом.
+передаёт тот же resolver в authoritative binding execution. Production registry
+содержит explicit codec для каждого durable contract и не использует fallback
+serialization. `address_async` закреплён за
+`postgres/address`, `runtime_async` — за `postgres/runtime`. Первый production
+binding сохраняет legacy identity `gar.address_coordinates.update`, принимает
+versioned event `gar.address_coordinates.resolved` и выполняет coordinate
+enrichment в worker scope.
 
 Application PostgreSQL schema владеет queue table и семью worker-control
 tables. Они создаются обычной target-owned migration, а не runtime DDL из
@@ -315,6 +317,14 @@ worker executable. Development Compose держит два opt-in services по 
 physical queue. Оба входят в control group `geo-registry`; pause/resume/drain/
 restart проходят через persisted control commands, а SIGTERM использует
 cooperative graceful shutdown.
+
+Coordinate enrichment сначала идемпотентно обновляет PostgreSQL rows только с
+неполной парой координат. `region_code` из event ограничивает update нужной
+партицией; отсутствие ключа сохраняет decode compatibility старых payload.
+OpenSearch updater является отдельным optional effect: failure не откатывает
+canonical update и не переводит job в retry, а replay повторно проецирует уже
+принятое событие даже при нулевом числе PostgreSQL updates. Это осознанная
+at-least-once policy, а не общий запрет retries для MessageBus.
 
 `app/bin/worker` использует library `WorkerRuntimeProviderInterface` и держит
 run/control/status operation целиком внутри application `Dic::run()`. Поэтому

@@ -4,16 +4,22 @@ declare(strict_types=1);
 
 namespace App\Application\DependencyInjection;
 
+use Amp\Http\Client\HttpClient;
 use Amp\Postgres\PostgresConnectionPool;
 use App\Application\MessageBus\ApplicationRegistryCompiler;
 use App\Application\MessageBus\MessageBusRegistrySource;
 use App\Application\MessageBus\MessageBusServiceMap;
 use App\Application\Observability\CorrelationContext;
 use App\Application\Worker\WorkerJobServiceResolver;
+use App\Config\ConsoleConfig;
 use App\Config\EnvironmentSnapshot;
 use App\Config\LoggingConfig;
+use App\Config\OpenSearchConfig;
 use App\Config\PostgresConfig;
+use App\Infrastructure\Http\AmpHttpClientFactory;
 use App\Infrastructure\Logging\StdoutLoggerFactory;
+use App\Infrastructure\OpenSearch\OpenSearchClient;
+use App\Infrastructure\OpenSearch\OpenSearchClientFactory;
 use App\Infrastructure\Postgres\PostgresPoolFactory;
 use Fedor\MessageBus\Codec\MessageCodecRegistry;
 use Fedor\MessageBus\Envelope\JsonEnvelopeSerializer;
@@ -44,6 +50,8 @@ final readonly class WorkerRuntimeModule implements Module
     public function configure(Dic $dic): Ref
     {
         $loggingConfig = LoggingConfig::fromEnvironment($this->environment);
+        $consoleConfig = ConsoleConfig::fromEnvironment($this->environment);
+        $openSearchConfig = OpenSearchConfig::fromEnvironment($this->environment);
         $postgresConfig = PostgresConfig::fromEnvironment($this->environment);
         $registrySource = $this->messageBusRegistry ?? MessageBusRegistrySource::empty();
         $codecs = $this->messageCodecs ?? new MessageCodecRegistry([]);
@@ -68,10 +76,31 @@ final readonly class WorkerRuntimeModule implements Module
                 ),
             )
             ->disposer(static fn(PostgresConnectionPool $pool) => $pool->close());
+        $openSearch = null;
+        if ($openSearchConfig->coordinateUpdatesEnabled) {
+            $httpClient = $dic->object(
+                HttpClient::class,
+                static fn(): HttpClient => AmpHttpClientFactory::create($openSearchConfig->timeoutSeconds),
+            );
+            $openSearch = $dic
+                ->object(OpenSearchClient::class, [
+                    $dic->object(OpenSearchClientFactory::class)->arg('httpClient', $httpClient),
+                    'create',
+                ])
+                ->args([
+                    'baseUrl' => $openSearchConfig->url,
+                    'userAgent' => $consoleConfig->userAgent,
+                    'username' => $openSearchConfig->username,
+                    'password' => $openSearchConfig->password,
+                ]);
+        }
         $addressRegistryServices = AddressRegistryMessageBusServices::configure(
             $dic,
             $registrySource,
             $postgres,
+            coordinateOpenSearch: $openSearch,
+            coordinateOpenSearchIndex: $openSearchConfig->coordinateUpdatesEnabled ? $openSearchConfig->index : null,
+            logger: $logger,
         );
         $messageBus = $dic->import(new ApplicationMessageBusModule(
             $registrySource,

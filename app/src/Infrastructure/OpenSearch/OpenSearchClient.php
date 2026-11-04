@@ -150,6 +150,41 @@ final readonly class OpenSearchClient
         }
     }
 
+    /**
+     * @param array<string, mixed> $query
+     * @param array<string, mixed> $script
+     */
+    public function updateByQuery(
+        string $index,
+        array $query,
+        array $script,
+        bool $refresh = false,
+        ?Cancellation $cancellation = null,
+    ): int {
+        $response = $this->request(
+            'POST',
+            '/' . rawurlencode($index) . '/_update_by_query',
+            ['conflicts' => 'proceed', 'refresh' => $refresh],
+            ['query' => $query, 'script' => $script],
+            cancellation: $cancellation,
+        );
+        $updated = $response['updated'] ?? null;
+        $versionConflicts = $response['version_conflicts'] ?? null;
+        $failures = $response['failures'] ?? null;
+        if (
+            !is_int($updated)
+            || $updated < 0
+            || $versionConflicts !== 0
+            || !is_array($failures)
+            || $failures !== []
+            || ($response['timed_out'] ?? null) !== false
+        ) {
+            throw new OpenSearchException('OpenSearch did not complete the update-by-query operation.');
+        }
+
+        return $updated;
+    }
+
     public function refreshIndex(string $index, ?Cancellation $cancellation = null): void
     {
         $this->request(

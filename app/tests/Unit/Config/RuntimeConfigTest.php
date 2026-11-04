@@ -36,6 +36,7 @@ final class RuntimeConfigTest
             'OPENSEARCH_URL' => 'https://search.example:9200',
             'OPENSEARCH_INDEX' => 'addresses',
             'OPENSEARCH_SEARCH_ENABLED' => 'true',
+            'OPENSEARCH_COORDINATE_UPDATES_ENABLED' => 'true',
             'OPENSEARCH_TIMEOUT_SECONDS' => '90',
             'OPENSEARCH_NUMBER_OF_SHARDS' => '3',
             'OPENSEARCH_NUMBER_OF_REPLICAS' => '1',
@@ -65,6 +66,7 @@ final class RuntimeConfigTest
         Assert::same($openSearch->url, 'https://search.example:9200');
         Assert::same($openSearch->index, 'addresses');
         Assert::same($openSearch->searchEnabled, true);
+        Assert::same($openSearch->coordinateUpdatesEnabled, true);
         Assert::same($openSearch->timeoutSeconds, 90.0);
         Assert::same($openSearch->numberOfShards, 3);
         Assert::same($openSearch->numberOfReplicas, 1);

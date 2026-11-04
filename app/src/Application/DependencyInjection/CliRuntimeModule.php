@@ -70,7 +70,7 @@ final readonly class CliRuntimeModule implements Module
             $source,
             $correlationContext,
             $logger,
-            AddressRegistryMessageBusServices::configure($dic, $source, $postgres),
+            AddressRegistryMessageBusServices::configure($dic, $source, $postgres, logger: $logger),
             $postgres,
             $codecs,
         ));

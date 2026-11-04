@@ -132,7 +132,7 @@ final readonly class HttpRuntimeModule implements Module
                 reverseGeocodeLocator: $reverseGeocodeLocator,
                 openSearch: $openSearchConfig->searchEnabled ? $openSearch : null,
                 openSearchIndex: $openSearchConfig->searchEnabled ? $openSearchConfig->index : null,
-                logger: $openSearchConfig->searchEnabled ? $logger : null,
+                logger: $logger,
             ),
             $postgres,
             $codecs,

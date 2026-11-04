@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Application\DependencyInjection;
 
 use App\Application\DependencyInjection\HttpRuntimeModule;
 use App\Application\MessageBus\MessageBusRegistrySource;
+use App\Application\MessageBus\MessageCodecRegistryLoader;
 use App\Application\Runtime\HttpRuntime;
 use App\Config\EnvironmentSnapshot;
 use Testo\Assert;
@@ -21,6 +22,7 @@ final class HttpRuntimeModuleTest
             new HttpRuntimeModule(
                 new EnvironmentSnapshot([]),
                 MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_http.php'),
+                MessageCodecRegistryLoader::fromFile(dirname(__DIR__, 4) . '/config/message_bus_codecs.php'),
             ),
             static fn(HttpRuntime $runtime): string => $runtime::class,
         );
@@ -34,6 +36,7 @@ final class HttpRuntimeModuleTest
             new HttpRuntimeModule(
                 new EnvironmentSnapshot(['OPENSEARCH_SEARCH_ENABLED' => 'true']),
                 MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_http.php'),
+                MessageCodecRegistryLoader::fromFile(dirname(__DIR__, 4) . '/config/message_bus_codecs.php'),
             ),
             static fn(HttpRuntime $runtime): string => $runtime::class,
         );

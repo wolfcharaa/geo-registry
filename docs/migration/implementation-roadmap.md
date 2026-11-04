@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; W1 application worker runtime complete, W2 coordinate enrichment next`
-- Версия документа: `0.57.0`
+- Статус: `Active; W2 implementation complete, legacy queue cutover gate pending`
+- Версия документа: `0.58.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -1464,14 +1464,38 @@ online queries читают только выбранный регион.
 
 ### W2 — Coordinate Enrichment
 
-- [ ] Публиковать `AddressCoordinatesResolved` через non-blocking producer.
-- [ ] Реализовать idempotent PostgreSQL update и optional OpenSearch updater.
-- [ ] Проверить replay, duplicate delivery и partial optional feature outage.
-- [ ] Документировать drain/restart/cutover binding procedure.
+- [x] Публиковать `AddressCoordinatesResolved` через non-blocking producer.
+- [x] Реализовать idempotent PostgreSQL update и optional OpenSearch updater.
+- [x] Проверить replay, duplicate delivery и partial optional feature outage.
+- [x] Документировать drain/restart/cutover binding procedure.
 - [ ] До переключения опустошить либо явно списать старые RoadRunner queues.
 
 Готовность: at-least-once delivery не создаёт некорректных повторных effects, а
 отключение OpenSearch не блокирует canonical PostgreSQL update.
+
+Реализовано:
+
+- Reverse-geocode publisher ставит stable event
+  `gar.address_coordinates.resolved` в `runtime_async` только для первого GAR
+  match с неполной парой координат. Publish failure не меняет публичный HTTP
+  result, cancellation не подавляется.
+- Binding `gar.address_coordinates.update` использует explicit codec v1 и
+  передаёт optional region key для partition pruning с decode compatibility
+  payload без нового поля.
+- PostgreSQL update записывает обе hierarchy rows только при missing
+  coordinates. Duplicate не перезаписывает canonical state; absent object —
+  no-op.
+- Optional OpenSearch `_update_by_query` включается отдельным environment flag.
+  Outage после PostgreSQL effect не вызывает retry/rollback, а replay повторяет
+  projection effect даже при `updated_rows=0`.
+- Real integration fixture доказал first delivery, duplicate, OpenSearch 404 и
+  replay recovery на production producer/codec/worker graph.
+- Fast gate: Testo `81 tests / 366 assertions`, PHPStan max, Deptrac
+  `0 violations / 0 uncovered`; Contract gate: `11 / 222`; Integration gate:
+  `14 / 209`.
+- Операторская последовательность и rollback записаны в
+  [worker-cutover.md](worker-cutover.md). Legacy `runtime`/`gar` BoltDB files не
+  объявлены drained: это отдельный release gate с внешним evidence.
 
 ## Wave 8 — Deferred Sources И Cutover
 
@@ -1574,8 +1598,10 @@ gate. C1 добавил CLI-only XMLReader/COPY importer с operation checkpoint
 проверенным partial-file recovery. C2 перенёс shadow rebuild в регионально
 partitioned projection с parity gate и atomic cutover. C3 добавил native async
 OpenSearch blue-green rebuild, atomic alias cutover и отдельную cleanup
-operation. W1 application worker runtime завершён; следующий slice — W2
-coordinate enrichment.
+operation. W1 application worker runtime и W2 coordinate enrichment
+реализованы. До release parity остаётся операторский gate старых RoadRunner
+queues; E1 Data.Mos/OSM extensions остаются deferred до отдельного подтверждения
+scope.
 JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
@@ -1585,6 +1611,18 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.58.0 — 2026-11-04
+
+- реализован production `runtime_async` contract для coordinate enrichment с
+  legacy-stable alias/binding и explicit codec v1;
+- добавлены идемпотентный региональный PostgreSQL update и independently
+  enabled best-effort OpenSearch projection update;
+- real integration gate подтвердил duplicate, optional outage и replay repair;
+- fast/contract/integration gates завершились как `81/366`, `11/222` и
+  `14/209`;
+- добавлена worker cutover/rollback procedure; фактический drain старых
+  RoadRunner BoltDB queues оставлен явным release gate.
 
 ### 0.57.0 — 2026-11-04
 

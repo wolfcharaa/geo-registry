@@ -17,7 +17,10 @@ use Fedor\MessageBus\Context\MessageContextInterface;
 )]
 final readonly class ReverseGeocodeHandler
 {
-    public function __construct(private ReverseGeocodePort $locator) {}
+    public function __construct(
+        private ReverseGeocodePort $locator,
+        private MissingAddressCoordinatesPublisher $coordinates,
+    ) {}
 
     public function __invoke(ReverseGeocode $query, MessageContextInterface $context): ReverseGeocodeResult
     {
@@ -37,8 +40,12 @@ final readonly class ReverseGeocodeHandler
             limit: $query->limit,
         ))->matches;
 
-        return $matches === []
-            ? ReverseGeocodeResult::fallback($location)
-            : ReverseGeocodeResult::matched($matches);
+        if ($matches === []) {
+            return ReverseGeocodeResult::fallback($location);
+        }
+
+        $this->coordinates->publishIfMissing($matches[0]->document, $location, $context);
+
+        return ReverseGeocodeResult::matched($matches);
     }
 }

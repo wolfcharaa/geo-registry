@@ -18,6 +18,7 @@ use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressHandler;
 use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressMatch;
 use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressPort;
 use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressUnavailable;
+use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\MissingAddressCoordinatesPublisher;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeHandler;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeLocation;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodePort;
@@ -27,6 +28,7 @@ use App\Module\AddressRegistry\Feature\ReverseGeocode\UserInterface\Http\Reverse
 use App\Module\AddressRegistry\Feature\ReverseGeocode\UserInterface\Http\ReverseGeocodeRequestMapper;
 use App\Module\AddressRegistry\UserInterface\Http\AddressSuggestionPresenter;
 use App\Tests\Support\Http\TestClient;
+use Fedor\MessageBus\Context\MessageContextInterface;
 use Fedor\MessageBus\MessageBus;
 use League\Uri\Http;
 use Psr\Log\NullLogger;
@@ -182,7 +184,7 @@ final readonly class ContractReverseGeocodeModule implements Module
         $services = [
             ReverseGeocodeHandler::class => $dic
                 ->object(ReverseGeocodeHandler::class)
-                ->arg('locator', $port)
+                ->args(['locator' => $port, 'coordinates' => $port])
                 ->canBeScoped(),
             SearchAddressHandler::class => $dic
                 ->object(SearchAddressHandler::class)
@@ -206,7 +208,10 @@ final readonly class ContractReverseGeocodeModule implements Module
     }
 }
 
-final readonly class ContractReverseGeocodePort implements ReverseGeocodePort, SearchAddressPort
+final readonly class ContractReverseGeocodePort implements
+    ReverseGeocodePort,
+    SearchAddressPort,
+    MissingAddressCoordinatesPublisher
 {
     public function __construct(private string $mode) {}
 
@@ -266,5 +271,13 @@ final readonly class ContractReverseGeocodePort implements ReverseGeocodePort, S
             aliases: [],
             matchedAlias: null,
         )];
+    }
+
+    public function publishIfMissing(
+        AddressDocument $document,
+        ReverseGeocodeLocation $location,
+        MessageContextInterface $context,
+    ): void {
+        $context->cancellation()->throwIfRequested();
     }
 }

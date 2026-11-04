@@ -1,6 +1,6 @@
 ---
 module: AddressRegistry
-version: 0.10.0
+version: 0.11.0
 updated: 2026-11-04
 language: ru
 ---
@@ -26,11 +26,11 @@ Application registry объявляет две durable точки подключ
   address-сценариев;
 - `runtime_async` → `postgres/runtime` для runtime enrichment events.
 
-Это transport boundaries, а не пустые business capabilities. В текущей версии
-production async binding отсутствует: первый `runtime_async` event/handler
-добавляется целиком в W2 вместе со stable alias, binding ID, versioned JSON
-codec, idempotency policy и PostgreSQL integration test. Async binding без codec
-не позволяет собрать ни producer, ни worker graph.
+Это transport boundaries, а не пустые business capabilities. `runtime_async`
+содержит production binding `gar.address_coordinates.update` для stable event
+alias `gar.address_coordinates.resolved`. Explicit JSON codec v1 входит в общий
+registry HTTP/CLI/worker; async binding без codec не позволяет собрать producer
+или worker graph.
 
 GAR import, региональная `address_search` rebuild и OpenSearch rebuild остаются
 прямыми CLI-only операциями. Они используют blocking COPY/PDO либо долгий
@@ -365,6 +365,49 @@ identity.
 - Feature binding объявлен только в `config/message_bus_http.php`. Базовый
   `message_bus_registry.php` для CLI/worker его не содержит; удаление binding-а
   из HTTP composition одновременно убирает handler и route.
+
+## Runtime Coordinate Enrichment Feature
+
+### Обновление координат — `Feature/CoordinateEnrichment`
+
+После Nominatim lookup reverse-geocode publisher выбирает первый ранжированный
+GAR match. Если у document отсутствует хотя бы одна координата, он публикует
+`AddressCoordinatesResolved` в `runtime_async`; HTTP response не ожидает
+выполнения business effect.
+
+**Правила**
+
+- Wire identity сохраняет проверенные alias `gar.address_coordinates.resolved`
+  и binding ID `gar.address_coordinates.update`; payload кодируется explicit
+  codec v1, PHP serialization не используется.
+- Event несёт object ID, координаты, Nominatim identity/metadata и optional
+  `region_code`. Последний ограничивает PostgreSQL update нужной региональной
+  партицией; codec принимает legacy payload без этого поля.
+- PostgreSQL обновляет обе hierarchy rows только при неполной паре
+  `geo_lat/geo_lon`. Duplicate/replay получает `updated_rows=0` и не
+  перезаписывает canonical координаты.
+- Отсутствующий object является успешным no-op. Существующий object всегда
+  допускает повтор projection effect, поэтому replay после outage чинит
+  OpenSearch без повторной записи PostgreSQL.
+- OpenSearch `_update_by_query` включается только через
+  `OPENSEARCH_COORDINATE_UPDATES_ENABLED=1`. Любая его transport/protocol ошибка
+  логируется bounded metadata и не блокирует ACK уже сохранённого canonical
+  effect; cancellation при этом не подавляется.
+- Automatic retry OpenSearch не добавлен. Ошибка обязательного PostgreSQL
+  effect остаётся worker failure и использует snapshot retry policy queue job.
+
+**Проверка**
+
+- Scenario проверяет публикацию только для matched document без координат.
+- Real PostgreSQL/OpenSearch test выполняет first delivery, duplicate, outage и
+  replay recovery через production codec, producer и worker runtime.
+
+**Эксплуатация**
+
+- Runtime worker читает `postgres/runtime`; OpenSearch updater выключен по
+  умолчанию и требует существующего read alias/physical target.
+- Drain/restart/cutover и legacy BoltDB gate описаны в
+  [worker-cutover.md](../../../../docs/migration/worker-cutover.md).
 
 ## Optional OpenSearch Search Feature
 
