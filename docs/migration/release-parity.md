@@ -8,7 +8,10 @@
 ## Что Доказывает Gate
 
 `make smoke-release` выполняет одну и ту же Postman collection в строгом
-release-режиме. В отличие от обычного contract-запуска strict mode требует:
+release-режиме. Перед запуском Newman target обязательно компилирует explicit
+MessageBus registry через `make registry-check`; invalid binding, service map
+или codec останавливают gate до HTTP-запросов. В отличие от обычного
+contract-запуска strict mode требует:
 
 - `live`, `startup` и `ready` со статусом `200`, а все readiness-компоненты —
   `ok`;
@@ -60,6 +63,7 @@ make doctor
 make check
 make contract
 make test-integration
+make registry-check
 git diff --check
 ```
 
@@ -125,6 +129,10 @@ make smoke-release \
   RELEASE_ARTIFACT_DIR=/tmp/geo-registry-release-smoke \
   RELEASE_RUN_NAME=amphp
 ```
+
+Отдельный `make registry-check` в первой фазе сохраняется для самостоятельного
+artifact/evidence. `make smoke-release` повторяет его намеренно, чтобы release
+Postman нельзя было запустить на revision с невалидным registry.
 
 При нестандартном порте или удалённом стенде передаётся
 `POSTMAN_BASE_URL=https://release-candidate.example`. Для legacy evidence

@@ -87,6 +87,10 @@ check: guard-user ## Run formatting, strict PHPStan, and Testo
 	$(COMPOSE) run --rm --no-deps app composer check
 .PHONY: check
 
+registry-check: guard-user ## Compile and validate the explicit MessageBus registry
+	$(COMPOSE) run --rm --no-deps app composer registry:check
+.PHONY: registry-check
+
 architecture-check: guard-user ## Verify application and module dependency directions
 	$(COMPOSE) run --rm --no-deps app composer deptrac
 .PHONY: architecture-check
@@ -120,7 +124,7 @@ smoke: ## Probe the running HTTP service and its integrations
 	APP_BASE_URL=$${APP_BASE_URL:-http://127.0.0.1:$${APP_PORT:-8080}} docker/scripts/smoke-check.sh
 .PHONY: smoke
 
-smoke-release: guard-user ## Run strict executable Postman parity against prepared release data
+smoke-release: registry-check ## Run strict executable Postman parity against prepared release data
 	POSTMAN_COLLECTION="$(POSTMAN_COLLECTION)" \
 		POSTMAN_ENVIRONMENT="$(POSTMAN_ENVIRONMENT)" \
 		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \

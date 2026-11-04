@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
 - Статус: `Active; local R1 preparation continues, full-data execution deferred to data server`
-- Версия документа: `0.60.0`
+- Версия документа: `0.63.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -131,7 +131,7 @@ G0 продолжает требовать отдельного подтверж
 ```text
 G4 ──> L1 MessageBus core ──> L2 registry/codecs ──> L3 async producer
                                                     └── L4 worker package
-L2 + L4 ──> L5 final Thesis DIC modules (deferred package polish)
+L2 + L4 ──> L5 default Thesis DIC modules (completed package polish)
 G1 ──> A1 quality/docs ──> A2 DIC/runtime roots ──> A3 bus integration
 G0 ──> D1 migration continuity
 D1 + G3 ──> D2 parity fixtures
@@ -620,11 +620,26 @@ Library, application foundation и database fixture tracks можно вести
 
 - [x] Закрыть G0 и записать выбранный режим переноса.
 - [x] Подтвердить либо заменить имя `AddressRegistry`.
-- [ ] Определить, какие endpoints и CLI commands входят в первый release.
-- [ ] Зафиксировать намеренно deferred Data.Mos и OSM scope.
+- [x] Определить, какие endpoints и CLI commands входят в первый release.
+- [x] Зафиксировать намеренно deferred Data.Mos и OSM scope.
 
 Готовность: можно создавать module namespace и переносить разрешённые contracts
 без риска смешать clean-room implementation с неподтверждённым source reuse.
+
+#### P1.R1 — First Release Surface Closure
+
+- State: P1 закрыт `2026-11-04`; executable implementation позволила заменить
+  ранний предварительный scope точным manifest-ом.
+- [release-scope.md](release-scope.md) фиксирует семь `current` OpenAPI
+  operations, application import/rebuild/migration/registry commands и полный
+  worker run/control/status surface первой `0.1.x` line.
+- Transitional demo routes не считаются release contract и остаются только до
+  R2 cutover; опасные migration tooling commands не включены в production
+  procedure, даже если Symfony Console показывает их в `list`.
+- Data.Mos enrichment и OSM aliases явно deferred в E1 до нового подтверждения;
+  Nominatim OSM dataset остаётся отдельной внешней reverse-geocode integration.
+- Worker schema reference command не заменяет versioned application migrations,
+  а legacy RoadRunner/BoltDB queue drain остаётся внешним release evidence.
 
 ### P2 — Executable Contract Snapshot
 
@@ -930,35 +945,59 @@ Package: новый `message-bus-async-worker`.
 - Fast worker gate: PHPUnit `29 tests / 135 assertions`, PHPStan level max,
   `composer validate --strict --no-check-lock`, executable list/schema smoke и
   `git diff --check`.
-- Следующий активный track: A1 application quality/docs skeleton. L5 DIC modules
-  сохранены как последний package-polish slice после стабилизации public API.
+- L5 DIC modules были сохранены как последний package-polish slice после
+  стабилизации public API и закрыты отдельным L5.R1.
 
 ### L5 — Default Thesis DIC Modules Для Обеих Библиотек
 
-Timing: `Deferred until final package-polish`. Этот slice выполняется в
-последний момент перед фиксацией первого package release, когда публичные
-core/worker contracts и фактическая A3 composition уже стабилизированы. Он не
-должен сейчас останавливать A1–A3 или менять neutral library contracts.
+Timing: `Completed 2026-11-04 as final package-polish`. Slice выполнен после
+стабилизации public core/worker contracts и фактической A3 composition, не меняя
+neutral library contracts.
 
-- [ ] В core добавить первичный default `Thesis\Dic\Module`, предлагаемый public
+- [x] В core добавить первичный default `Thesis\Dic\Module`, предлагаемый public
   class `Fedor\MessageBus\Integration\Thesis\MessageBusModule`.
-- [ ] В worker добавить первичный default `Thesis\Dic\Module`, предлагаемый
+- [x] В worker добавить первичный default `Thesis\Dic\Module`, предлагаемый
   public class
   `Fedor\MessageBus\Worker\Integration\Thesis\WorkerModule`.
-- [ ] В обоих packages объявить `thesis/dic` только через Composer `suggest` и
+- [x] В обоих packages объявить `thesis/dic` только через Composer `suggest` и
   `require-dev`; обязательной runtime dependency не добавлять.
-- [ ] Default modules должны экспортировать только library-owned composition и
+- [x] Default modules должны экспортировать только library-owned composition и
   extension points, не импортировать application services и допускать явное
   application override/import поверх defaults.
-- [ ] Проверить отдельную установку каждого module и совместный core+worker
+- [x] Проверить отдельную установку каждого module и совместный core+worker
   graph на реальном `thesis/dic`, включая scope lifecycle и disposal.
-- [ ] Описать минимальный copyable application bootstrap, чтобы после установки
+- [x] Описать минимальный copyable application bootstrap, чтобы после установки
   библиотеки был готовый стандартный Module class без ручного повторения всех
   library bindings.
 
 Готовность: приложение может подключить core и worker через два поставляемых
 Module class, а пользователи других DI/container решений не получают Thesis DIC
 в обязательных dependencies.
+
+#### L5.R1 — Optional Default Modules И Application Overrides
+
+- State: L5 закрыт `2026-11-04`; оба package предоставляют готовую Thesis DIC
+  composition без изменения neutral resolver/scope contracts.
+- Core `MessageBusModule` экспортирует `Ref<MessageBus>`, принимает compiled
+  registry и application service refs, сам создаёт scoped Thesis resolver либо
+  использует явно переданный application-owned `ServiceScopeFactoryInterface`.
+  Queue provider, serializer, clock, invoker и retry registry остаются явными
+  optional extension refs.
+- Worker `WorkerModule` экспортирует `Ref<WorkerRuntime>` и по умолчанию собирает
+  job resolver, `MessageBusQueueWorker`, один job scope, runner и runtime. Для
+  correlation/decorator-specific lifecycle приложение может передать готовую
+  scope factory вместо default executor/serializer/service composition.
+- `thesis/dic ^0.5.3` присутствует только в `require-dev` и `suggest` обоих
+  packages; runtime `require` не появился.
+- Реальное приложение импортирует оба library module: core сохраняет свой
+  validated service map, worker — correlation-декорированный job resolver, а
+  library-owned сборка bus/runner/runtime больше не повторяется.
+- Package gates: core PHPUnit `105 tests / 429 assertions`, worker PHPUnit
+  `32 tests / 147 assertions`, PHPStan level max и strict Composer validation;
+  joint test исполняет queued binding и подтверждает job-scope disposal.
+- README обоих packages содержит минимальные import examples и границу между
+  library defaults и application-owned registry, codecs, transports, control и
+  resource lifecycle.
 
 ## Wave 2 — Application Foundation
 
@@ -1028,7 +1067,7 @@ network I/O, optional outage даёт `degraded`, process-specific resources н�
 - [x] Добавить Thesis scope bridge и correlation interceptor seam.
 - [x] Добавить telemetry interceptor поверх существующего pipeline contract.
 - [x] Включить registry compile в fast gate.
-- [ ] Включить registry compile в release gate после принятия G2.
+- [x] Включить registry compile в release gate после принятия G2.
 - [x] Подключить worker executable к managed DIC lifecycle без `Dic::build()` и
   утечки process resources.
 - [x] Доказать nested dispatch и cancellation через representative target-owned
@@ -1117,6 +1156,21 @@ artifact воспроизводим, три runtime graph компилируют
   application fast gate: Testo `31 tests / 102 assertions`, PHPStan max,
   Deptrac `0 violations / 0 uncovered`, registry compile и три DIC graph.
 - Следующий незаблокированный application slice — D1 migration continuity.
+
+#### A3.R5 — Release Registry Gate
+
+- State: A3 закрыт `2026-11-04`; принятый G2 contract baseline теперь защищён
+  обязательной registry compilation не только в fast, но и в release path.
+- Добавлен самостоятельный `make registry-check`, использующий тот же
+  application container и `message-bus:registry:check`, что `composer check`.
+- `make smoke-release` зависит от `registry-check`, поэтому invalid binding,
+  service map или codec завершают release gate до запуска Newman и не могут
+  быть скрыты готовым HTTP process на другой revision.
+- Makefile target и release runbook фиксируют обязательную dependency,
+  намеренное повторение проверки для отдельного evidence и fail-closed smoke.
+- Verified: Fast `81 tests / 368 assertions`, Contract `12 tests / 227
+  assertions`, Integration `15 tests / 218 assertions`, PHPStan max и Deptrac
+  `0 violations / 0 uncovered`.
 
 ## Wave 3 — Database Foundation И Первый HTTP Slice
 
@@ -1536,8 +1590,9 @@ online queries читают только выбранный регион.
 - JUnit/JSON report пишется в configurable artifact directory. Dataset import,
   Nominatim readiness, legacy queue drain и operator approval не объявляются
   выполненными самим read-only runner.
-- На revision текущего slice пройдены Fast `81/366`, Contract `12/227` и real
-  PostgreSQL/OpenSearch Integration `14/209` gates.
+- На revision текущего slice пройдены Fast `81/368`, Contract `12/227` и real
+  PostgreSQL/OpenSearch Integration `15/218` gates; `smoke-release` сначала
+  компилирует explicit MessageBus registry.
 
 ### R2 — Cutover И Cleanup
 
@@ -1630,13 +1685,44 @@ RoadRunner queues остаются release execution на сервере с по
 Data.Mos/OSM extensions остаются deferred до отдельного подтверждения scope.
 JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
-Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
-последний package-polish slice после стабилизации фактической A3 composition.
+Default Thesis DIC modules для core и worker реализованы в L5 как последний
+package-polish slice после стабилизации фактической A3 composition. Приложение
+использует их через explicit application-owned scope overrides, сохраняя
+correlation и resource lifecycle.
 Вопросы с вариантами открываются только для реально отсутствующего в v6 и
 dependency baseline поведения. G0 разрешает 21 migration и публичные HTTP
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.63.0 — 2026-11-04
+
+- P1 закрыт source-verifiable manifest-ом первого release: семь current HTTP
+  operations, application CLI и worker operational surface;
+- transitional demo routes и framework migration tooling отделены от release
+  contract/procedure;
+- Data.Mos и OSM aliases явно оставлены в deferred E1, не смешиваясь с
+  Nominatim reverse-geocode integration.
+
+### 0.62.0 — 2026-11-04
+
+- A3 закрыт release registry gate: `make smoke-release` теперь fail-closed
+  зависит от отдельного `make registry-check`;
+- Makefile dependency и release runbook фиксируют повторную compilation перед
+  Newman;
+- актуальные gates: Fast `81/368`, Contract `12/227`, Integration `15/218`.
+
+### 0.61.0 — 2026-11-04
+
+- L5 закрыт default `MessageBusModule` и `WorkerModule` с optional Thesis DIC
+  dependency только через Composer `suggest`/`require-dev`;
+- core module поддерживает default service-ref composition и явную application
+  scope override, worker module — default job resolver и override для
+  correlation/decorator-specific lifecycle;
+- joint package test доказал core+worker graph, exact-binding execution и
+  disposal одного job scope; оба package прошли PHPUnit и PHPStan max;
+- application roots импортируют library modules, сохраняя validated service map
+  и correlation-aware worker scope.
 
 ### 0.60.0 — 2026-11-04
 

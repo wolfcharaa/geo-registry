@@ -1,6 +1,6 @@
 # Архитектура Geo Registry
 
-- Версия документа: `0.8.0`
+- Версия документа: `0.9.0`
 - Обновлено: `2026-11-04`
 - Статус: `Target architecture; scaffold is transitional`
 - План миграции: [migration/implementation-roadmap.md](migration/implementation-roadmap.md)
@@ -248,10 +248,11 @@ clients закрываются disposer-ами root scope; каждый HTTP req
 получает отдельный scoped lifecycle.
 
 `thesis/dic` является application composition engine. MessageBus core сохраняет
-neutral resolver/scope contracts и не требует container package. До финального
-L5 application владеет DIC modules; L5 добавит в core и worker libraries
-готовые default `Thesis\Dic\Module` classes через Composer `suggest`, не делая
-DIC обязательной dependency.
+neutral resolver/scope contracts и не требует container package. L5 добавил в
+core и worker libraries готовые default `Thesis\Dic\Module` classes только
+через Composer `suggest`/`require-dev`, поэтому DIC не стал обязательной runtime
+dependency. Application roots импортируют эти modules, но передают собственные
+validated service map и correlation-aware job scope через explicit overrides.
 
 ## MessageBus И Async Boundary
 
@@ -276,6 +277,9 @@ reference по explicit service map и экспортирует один `Messag
 roots получают один application-owned codec registry. Если graph содержит
 async binding без stable alias и versioned codec либо alias указывает на другой
 message class, compilation завершается ошибкой до запуска process.
+Стандартную сборку concrete bus он делегирует library `MessageBusModule`;
+worker root аналогично делегирует runner/runtime в library `WorkerModule`, не
+отдавая библиотекам application config, PostgreSQL pools или observability.
 
 HTTP, CLI и worker producer-side composition подключает native AMPHP
 `PostgresQueueGateway`, `JsonEnvelopeSerializer`, clock и
