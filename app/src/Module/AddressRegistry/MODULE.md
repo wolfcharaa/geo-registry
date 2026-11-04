@@ -1,6 +1,6 @@
 ---
 module: AddressRegistry
-version: 0.1.0
+version: 0.1.1
 updated: 2026-11-04
 language: ru
 ---
@@ -17,9 +17,13 @@ OpenSearch ему не принадлежат. PostgreSQL приложения �
 ## Текущее Состояние
 
 В модуле пока нет исполняемых capabilities, features, HTTP/CLI entrypoints,
-MessageBus messages или публичных read boundaries. Поэтому Postman collection и
-карточки сценариев в этой версии отсутствуют. Текущие `/geocode` и `/search`
-остаются переходными scaffold routes вне модуля и не считаются его контрактом.
+MessageBus messages или публичных read boundaries. Поэтому карточки сценариев и
+Postman companion, подтверждающий target behavior, в этой версии отсутствуют.
+Разрешённый legacy-контракт сохранён отдельно как
+[migration baseline](../../../../docs/api/http-contract-baseline.md); его address
+operations помечены `planned` и не означают наличие target routes. Текущие
+`/geocode` и `/search` остаются переходными scaffold routes вне модуля и не
+считаются его контрактом.
 
 Первый реализованный vertical slice добавит собственную scenario-карточку и
 повысит minor-версию документа. Порядок реализации и ещё не исполняемые сценарии

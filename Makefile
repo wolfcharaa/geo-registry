@@ -52,6 +52,10 @@ architecture-check: guard-user ## Verify application and module dependency direc
 	$(COMPOSE) run --rm --no-deps app composer deptrac
 .PHONY: architecture-check
 
+contract: guard-user ## Validate OpenAPI and Postman contract artifacts
+	$(COMPOSE) run --rm --no-deps app composer test:contract
+.PHONY: contract
+
 fix: guard-user ## Apply PHP formatting
 	$(COMPOSE) run --rm --no-deps app composer cs-fix
 .PHONY: fix

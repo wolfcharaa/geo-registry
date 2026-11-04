@@ -1,0 +1,715 @@
+openapi: 3.1.0
+info:
+  title: Geo Registry HTTP API
+  version: 0.1.0
+  summary: Contract baseline for the Spiral-to-AMPHP migration
+  description: |
+    Health operations describe the current AMPHP runtime. Address operations are
+    the accepted migration contract and are not routed by the target runtime yet.
+    The `x-migration-status` extension makes that distinction machine-readable.
+servers:
+  - url: http://127.0.0.1:8080
+    description: Local development runtime
+tags:
+  - name: Health
+  - name: Addresses
+
+paths:
+  /health/live:
+    get:
+      operationId: getHealthLive
+      tags: [Health]
+      summary: Check process liveness
+      x-migration-status: current
+      x-postman-folder: Health
+      x-postman-request: Live
+      responses:
+        '200':
+          description: The process event loop is alive.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthReport'
+              examples:
+                ok:
+                  value: {status: ok}
+
+  /health/ready:
+    get:
+      operationId: getHealthReady
+      tags: [Health]
+      summary: Check required and optional dependencies
+      x-migration-status: current
+      x-postman-folder: Health
+      x-postman-request: Ready
+      responses:
+        '200':
+          description: Required dependencies are ready; optional dependencies may be degraded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthReport'
+              examples:
+                ready:
+                  value:
+                    status: ok
+                    components:
+                      - {name: postgres, policy: required, status: ok}
+                      - {name: nominatim, policy: optional, status: ok}
+                      - {name: opensearch, policy: optional, status: ok}
+                degraded:
+                  value:
+                    status: degraded
+                    components:
+                      - {name: postgres, policy: required, status: ok}
+                      - {name: nominatim, policy: optional, status: unavailable}
+                      - {name: opensearch, policy: optional, status: ok}
+        '503':
+          description: A required dependency is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthReport'
+              examples:
+                unavailable:
+                  value:
+                    status: unavailable
+                    components:
+                      - {name: postgres, policy: required, status: unavailable}
+                      - {name: nominatim, policy: optional, status: ok}
+                      - {name: opensearch, policy: optional, status: ok}
+
+  /health/startup:
+    get:
+      operationId: getHealthStartup
+      tags: [Health]
+      summary: Check whether application startup completed
+      x-migration-status: current
+      x-postman-folder: Health
+      x-postman-request: Startup
+      responses:
+        '200':
+          description: Startup completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthReport'
+              examples:
+                started:
+                  value: {status: ok}
+        '503':
+          description: Startup has not completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthReport'
+              examples:
+                starting:
+                  value: {status: unavailable}
+
+  /api/addresses/search:
+    get:
+      operationId: searchAddresses
+      tags: [Addresses]
+      summary: Search normalized address documents
+      description: Accepted legacy contract; target AMPHP routing is planned for V2.
+      x-migration-status: planned
+      x-postman-folder: Addresses
+      x-postman-request: Search
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: {type: string, minLength: 1}
+        - name: hier
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/Hierarchy'}
+        - name: profile
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [search, remediation-debug]
+            default: search
+        - name: limit
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 50, default: 10}
+      responses:
+        '200':
+          description: Matching address suggestions ordered by relevance.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AddressSuccessResponse'}
+              examples:
+                found: {$ref: '#/components/examples/SearchSuccess'}
+        '400':
+          description: Query parameters are malformed or the required query is missing.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AddressErrorResponse'}
+              examples:
+                missingQuery: {$ref: '#/components/examples/MissingQuery'}
+        '503':
+          description: Search storage is unavailable.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AddressErrorResponse'}
+              examples:
+                unavailable: {$ref: '#/components/examples/SearchUnavailable'}
+
+  /api/addresses/suggest:
+    post:
+      operationId: suggestAddresses
+      tags: [Addresses]
+      summary: Progress through an address hierarchy
+      description: Accepted legacy contract; target AMPHP routing is planned for V3.
+      x-migration-status: planned
+      x-postman-folder: Addresses
+      x-postman-request: Suggest City
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SuggestRequest'}
+            examples:
+              city:
+                value:
+                  suggest: Тестоград
+                  stage: administrative_area
+                  hierarchy: mun
+                  count: 5
+              district:
+                value:
+                  suggest: Центральный
+                  stage: administrative_area
+                  hierarchy: mun
+                  context: {parent_id: 770001}
+                  count: 5
+              thoroughfare:
+                value:
+                  suggest: Общая
+                  stage: thoroughfare
+                  hierarchy: mun
+                  context: {parent_id: 770002}
+                  count: 5
+      responses:
+        '200':
+          description: Suggestions for the requested hierarchy stage.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AddressSuccessResponse'}
+              examples:
+                found: {$ref: '#/components/examples/SuggestSuccess'}
+        '400':
+          description: Request fields have invalid types or values.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AddressErrorResponse'}
+              examples:
+                invalidStage: {$ref: '#/components/examples/InvalidStage'}
+        '422':
+          description: The requested parent context does not exist.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AddressErrorResponse'}
+              examples:
+                missingContext: {$ref: '#/components/examples/SuggestionContextNotFound'}
+        '503':
+          description: Suggestion storage is unavailable.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AddressErrorResponse'}
+              examples:
+                unavailable: {$ref: '#/components/examples/SuggestUnavailable'}
+
+  /api/addresses/find-by-id:
+    post:
+      operationId: findAddressById
+      tags: [Addresses]
+      summary: Find an address by a stable identifier
+      description: Accepted legacy contract; target AMPHP routing is planned for V1.
+      x-migration-status: planned
+      x-postman-folder: Addresses
+      x-postman-request: Find By Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FindByIdRequest'}
+            examples:
+              byGuid:
+                value: {query: 00000000-0000-4000-8000-000000770005, limit: 5}
+      responses:
+        '200':
+          description: Matching address suggestions; an empty result is successful.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AddressSuccessResponse'}
+              examples:
+                found: {$ref: '#/components/examples/FindByIdSuccess'}
+                notFound: {$ref: '#/components/examples/FindByIdNotFound'}
+        '400':
+          description: Request fields have invalid types.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AddressErrorResponse'}
+              examples:
+                invalidQuery: {$ref: '#/components/examples/InvalidFindByIdQuery'}
+        '503':
+          description: Search storage is unavailable.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AddressErrorResponse'}
+              examples:
+                unavailable: {$ref: '#/components/examples/SearchUnavailable'}
+
+  /api/addresses/reverse-geocode:
+    get:
+      operationId: reverseGeocodeAddresses
+      tags: [Addresses]
+      summary: Resolve an address near coordinates
+      description: Accepted legacy contract; target AMPHP routing is planned for V4.
+      x-migration-status: planned
+      x-postman-folder: Addresses
+      x-postman-request: Reverse Geocode
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema: {type: number, format: double, minimum: -90, maximum: 90}
+        - name: lon
+          in: query
+          required: true
+          schema: {type: number, format: double, minimum: -180, maximum: 180}
+        - name: hier
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/Hierarchy'}
+        - name: num
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 20, default: 1}
+      responses:
+        '200':
+          description: Nearest normalized address suggestions.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AddressSuccessResponse'}
+              examples:
+                found: {$ref: '#/components/examples/ReverseGeocodeSuccess'}
+        '400':
+          description: Coordinates are missing or malformed.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AddressErrorResponse'}
+              examples:
+                missingCoordinates: {$ref: '#/components/examples/MissingCoordinates'}
+        '503':
+          description: Geocoding storage is unavailable.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AddressErrorResponse'}
+              examples:
+                unavailable: {$ref: '#/components/examples/GeocodingUnavailable'}
+
+components:
+  schemas:
+    Hierarchy:
+      type: string
+      enum: [adm, mun]
+      default: adm
+
+    HealthStatus:
+      type: string
+      enum: [ok, degraded, unavailable]
+
+    HealthComponent:
+      type: object
+      additionalProperties: false
+      required: [name, policy, status]
+      properties:
+        name: {type: string, minLength: 1}
+        policy: {type: string, enum: [required, optional]}
+        status: {type: string, enum: [ok, unavailable]}
+
+    HealthReport:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: {$ref: '#/components/schemas/HealthStatus'}
+        components:
+          type: array
+          items: {$ref: '#/components/schemas/HealthComponent'}
+
+    AddressSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [success, count, query, suggestions, meta]
+      properties:
+        success: {type: boolean, const: true}
+        count: {type: integer, minimum: 0}
+        query: {type: object, additionalProperties: true}
+        suggestions:
+          type: array
+          items: {$ref: '#/components/schemas/AddressSuggestion'}
+        meta: {type: object, additionalProperties: true}
+
+    AddressErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [success, count, query, suggestions, meta, error, error_code]
+      properties:
+        success: {type: boolean, const: false}
+        count: {type: integer, const: 0}
+        query: {type: object, additionalProperties: true}
+        suggestions: {type: array, maxItems: 0}
+        meta: {type: object, additionalProperties: true}
+        error: {type: string, minLength: 1}
+        error_code: {type: string, minLength: 1}
+
+    AddressSuggestion:
+      oneOf:
+        - $ref: '#/components/schemas/DocumentSuggestion'
+        - $ref: '#/components/schemas/ProgressiveSuggestion'
+
+    DocumentSuggestion:
+      type: object
+      additionalProperties: false
+      required: [value, unrestricted_value, data]
+      properties:
+        value: {type: string}
+        unrestricted_value: {type: string}
+        data: {$ref: '#/components/schemas/DocumentSuggestionData'}
+
+    DocumentSuggestionData:
+      type: object
+      additionalProperties: true
+      required:
+        - fias_id
+        - fias_uuid
+        - object_id
+        - object_guid
+        - geo_lat
+        - geo_lon
+        - hierarchy_type
+        - level
+        - source
+        - aliases
+        - alias_count
+      properties:
+        fias_id: {type: [string, integer, 'null']}
+        fias_uuid: {type: [string, 'null']}
+        object_id: {type: [string, integer, 'null']}
+        object_guid: {type: [string, 'null']}
+        postal_code: {type: [string, 'null']}
+        okato: {type: [string, 'null']}
+        oktmo: {type: [string, 'null']}
+        geo_lat: {type: [number, 'null']}
+        geo_lon: {type: [number, 'null']}
+        hierarchy_type: {type: [string, 'null']}
+        level: {type: [integer, 'null']}
+        score: {type: [number, 'null']}
+        search_backend: {type: [string, 'null']}
+        source: {type: [string, 'null']}
+        source_id: {type: [string, integer, 'null']}
+        aliases: {type: array, items: {type: object, additionalProperties: true}}
+        alias_count: {type: integer, minimum: 0}
+        matched_alias: {type: [string, 'null']}
+
+    ProgressiveSuggestion:
+      type: object
+      additionalProperties: false
+      required: [value, unrestricted_value, data]
+      properties:
+        value: {type: string}
+        unrestricted_value: {type: string}
+        data: {$ref: '#/components/schemas/ProgressiveSuggestionData'}
+
+    ProgressiveSuggestionData:
+      type: object
+      additionalProperties: false
+      required:
+        - fias_id
+        - fias_uuid
+        - object_id
+        - object_guid
+        - name
+        - hierarchy_type
+        - level
+        - district
+        - context
+        - next_stage
+        - ready_for_search
+      properties:
+        fias_id: {type: string}
+        fias_uuid: {type: string}
+        object_id: {type: integer}
+        object_guid: {type: string}
+        name: {type: string}
+        hierarchy_type: {$ref: '#/components/schemas/Hierarchy'}
+        level: {type: integer}
+        district: {type: [string, 'null']}
+        context:
+          type: object
+          additionalProperties: false
+          required: [parent_id, hierarchy, district]
+          properties:
+            parent_id: {type: integer}
+            hierarchy: {$ref: '#/components/schemas/Hierarchy'}
+            district:
+              oneOf:
+                - type: 'null'
+                - type: object
+                  additionalProperties: false
+                  required: [object_id, name]
+                  properties:
+                    object_id: {type: [integer, 'null']}
+                    name: {type: string}
+        next_stage:
+          type: string
+          enum: [administrative_area, thoroughfare, search]
+        ready_for_search: {type: boolean}
+
+    SuggestRequest:
+      type: object
+      additionalProperties: false
+      required: [suggest, stage, hierarchy]
+      properties:
+        suggest: {type: string}
+        stage:
+          type: string
+          enum: [administrative_area, thoroughfare, search]
+        hierarchy: {$ref: '#/components/schemas/Hierarchy'}
+        exact: {type: string}
+        count: {type: integer, minimum: 1, maximum: 7, default: 5}
+        context:
+          type: object
+          additionalProperties: false
+          properties:
+            parent_id: {type: integer, minimum: 1}
+
+    FindByIdRequest:
+      type: object
+      additionalProperties: false
+      required: [query]
+      properties:
+        query: {type: string}
+        count: {type: integer, minimum: 1, maximum: 20}
+        limit: {type: integer, minimum: 1, maximum: 20, default: 20}
+
+  examples:
+    SearchSuccess:
+      summary: Synthetic search result
+      value:
+        success: true
+        count: 1
+        query: {q: Тестоград Общая, hierarchy: adm, limit: 5, profile: search}
+        suggestions:
+          - value: Регион Альфа, г. Тестоград, ул. Общая, д. 10
+            unrestricted_value: Регион Альфа, г. Тестоград, ул. Общая, д. 10
+            data:
+              fias_id: 00000000-0000-4000-8000-000000770005
+              fias_uuid: 00000000-0000-4000-8000-000000770005
+              object_id: 770005
+              object_guid: 00000000-0000-4000-8000-000000770005
+              postal_code: null
+              okato: null
+              oktmo: null
+              geo_lat: 55.750001
+              geo_lon: 37.610001
+              hierarchy_type: adm
+              level: 10
+              score: 1.0
+              search_backend: postgres
+              source: gar
+              source_id: 770005
+              aliases: []
+              alias_count: 0
+              matched_alias: null
+        meta: {endpoint: search}
+
+    MissingQuery:
+      value:
+        success: false
+        count: 0
+        query: {q: '', hierarchy: adm, limit: 10, profile: search}
+        suggestions: []
+        meta: {endpoint: search}
+        error: 'Missing required parameter: q'
+        error_code: missing_query
+
+    SearchUnavailable:
+      value:
+        success: false
+        count: 0
+        query: {}
+        suggestions: []
+        meta: {endpoint: search}
+        error: Search service unavailable
+        error_code: search_unavailable
+
+    SuggestSuccess:
+      value:
+        success: true
+        count: 1
+        query:
+          exact: ''
+          suggest: Тестоград
+          stage: administrative_area
+          hierarchy: mun
+          parent_id: 770001
+          count: 5
+        suggestions:
+          - value: г. Тестоград
+            unrestricted_value: г. Тестоград
+            data:
+              fias_id: 00000000-0000-4000-8000-000000770003
+              fias_uuid: 00000000-0000-4000-8000-000000770003
+              object_id: 770003
+              object_guid: 00000000-0000-4000-8000-000000770003
+              name: Тестоград
+              hierarchy_type: mun
+              level: 5
+              district: Центральный
+              context:
+                parent_id: 770003
+                hierarchy: mun
+                district: {object_id: 770002, name: Центральный}
+              next_stage: thoroughfare
+              ready_for_search: false
+        meta: {endpoint: suggest, contract_version: 2, stage: administrative_area}
+
+    InvalidStage:
+      value:
+        success: false
+        count: 0
+        query: {}
+        suggestions: []
+        meta: {endpoint: suggest, contract_version: 2}
+        error: Unsupported suggestion stage.
+        error_code: invalid_stage
+
+    SuggestionContextNotFound:
+      value:
+        success: false
+        count: 0
+        query:
+          suggest: Общая
+          stage: thoroughfare
+          hierarchy: mun
+          context: {parent_id: 999999999}
+          count: 5
+        suggestions: []
+        meta: {endpoint: suggest, contract_version: 2}
+        error: Suggestion context was not found.
+        error_code: suggestion_context_not_found
+
+    SuggestUnavailable:
+      value:
+        success: false
+        count: 0
+        query: {}
+        suggestions: []
+        meta: {endpoint: suggest, contract_version: 2}
+        error: Suggestion service unavailable
+        error_code: suggest_unavailable
+
+    FindByIdSuccess:
+      summary: Synthetic UUID lookup result
+      value:
+        success: true
+        count: 1
+        query: {query: 00000000-0000-4000-8000-000000770005, limit: 5}
+        suggestions:
+          - value: Регион Альфа, г. Тестоград, ул. Общая, д. 10
+            unrestricted_value: Регион Альфа, г. Тестоград, ул. Общая, д. 10
+            data:
+              fias_id: 00000000-0000-4000-8000-000000770005
+              fias_uuid: 00000000-0000-4000-8000-000000770005
+              object_id: 770005
+              object_guid: 00000000-0000-4000-8000-000000770005
+              postal_code: null
+              okato: null
+              oktmo: null
+              geo_lat: 55.750001
+              geo_lon: 37.610001
+              hierarchy_type: adm
+              level: 10
+              score: 1.0
+              search_backend: postgres
+              source: gar
+              source_id: 770005
+              aliases: []
+              alias_count: 0
+              matched_alias: null
+        meta: {endpoint: find-by-id}
+
+    FindByIdNotFound:
+      value:
+        success: true
+        count: 0
+        query: {query: 00000000-0000-4000-8000-000000000000, limit: 5}
+        suggestions: []
+        meta: {endpoint: find-by-id}
+
+    InvalidFindByIdQuery:
+      value:
+        success: false
+        count: 0
+        query: {}
+        suggestions: []
+        meta: {endpoint: find-by-id}
+        error: query must be a string.
+        error_code: invalid_query
+
+    ReverseGeocodeSuccess:
+      value:
+        success: true
+        count: 1
+        query: {lat: 55.750001, lon: 37.610001, hierarchy: adm, limit: 1}
+        suggestions:
+          - value: Регион Альфа, г. Тестоград, ул. Общая, д. 10
+            unrestricted_value: Регион Альфа, г. Тестоград, ул. Общая, д. 10
+            data:
+              fias_id: 00000000-0000-4000-8000-000000770005
+              fias_uuid: 00000000-0000-4000-8000-000000770005
+              object_id: 770005
+              object_guid: 00000000-0000-4000-8000-000000770005
+              postal_code: null
+              okato: null
+              oktmo: null
+              geo_lat: 55.750001
+              geo_lon: 37.610001
+              hierarchy_type: adm
+              level: 10
+              score: 1.0
+              search_backend: postgres
+              source: gar
+              source_id: 770005
+              aliases: []
+              alias_count: 0
+              matched_alias: null
+        meta: {endpoint: reverse-geocode}
+
+    MissingCoordinates:
+      value:
+        success: false
+        count: 0
+        query: {lat: null, lon: null, hierarchy: adm, limit: 1}
+        suggestions: []
+        meta: {endpoint: reverse-geocode}
+        error: 'Missing required parameters: lat and lon'
+        error_code: missing_coordinates
+
+    GeocodingUnavailable:
+      value:
+        success: false
+        count: 0
+        query: {}
+        suggestions: []
+        meta: {endpoint: reverse-geocode}
+        error: Geocoding service unavailable
+        error_code: geocoding_unavailable

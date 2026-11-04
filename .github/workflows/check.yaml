@@ -29,9 +29,28 @@ jobs:
       - run: composer install --no-interaction --prefer-dist
       - run: composer check
 
+  contract:
+    name: HTTP contract artifacts
+    needs: fast
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pcntl, pgsql
+          tools: composer:v2
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist
+      - run: composer test:contract
+
   integration:
     name: PostgreSQL and OpenSearch integration
-    needs: fast
+    needs: [fast, contract]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

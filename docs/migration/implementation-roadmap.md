@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; G1 accepted, G2 HTTP contract gate next`
-- Версия документа: `0.47.0`
+- Статус: `Active; G2 accepted, V1 FindAddressById next`
+- Версия документа: `0.48.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -33,7 +33,8 @@ architecture gates, integration profile и worker runtime.
 PHPUnit tests, executable Postman collection и сценарии поиска, подсказок,
 импорта, построения read model, reverse geocode и enrichment. Его Composer
 package имеет лицензию `proprietary`; владелец исходного кода отдельно разрешил
-перенос всех 21 migration в MIT repository, что закрывает G0 для этого набора.
+перенос всех 21 migration и публичных Postman/response contracts в MIT
+repository. Разрешение не распространяется на implementation code.
 
 ### Исходная MessageBus
 
@@ -115,14 +116,15 @@ line с `0.1.0`; Git repository topology определяется gate G4:
 | --- | --- | --- | --- |
 | G0 Provenance | Право переноса под MIT либо clean-room реализация только по наблюдаемым контрактам | Копирование исходных PHP/SQL/test файлов | `Accepted` |
 | G1 Module name | `AddressRegistry` принят как окончательное имя | Создание module namespace и `MODULE.md` | `Accepted` |
-| G2 Contract baseline | Зафиксированы Postman collection, OpenAPI draft, representative responses и ошибки | Первый HTTP parity slice | `Open` |
+| G2 Contract baseline | Зафиксированы Postman collection, OpenAPI draft, representative responses и ошибки | Первый HTTP parity slice | `Accepted` |
 | G3 Parity dataset | Определён маленький deterministic PostgreSQL dataset с регионами и hierarchy cases | Search/Suggest parity | `Accepted` |
 | G4 Package workspace | Два соседних Git repository: `MessageBusAsync` и `MessageBusAsyncWorker`; history v6 не изменяется | Реализация MessageBus 0.1.0 | `Accepted` |
 | G5 Cutover data | Выбраны full re-import либо проверенный dump/restore path | Production cutover | `Deferred` |
 
-За пределами явно разрешённых 21 migration G0 продолжает требовать отдельного
-подтверждения либо clean-room реализацию. Доступность proprietary implementation
-локально сама по себе не разрешает перенос остальных исходных файлов.
+За пределами явно разрешённых 21 migration и публичных HTTP contract artifacts
+G0 продолжает требовать отдельного подтверждения либо clean-room реализацию.
+Доступность proprietary implementation локально сама по себе не разрешает
+перенос остальных исходных файлов.
 
 ## Карта Зависимостей
 
@@ -173,6 +175,19 @@ Library, application foundation и database fixture tracks можно вести
   данных, но не именем business owner.
 - State: создан `Module/AddressRegistry/MODULE.md` версии 0.1.0 без пустых layer
   directories и вымышленных scenario cards; executable behavior пока отсутствует.
+
+### G2 — Executable HTTP Contract Baseline
+
+- User answer: `2026-11-04` — принят вариант А: прямой перенос разрешённых
+  публичных Postman/response contracts без переноса implementation code.
+- Accepted: OpenAPI 3.1 YAML является structural source, sanitized Postman v2.1
+  collection — executable companion, а synthetic environment использует G3
+  fixture вместо исходных имён, IDs и координат.
+- Boundary: health operations отражают текущий AMPHP runtime; address operations
+  помечены `planned` и не считаются реализованными до соответствующего V-slice.
+- Gate: Contract suite проверяет parsing, schema references, response examples,
+  operationId/method/path coverage и отсутствие legacy/secret values.
+- Artifact: [HTTP contract baseline](../api/http-contract-baseline.md).
 
 ### G3 — Target-Owned Parity Dataset
 
@@ -609,12 +624,12 @@ Library, application foundation и database fixture tracks можно вести
 
 ### P2 — Executable Contract Snapshot
 
-- [ ] Скопировать или независимо восстановить разрешённую Postman collection.
-- [ ] Создать OpenAPI 3.1 skeleton с operation IDs для health и address API.
-- [ ] Сохранить representative success/error responses без secrets и real data.
-- [ ] Определить compatibility policy: exact JSON, additive fields, ordering,
+- [x] Скопировать или независимо восстановить разрешённую Postman collection.
+- [x] Создать OpenAPI 3.1 skeleton с operation IDs для health и address API.
+- [x] Сохранить representative success/error responses без secrets и real data.
+- [x] Определить compatibility policy: exact JSON, additive fields, ordering,
   pagination, error codes и status codes.
-- [ ] Создать operationId-to-Postman coverage check.
+- [x] Создать operationId-to-Postman coverage check.
 
 Готовность: будущая AMPHP-реализация сравнивается с неизменяемой contract base,
 а не с памятью о поведении исходного приложения.
@@ -950,8 +965,9 @@ Module class, а пользователи других DI/container решени
 - [x] Разделить Testo suites на Unit, Scenario, Integration и Contract.
 - [x] Добавить Deptrac rules и project checks для запрещённых dependencies.
 - [x] Добавить Compose integration profile с ephemeral PostgreSQL/OpenSearch.
-- [ ] Разделить `make check`, `make test-integration`, `make contract` и
-  `make smoke-release`; обновить CI fast/integration jobs.
+- [x] Разделить `make check`, `make test-integration` и `make contract`; добавить
+  отдельный CI contract job.
+- [ ] Добавить `make smoke-release` после принятия состава release smoke.
 
 Готовность: пустой module skeleton не нужен; gates проверяют реальный scaffold,
 Testo suites запускаются отдельно, integration resources не используют dev
@@ -959,8 +975,8 @@ volumes.
 
 #### A1.R1 — Architecture И Executable Quality Gates
 
-- State: G1-dependent часть A1 закрыта `2026-11-04`; A1 остаётся partial из-за
-  G2-dependent contract/release artifacts.
+- State: G1/G2-dependent часть A1 закрыта `2026-11-04`; A1 остаётся partial
+  только из-за состава release smoke.
 - `docs/architecture.md` стал целевым источником layer/runtime/data boundaries и
   явно отделяет transitional HTTP scaffold от placement нового business code.
 - Testo разделён на Unit, Scenario, Integration и Contract; fast gate запускает
@@ -977,10 +993,10 @@ volumes.
   health/index/search/delete lifecycle.
 - GitHub Actions разделён на `fast` и следующий после него `integration` job;
   CI вызывает те же Composer/Make entrypoints, что и local workflow.
-- `make contract` и `make smoke-release` не создаются как пустые команды: первый
-  ждёт G2 OpenAPI/Postman contract, второй — состав принятого release smoke.
-- `AddressRegistry/MODULE.md` версии 0.1.0 фиксирует ownership и подтверждает
-  отсутствие executable module scenarios; Postman не создаётся до G2/V1.
+- `make contract` выполняет отдельную Contract suite для OpenAPI/Postman;
+  `make smoke-release` ждёт состав принятого release smoke.
+- `AddressRegistry/MODULE.md` версии 0.1.1 фиксирует ownership и отличает G2
+  migration baseline от ещё отсутствующего executable module companion.
 
 ### A2 — Typed Config, Thesis DIC И Runtime Roots
 
@@ -1364,16 +1380,28 @@ direct runtime bootstrap сохранён для совместимости. D1 
 migration проходят apply-from-zero и полный rollback на PostgreSQL 17/PostGIS.
 D2 добавил target-owned fixture v1 с regional ambiguity, checksum и быстрым
 reset. G1 закрепил `AddressRegistry` как business owner и добавил первый
-source-verifiable `MODULE.md` без пустого code skeleton. Следующий HTTP slice V1
-ждёт решения G2 по executable contract baseline. JSON stdout,
+source-verifiable `MODULE.md` без пустого code skeleton. G2 сохранил разрешённый
+публичный HTTP contract в OpenAPI/Postman, очистил examples и включил отдельный
+coverage gate. Следующий HTTP slice — V1 `FindAddressById`. JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
 последний package-polish slice после стабилизации фактической A3 composition.
 Вопросы с вариантами открываются только для реально отсутствующего в v6 и
-dependency baseline поведения. G0 закрыт только для 21 migration; G1 принят для
-application module source.
+dependency baseline поведения. G0 разрешает 21 migration и публичные HTTP
+contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.48.0 — 2026-11-04
+
+- G2 принят по варианту А: публичный contract перенесён без implementation code;
+- добавлены OpenAPI 3.1 YAML, sanitized Postman v2.1 collection/environment и
+  representative synthetic success/error responses;
+- зафиксирована compatibility policy и distinction `current`/`planned` routes;
+- Contract suite и `make contract` проверяют schema references и полное
+  operationId/method/path coverage; CI получил отдельный contract job, а test
+  runners монтируют repository docs только для чтения;
+- следующий vertical slice — V1 `FindAddressById`.
 
 ### 0.47.0 — 2026-11-04
 

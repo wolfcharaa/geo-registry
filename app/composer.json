@@ -28,6 +28,7 @@
         "friendsofphp/php-cs-fixer": "^3.89",
         "phpstan/phpstan": "^2.3",
         "phpstan/phpstan-strict-rules": "^2.1",
+        "symfony/yaml": "^8.1",
         "testo/testo": "^0.10"
     },
     "autoload": {
@@ -79,6 +80,7 @@
         "phpstan": "phpstan analyse --memory-limit=1G",
         "registry:check": "php bin/console message-bus:registry:check --no-interaction",
         "test": "testo --suite=Unit --suite=Scenario",
-        "test:integration": "testo --suite=Integration"
+        "test:integration": "testo --suite=Integration",
+        "test:contract": "testo --suite=Contract"
     }
 }
