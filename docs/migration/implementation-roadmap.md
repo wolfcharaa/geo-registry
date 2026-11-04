@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; V1 FindAddressById complete, V2 SearchAddress next`
-- Версия документа: `0.49.0`
+- Статус: `Active; V2 SearchAddress complete, V3 SuggestAddress next`
+- Версия документа: `0.50.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -183,9 +183,9 @@ Library, application foundation и database fixture tracks можно вести
 - Accepted: OpenAPI 3.1 YAML является structural source, sanitized Postman v2.1
   collection — executable companion, а synthetic environment использует G3
   fixture вместо исходных имён, IDs и координат.
-- Boundary: health operations и завершённый `FindAddressById` отражают текущий
-  AMPHP runtime; остальные address operations помечены `planned` до своего
-  V-slice.
+- Boundary: health operations, `FindAddressById` и `SearchAddress` отражают
+  текущий AMPHP runtime; остальные address operations помечены `planned` до
+  своего V-slice.
 - Gate: Contract suite проверяет parsing, schema references, response examples,
   operationId/method/path coverage и отсутствие legacy/secret values.
 - Artifact: [HTTP contract baseline](../api/http-contract-baseline.md).
@@ -1203,15 +1203,33 @@ GAR import.
 
 ### V2 — `SearchAddress` На PostgreSQL
 
-- [ ] Перенести как поведение query parsing/ranking без framework types.
-- [ ] Реализовать typed `SearchAddressPort` и AMPHP PostgreSQL reader.
-- [ ] Передавать `regionCode` явно и не выполнять nationwide `DISTINCT` в online
+- [x] Перенести как поведение query parsing/ranking без framework types.
+- [x] Реализовать typed `SearchAddressPort` и AMPHP PostgreSQL reader.
+- [x] Передавать `regionCode` явно и не выполнять nationwide `DISTINCT` в online
   path.
-- [ ] Добавить `GET /api/addresses/search`, presenter и compatibility cases.
-- [ ] Сохранить PostgreSQL adapter как обязательный fallback backend.
+- [x] Добавить `GET /api/addresses/search`, presenter и compatibility cases.
+- [x] Сохранить PostgreSQL adapter как обязательный fallback backend.
 
 Готовность: core search работает без OpenSearch и совпадает с fixture contract
 по ordering, limits, hierarchy и error semantics.
+
+- State: V2 закрыт `2026-11-04`; `searchAddresses` переведён в `current`,
+  PostgreSQL остаётся обязательным core backend без OpenSearch dependency.
+- Typed query/criteria/result/match contracts используют общий
+  `AddressDocument`, `AddressHierarchy` и alias evidence; binding
+  `address-registry.search-address.v1` компилируется explicit registry.
+- Forward migration добавляет вычисляемый `address_search.region_code` и индекс,
+  не меняя canonical GAR tables; C2 сохраняет ответственность за partitioned
+  read model и shadow cutover.
+- Региональный вызов применяет predicate до ranking. Nullable region остаётся
+  только additive legacy HTTP fallback и также не использует `DISTINCT`.
+- Ranking объединяет Russian FTS, exact/trigram score с порогом `0.3`, level и
+  deterministic tie-breakers; alias match возвращает typed evidence.
+- Fast gate: Testo `43 tests / 197 assertions`, PHPStan max, Deptrac
+  `0 violations / 0 uncovered`, registry `2 bindings`; Contract gate:
+  `6 tests / 181 assertions`; Integration gate на PHP 8.4/PostgreSQL 17:
+  `7 tests / 49 assertions`.
+- Следующий vertical slice — V3 staged `SuggestAddress`.
 
 ### V3 — Staged `SuggestAddress`
 
@@ -1392,13 +1410,16 @@ Scenario test. Worker library и `app/bin/worker` теперь
 поддерживают managed `Dic::run()` provider lifecycle с гарантированным teardown;
 direct runtime bootstrap сохранён для совместимости. D1 завершён: CLI root
 содержит изолированный Yiisoft migration graph и PDO PostgreSQL adapter, все 21
-migration проходят apply-from-zero и полный rollback на PostgreSQL 17/PostGIS.
+исходные migration и target-owned forward migrations проходят apply-from-zero и
+полный rollback на PostgreSQL 17/PostGIS.
 D2 добавил target-owned fixture v1 с regional ambiguity, checksum и быстрым
 reset. G1 закрепил `AddressRegistry` как business owner, G2 сохранил разрешённый
 публичный HTTP contract в OpenAPI/Postman и включил отдельный coverage gate. V1
 реализовал первый source-verifiable scenario `FindAddressById`: current HTTP
 route, typed MessageBus query/result, AMPHP PostgreSQL reader и все четыре Testo
-suites. Следующий HTTP slice — V2 `SearchAddress`. JSON stdout,
+suites. V2 добавил current `SearchAddress`, региональный predicate, FTS/trigram
+ranking, alias evidence и compatibility fallback без nationwide `DISTINCT`.
+Следующий HTTP slice — V3 staged `SuggestAddress`. JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
 последний package-polish slice после стабилизации фактической A3 composition.
@@ -1407,6 +1428,18 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.50.0 — 2026-11-04
+
+- завершён V2 `SearchAddress` с typed criteria/result/match contracts и stable
+  MessageBus binding;
+- добавлены current GET route, Symfony validation, regional `region_code` и
+  legacy nationwide fallback без `DISTINCT`;
+- PostgreSQL reader реализует Russian FTS, trigram ranking и alias evidence;
+- target-owned forward migration добавила вычисляемый региональный ключ и индекс
+  только в disposable `address_search` projection;
+- Unit, Scenario, Contract и real PostgreSQL Integration gates закрыты;
+  следующий slice — V3 staged `SuggestAddress`.
 
 ### 0.49.0 — 2026-11-04
 

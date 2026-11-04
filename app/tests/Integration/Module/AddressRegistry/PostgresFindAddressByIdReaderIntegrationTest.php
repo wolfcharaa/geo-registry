@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Module\AddressRegistry;
 use Amp\NullCancellation;
 use App\Infrastructure\Postgres\PostgresPoolFactory;
 use App\Module\AddressRegistry\Capability\AddressDocument;
+use App\Module\AddressRegistry\Infrastructure\Postgres\PostgresAddressDocumentHydrator;
 use App\Module\AddressRegistry\Infrastructure\Postgres\PostgresFindAddressByIdReader;
 use App\Tests\Support\Database\AddressRegistryParityFixture;
 use App\Tests\Support\Database\IntegrationDatabase;
@@ -25,14 +26,18 @@ final class PostgresFindAddressByIdReaderIntegrationTest
             IntegrationDatabase::resetSchema($pool);
             IntegrationDatabase::runMigrationCommand($dsn, 'migrate:up', ['--force-yes' => true]);
             AddressRegistryParityFixture::load($pool);
-            $reader = new PostgresFindAddressByIdReader($pool);
+            $reader = new PostgresFindAddressByIdReader($pool, new PostgresAddressDocumentHydrator());
             $cancellation = new NullCancellation();
 
             $byGuid = $reader->find('00000000-0000-4000-8000-000000770005', 20, $cancellation);
             $byObjectId = $reader->find('770005', 1, $cancellation);
 
             Assert::same(array_map(
-                static fn($document): array => [$document->objectId, $document->hierarchy, $document->address],
+                static fn(AddressDocument $document): array => [
+                    $document->objectId,
+                    $document->hierarchy->value,
+                    $document->address,
+                ],
                 $byGuid,
             ), [
                 [770005, 'adm', 'Регион Альфа, р-н Центральный, г. Тестоград, ул. Общая, д. 10'],

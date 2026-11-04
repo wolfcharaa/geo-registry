@@ -10,6 +10,7 @@ use App\Application\DependencyInjection\ApplicationMessageBusModule;
 use App\Application\MessageBus\MessageBusRegistrySource;
 use App\Application\Observability\CorrelationContext;
 use App\Module\AddressRegistry\Capability\AddressDocument;
+use App\Module\AddressRegistry\Capability\AddressHierarchy;
 use App\Module\AddressRegistry\Capability\FindAddressById\FindAddressById;
 use App\Module\AddressRegistry\Capability\FindAddressById\FindAddressByIdHandler;
 use App\Module\AddressRegistry\Capability\FindAddressById\FindAddressByIdPort;
@@ -104,7 +105,7 @@ final class RecordingFindAddressByIdPort implements FindAddressByIdPort
             objectId: 770005,
             objectGuid: '00000000-0000-4000-8000-000000770005',
             address: 'Регион Альфа, г. Тестоград, ул. Общая, д. 10',
-            hierarchy: 'adm',
+            hierarchy: AddressHierarchy::Administrative,
             level: 8,
             postalCode: '770001',
             okato: null,

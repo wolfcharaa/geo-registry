@@ -1,6 +1,6 @@
 # HTTP Contract Baseline
 
-- Версия baseline: `0.2.0`
+- Версия baseline: `0.3.0`
 - Дата: `2026-11-04`
 - Structural source: [OpenAPI 3.1](openapi.yaml)
 - Executable companion: [Postman collection](postman/geo-registry.postman_collection.json)
@@ -13,11 +13,11 @@ Baseline фиксирует публичное поведение, разреш�
 Исходные имена, идентификаторы и координаты в примерах заменены синтетическим
 двухрегиональным fixture проекта.
 
-Health operations и `POST /api/addresses/find-by-id` со статусом
-`x-migration-status: current` обслуживаются целевым AMPHP runtime. Остальные
-address operations со статусом `planned` являются целью следующих parity slices
-и пока не маршрутизируются. Переходные `/geocode` и `/search` не входят в
-публичный AddressRegistry contract.
+Health operations, `POST /api/addresses/find-by-id` и
+`GET /api/addresses/search` со статусом `x-migration-status: current`
+обслуживаются целевым AMPHP runtime. Остальные address operations со статусом
+`planned` являются целью следующих parity slices и пока не маршрутизируются.
+Переходные `/geocode` и `/search` не входят в публичный AddressRegistry contract.
 
 ## Правила Совместимости
 
@@ -35,10 +35,13 @@ address operations со статусом `planned` являются целью �
 - Empty/not-found для `find-by-id` — успешный ответ `200` с пустым массивом.
 - Malformed transport input возвращает `400`; отсутствующий suggest context —
   `422`; недоступность зависимого сервиса — `503` с route-specific error code.
+- `region_code` — additive optional filter legacy search route. Региональный
+  downstream path передаёт его явно; отсутствие сохраняет совместимый nationwide
+  fallback без online `DISTINCT`.
 - Response examples не являются production data и сами по себе не доказывают
-  наличие route в target. Исполняемость `find-by-id` подтверждают handler/
-  contract tests и карточка сценария в `MODULE.md`; остальные address examples
-  остаются baseline для следующих slices.
+  наличие route в target. Исполняемость `find-by-id` и `search` подтверждают
+  handler/contract tests и карточки сценариев в `MODULE.md`; остальные address
+  examples остаются baseline для следующих slices.
 
 ## Автоматическая Проверка
 

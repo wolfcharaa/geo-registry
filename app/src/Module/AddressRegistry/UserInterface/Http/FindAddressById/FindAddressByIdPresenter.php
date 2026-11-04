@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Module\AddressRegistry\UserInterface\Http\FindAddressById;
 
-use App\Module\AddressRegistry\Capability\AddressDocument;
 use App\Module\AddressRegistry\Capability\FindAddressById\FindAddressByIdResult;
+use App\Module\AddressRegistry\UserInterface\Http\AddressSuggestionPresenter;
 
 final readonly class FindAddressByIdPresenter
 {
+    public function __construct(private AddressSuggestionPresenter $suggestions) {}
+
     /** @return array<string, mixed> */
     public function success(FindAddressByIdResult $result, string $id, int $limit): array
     {
@@ -16,7 +18,10 @@ final readonly class FindAddressByIdPresenter
             'success' => true,
             'count' => count($result->documents),
             'query' => ['query' => $id, 'limit' => $limit],
-            'suggestions' => array_map($this->suggestion(...), $result->documents),
+            'suggestions' => array_map(
+                fn($document): array => $this->suggestions->present($document, 1.0),
+                $result->documents,
+            ),
             'meta' => ['endpoint' => 'find-by-id'],
         ];
     }
@@ -35,42 +40,6 @@ final readonly class FindAddressByIdPresenter
             'meta' => ['endpoint' => 'find-by-id'],
             'error' => $message,
             'error_code' => $code,
-        ];
-    }
-
-    /** @return array<string, mixed> */
-    private function suggestion(AddressDocument $document): array
-    {
-        return [
-            'value' => $document->address,
-            'unrestricted_value' => $document->address,
-            'data' => [
-                'fias_id' => $document->objectGuid ?? $document->objectId,
-                'fias_uuid' => $document->objectGuid,
-                'object_id' => $document->objectId,
-                'object_guid' => $document->objectGuid,
-                'postal_code' => $document->postalCode,
-                'okato' => $document->okato,
-                'oktmo' => $document->oktmo,
-                'geo_lat' => $document->latitude,
-                'geo_lon' => $document->longitude,
-                'hierarchy_type' => $document->hierarchy,
-                'level' => $document->level,
-                'score' => 1.0,
-                'search_backend' => 'postgres',
-                'source' => $document->source,
-                'source_id' => $document->sourceId,
-                'datamos_global_id' => $document->dataMosGlobalId,
-                'unom' => $document->dataMosUnom,
-                'nreg' => $document->dataMosNreg,
-                'aliases' => [],
-                'alias_count' => $document->aliasCount,
-                'matched_alias' => null,
-                'adm_area' => $document->dataMosAdministrativeArea,
-                'district' => $document->dataMosDistrict,
-                'kad_n' => $document->cadastralNumbers,
-                'kad_zu' => $document->landCadastralNumbers,
-            ],
         ];
     }
 }

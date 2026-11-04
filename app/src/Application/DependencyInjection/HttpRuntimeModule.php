@@ -28,9 +28,13 @@ use App\Infrastructure\OpenSearch\OpenSearchClientFactory;
 use App\Infrastructure\OpenSearch\OpenSearchHealthCheck;
 use App\Infrastructure\Postgres\PostgresHealthCheck;
 use App\Infrastructure\Postgres\PostgresPoolFactory;
+use App\Module\AddressRegistry\UserInterface\Http\AddressSuggestionPresenter;
 use App\Module\AddressRegistry\UserInterface\Http\FindAddressById\FindAddressByIdAction;
 use App\Module\AddressRegistry\UserInterface\Http\FindAddressById\FindAddressByIdPresenter;
 use App\Module\AddressRegistry\UserInterface\Http\FindAddressById\FindAddressByIdRequestMapper;
+use App\Module\AddressRegistry\UserInterface\Http\SearchAddress\SearchAddressAction;
+use App\Module\AddressRegistry\UserInterface\Http\SearchAddress\SearchAddressPresenter;
+use App\Module\AddressRegistry\UserInterface\Http\SearchAddress\SearchAddressRequestMapper;
 use App\UserInterface\Http\CorrelationMiddleware;
 use App\UserInterface\Http\RouterFactory;
 use Monolog\Logger;
@@ -168,11 +172,27 @@ final readonly class HttpRuntimeModule implements Module
         $findAddressByIdRequestMapper = $dic
             ->object(FindAddressByIdRequestMapper::class)
             ->arg('validator', $validator);
+        $suggestionPresenter = $dic->object(AddressSuggestionPresenter::class);
         $findAddressById = $dic
             ->object(FindAddressByIdAction::class)
             ->args([
                 'requestMapper' => $findAddressByIdRequestMapper,
-                'presenter' => $dic->object(FindAddressByIdPresenter::class),
+                'presenter' => $dic
+                    ->object(FindAddressByIdPresenter::class)
+                    ->arg('suggestions', $suggestionPresenter),
+                'messageBus' => $messageBus,
+                'timeoutSeconds' => $httpConfig->timeoutSeconds,
+            ]);
+        $searchAddressRequestMapper = $dic
+            ->object(SearchAddressRequestMapper::class)
+            ->arg('validator', $validator);
+        $searchAddress = $dic
+            ->object(SearchAddressAction::class)
+            ->args([
+                'requestMapper' => $searchAddressRequestMapper,
+                'presenter' => $dic
+                    ->object(SearchAddressPresenter::class)
+                    ->arg('suggestions', $suggestionPresenter),
                 'messageBus' => $messageBus,
                 'timeoutSeconds' => $httpConfig->timeoutSeconds,
             ]);
@@ -186,6 +206,7 @@ final readonly class HttpRuntimeModule implements Module
                 'openSearchIndex' => $openSearchConfig->index,
                 'correlationMiddleware' => $correlationMiddleware,
                 'findAddressById' => $findAddressById,
+                'searchAddress' => $searchAddress,
             ]);
 
         return $dic

@@ -12,9 +12,11 @@ use App\Application\DependencyInjection\ApplicationMessageBusModule;
 use App\Application\MessageBus\MessageBusRegistrySource;
 use App\Application\Observability\CorrelationContext;
 use App\Module\AddressRegistry\Capability\AddressDocument;
+use App\Module\AddressRegistry\Capability\AddressHierarchy;
 use App\Module\AddressRegistry\Capability\FindAddressById\FindAddressByIdHandler;
 use App\Module\AddressRegistry\Capability\FindAddressById\FindAddressByIdPort;
 use App\Module\AddressRegistry\Capability\FindAddressById\FindAddressByIdUnavailable;
+use App\Module\AddressRegistry\UserInterface\Http\AddressSuggestionPresenter;
 use App\Module\AddressRegistry\UserInterface\Http\FindAddressById\FindAddressByIdAction;
 use App\Module\AddressRegistry\UserInterface\Http\FindAddressById\FindAddressByIdPresenter;
 use App\Module\AddressRegistry\UserInterface\Http\FindAddressById\FindAddressByIdRequestMapper;
@@ -86,7 +88,7 @@ final class FindAddressByIdHttpContractTest
             new FindAddressByIdRequestMapper(
                 Validation::createValidatorBuilder()->enableAttributeMapping()->getValidator(),
             ),
-            new FindAddressByIdPresenter(),
+            new FindAddressByIdPresenter(new AddressSuggestionPresenter()),
             $messageBus,
             10,
         );
@@ -160,7 +162,7 @@ final readonly class ContractFindAddressByIdPort implements FindAddressByIdPort
             objectId: 770005,
             objectGuid: '00000000-0000-4000-8000-000000770005',
             address: 'Регион Альфа, г. Тестоград, ул. Общая, д. 10',
-            hierarchy: 'adm',
+            hierarchy: AddressHierarchy::Administrative,
             level: 8,
             postalCode: '770001',
             okato: '77001000000',

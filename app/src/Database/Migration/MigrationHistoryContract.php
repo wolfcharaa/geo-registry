@@ -31,6 +31,7 @@ final class MigrationHistoryContract
         M260903130000RebuildObjectParamsDenormIndex::class,
         M260903140000AddDataMosAddressRegistry::class,
         M260904010000CreateAddressAliases::class,
+        M261104000000AddAddressSearchRegionCode::class,
     ];
 
     private function __construct() {}

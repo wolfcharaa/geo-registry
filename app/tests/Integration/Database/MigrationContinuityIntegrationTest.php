@@ -44,7 +44,15 @@ SELECT
     to_regclass('public.gar_import_index_snapshots')::text AS import_snapshots,
     to_regclass('public.datamos_address_registry')::text AS datamos_registry,
     to_regclass('public.address_aliases')::text AS address_aliases,
-    to_regclass('public.idx_object_params_denorm_type_object_update')::text AS denorm_index
+    to_regclass('public.idx_object_params_denorm_type_object_update')::text AS denorm_index,
+    to_regclass('public.idx_address_search_region_hierarchy')::text AS region_index,
+    (
+        SELECT is_generated
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'address_search'
+          AND column_name = 'region_code'
+    ) AS region_generated
 SQL)->fetchRow();
 
             Assert::notNull($schema);
@@ -55,6 +63,8 @@ SQL)->fetchRow();
             Assert::same($schema['datamos_registry'] ?? null, 'datamos_address_registry');
             Assert::same($schema['address_aliases'] ?? null, 'address_aliases');
             Assert::same($schema['denorm_index'] ?? null, 'idx_object_params_denorm_type_object_update');
+            Assert::same($schema['region_index'] ?? null, 'idx_address_search_region_hierarchy');
+            Assert::same($schema['region_generated'] ?? null, 'ALWAYS');
 
             $extensions = [];
             $result = $pool->query(

@@ -14,7 +14,7 @@ final readonly class AddressDocument
         public int $objectId,
         public ?string $objectGuid,
         public string $address,
-        public string $hierarchy,
+        public AddressHierarchy $hierarchy,
         public int $level,
         public ?string $postalCode,
         public ?string $okato,

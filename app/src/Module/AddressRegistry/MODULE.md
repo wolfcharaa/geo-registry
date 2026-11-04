@@ -1,6 +1,6 @@
 ---
 module: AddressRegistry
-version: 0.2.0
+version: 0.3.0
 updated: 2026-11-04
 language: ru
 ---
@@ -16,9 +16,9 @@ OpenSearch ему не принадлежат. PostgreSQL приложения �
 
 ## Текущее Состояние
 
-В модуле исполняется первый read scenario `FindAddressById`. Его HTTP route,
-MessageBus binding, PostgreSQL adapter и contract artifacts реализованы одним
-вертикальным slice. Остальные address operations в
+В модуле исполняются read scenarios `FindAddressById` и `SearchAddress`. Их HTTP
+routes, MessageBus bindings, PostgreSQL adapters и contract artifacts
+реализованы вертикальными slices. Остальные address operations в
 [migration baseline](../../../../docs/api/http-contract-baseline.md) пока
 помечены `planned`. Текущие `/geocode` и `/search` остаются переходными scaffold
 routes вне модуля и не считаются его контрактом.
@@ -58,3 +58,36 @@ routes вне модуля и не считаются его контракто�
   [Scenario dispatch](../../../tests/Scenario/Module/AddressRegistry/FindAddressByIdScenarioTest.php),
   [PostgreSQL integration](../../../tests/Integration/Module/AddressRegistry/PostgresFindAddressByIdReaderIntegrationTest.php)
   и [HTTP contract](../../../tests/Contract/FindAddressByIdHttpContractTest.php).
+
+## Сценарий `SearchAddress`
+
+- Назначение: найти нормализованные адресные документы по русскому full-text и
+  trigram ranking, включая evidence совпавшего alias.
+- Вход: `GET /api/addresses/search` с обязательным `q`, `hier`, `profile`,
+  `limit` и additive optional `region_code`; limit ограничен `1..50`.
+- Региональная политика: downstream path передаёт `region_code` явно и получает
+  predicate до ranking. Отсутствие региона сохраняет legacy nationwide fallback
+  без `DISTINCT`; после V3 suggest всегда передаёт вычисленный регион.
+- Публичный контракт: operation `searchAddresses` в
+  [OpenAPI](../../../../docs/api/openapi.yaml) и requests `Addresses / Search*`
+  в [Postman](../../../../docs/api/postman/geo-registry.postman_collection.json).
+- MessageBus: query [`SearchAddress`](Capability/SearchAddress/SearchAddress.php),
+  handler [`SearchAddressHandler`](Capability/SearchAddress/SearchAddressHandler.php),
+  stable binding `address-registry.search-address.v1`.
+- Поток: [`SearchAddressAction`](UserInterface/Http/SearchAddress/SearchAddressAction.php)
+  выполняет transport validation и dispatch; handler создаёт typed criteria для
+  [`SearchAddressPort`](Capability/SearchAddress/SearchAddressPort.php), а
+  [`PostgresSearchAddressReader`](Infrastructure/Postgres/PostgresSearchAddressReader.php)
+  читает `address_search` и `address_aliases` без raw rows на границе capability.
+- Состояние и эффекты: только чтение application PostgreSQL. Forward migration
+  добавляет в disposable `address_search` вычисляемый `region_code` и индекс;
+  canonical GAR tables не изменяются.
+- Результаты: `200` с ранжированными suggestions либо пустым списком, `400` для
+  missing/malformed filters, `503/search_unavailable` при timeout/storage failure.
+- Ranking/recovery: exact string, PostgreSQL Russian FTS, trigram similarity с
+  порогом `0.3`, level и стабильные string/object tie-breakers; автоматического
+  retry нет, read-only повтор безопасен.
+- Проверки: [Unit mapper](../../../tests/Unit/Module/AddressRegistry/UserInterface/Http/SearchAddressRequestMapperTest.php),
+  [Scenario dispatch](../../../tests/Scenario/Module/AddressRegistry/SearchAddressScenarioTest.php),
+  [PostgreSQL integration](../../../tests/Integration/Module/AddressRegistry/PostgresSearchAddressReaderIntegrationTest.php)
+  и [HTTP contract](../../../tests/Contract/SearchAddressHttpContractTest.php).

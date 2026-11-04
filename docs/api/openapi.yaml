@@ -1,13 +1,13 @@
 openapi: 3.1.0
 info:
   title: Geo Registry HTTP API
-  version: 0.2.0
+  version: 0.3.0
   summary: Contract baseline for the Spiral-to-AMPHP migration
   description: |
-    Health operations and FindAddressById describe the current AMPHP runtime.
-    Remaining address operations are the accepted migration contract and are not
-    routed by the target runtime yet. The `x-migration-status` extension makes
-    that distinction machine-readable.
+    Health, FindAddressById, and SearchAddress describe the current AMPHP
+    runtime. Remaining address operations are the accepted migration contract
+    and are not routed by the target runtime yet. The `x-migration-status`
+    extension makes that distinction machine-readable.
 servers:
   - url: http://127.0.0.1:8080
     description: Local development runtime
@@ -113,8 +113,8 @@ paths:
       operationId: searchAddresses
       tags: [Addresses]
       summary: Search normalized address documents
-      description: Accepted legacy contract; target AMPHP routing is planned for V2.
-      x-migration-status: planned
+      description: Current AMPHP V2 contract backed by the application PostgreSQL read model.
+      x-migration-status: current
       x-postman-folder: Addresses
       x-postman-request: Search
       parameters:
@@ -137,6 +137,11 @@ paths:
           in: query
           required: false
           schema: {type: integer, minimum: 1, maximum: 50, default: 10}
+        - name: region_code
+          in: query
+          required: false
+          description: Additive regional scope; V3 suggest passes it explicitly to avoid nationwide search.
+          schema: {type: integer, minimum: 1, maximum: 99}
       responses:
         '200':
           description: Matching address suggestions ordered by relevance.
@@ -507,26 +512,26 @@ components:
       value:
         success: true
         count: 1
-        query: {q: Тестоград Общая, hierarchy: adm, limit: 5, profile: search}
+        query: {q: Тестоград Общая 10, hierarchy: adm, limit: 5, profile: search, region_code: 77}
         suggestions:
-          - value: Регион Альфа, г. Тестоград, ул. Общая, д. 10
-            unrestricted_value: Регион Альфа, г. Тестоград, ул. Общая, д. 10
+          - value: Регион Альфа, р-н Центральный, г. Тестоград, ул. Общая, д. 10
+            unrestricted_value: Регион Альфа, р-н Центральный, г. Тестоград, ул. Общая, д. 10
             data:
               fias_id: 00000000-0000-4000-8000-000000770005
               fias_uuid: 00000000-0000-4000-8000-000000770005
               object_id: 770005
               object_guid: 00000000-0000-4000-8000-000000770005
-              postal_code: null
-              okato: null
-              oktmo: null
+              postal_code: '770001'
+              okato: '77001000000'
+              oktmo: '77001001000'
               geo_lat: 55.750001
               geo_lon: 37.610001
               hierarchy_type: adm
-              level: 10
+              level: 8
               score: 1.0
               search_backend: postgres
               source: gar
-              source_id: 770005
+              source_id: null
               aliases: []
               alias_count: 0
               matched_alias: null
@@ -546,7 +551,7 @@ components:
       value:
         success: false
         count: 0
-        query: {}
+        query: {q: Тестоград Общая 10, hierarchy: adm, limit: 5, profile: search, region_code: 77}
         suggestions: []
         meta: {endpoint: search}
         error: Search service unavailable

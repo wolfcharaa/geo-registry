@@ -17,6 +17,7 @@ use App\Application\Health\HealthStatus;
 use App\Infrastructure\Nominatim\NominatimClient;
 use App\Infrastructure\OpenSearch\OpenSearchClient;
 use App\Module\AddressRegistry\UserInterface\Http\FindAddressById\FindAddressByIdAction;
+use App\Module\AddressRegistry\UserInterface\Http\SearchAddress\SearchAddressAction;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
@@ -30,6 +31,7 @@ final readonly class RouterFactory
         private string $openSearchIndex,
         private CorrelationMiddleware $correlationMiddleware,
         private FindAddressByIdAction $findAddressById,
+        private SearchAddressAction $searchAddress,
     ) {}
 
     public function create(HttpServer $server, ErrorHandler $errorHandler): Router
@@ -51,6 +53,10 @@ final readonly class RouterFactory
 
         $router->addRoute('POST', '/api/addresses/find-by-id', new ClosureRequestHandler(
             fn(Request $request): Response => $this->findAddressById->handle($request),
+        ));
+
+        $router->addRoute('GET', '/api/addresses/search', new ClosureRequestHandler(
+            fn(Request $request): Response => $this->searchAddress->handle($request),
         ));
 
         $router->addRoute('GET', '/geocode', new ClosureRequestHandler(
