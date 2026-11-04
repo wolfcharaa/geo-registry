@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; D1 complete, G2/G3 parity fixture gates next`
-- Версия документа: `0.45.0`
+- Статус: `Active; D2 complete, G1/G2 HTTP contract gates next`
+- Версия документа: `0.46.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -116,7 +116,7 @@ line с `0.1.0`; Git repository topology определяется gate G4:
 | G0 Provenance | Право переноса под MIT либо clean-room реализация только по наблюдаемым контрактам | Копирование исходных PHP/SQL/test файлов | `Accepted` |
 | G1 Module name | `AddressRegistry` принят как окончательное имя | Создание module namespace и `MODULE.md` | `Open` |
 | G2 Contract baseline | Зафиксированы Postman collection, OpenAPI draft, representative responses и ошибки | Первый HTTP parity slice | `Open` |
-| G3 Parity dataset | Определён маленький deterministic PostgreSQL dataset с регионами и hierarchy cases | Search/Suggest parity | `Open` |
+| G3 Parity dataset | Определён маленький deterministic PostgreSQL dataset с регионами и hierarchy cases | Search/Suggest parity | `Accepted` |
 | G4 Package workspace | Два соседних Git repository: `MessageBusAsync` и `MessageBusAsyncWorker`; history v6 не изменяется | Реализация MessageBus 0.1.0 | `Accepted` |
 | G5 Cutover data | Выбраны full re-import либо проверенный dump/restore path | Production cutover | `Deferred` |
 
@@ -132,9 +132,9 @@ G4 ──> L1 MessageBus core ──> L2 registry/codecs ──> L3 async produc
 L2 + L4 ──> L5 final Thesis DIC modules (deferred package polish)
 G1 ──> A1 quality/docs ──> A2 DIC/runtime roots ──> A3 bus integration
 G0 ──> D1 migration continuity
-D1 + G2 + G3 ──> D2 parity fixtures
+D1 + G3 ──> D2 parity fixtures
 
-L2 + A3 + D2
+G1 + G2 + L2 + A3 + D2
   └── V1 FindAddressById ──> V2 PostgreSQL Search ──> V3 Suggest
                                ├── V4 ReverseGeocode
                                └── V5 OpenSearch search
@@ -163,6 +163,17 @@ Library, application foundation и database fixture tracks можно вести
 - State: 21 migration перенесена с исходными identifiers и SQL semantics;
   compatibility edits ограничены typed-вызовом quoter и проверкой строковых
   metadata keys, генерируемый SQL не изменён.
+
+### G3 — Target-Owned Parity Dataset
+
+- Accepted: synthetic fixture v1 с регионами 77/78, одинаковыми названиями
+  района, города, улицы и дома, а также `adm`/`mun` hierarchy variants.
+- Coverage: stable UUID lookup, active/inactive selection, regional path,
+  nationwide ambiguity, search documents и deterministic empty/not-found data.
+- Artifact: [parity-fixture.md](parity-fixture.md), SQL source с закреплённым
+  SHA-256 и real PostgreSQL integration test.
+- Boundary: malformed input относится к G2 transport contract и не кодируется
+  искусственной строкой в database fixture.
 
 ### G4 — Package Workspace
 
@@ -578,7 +589,7 @@ Library, application foundation и database fixture tracks можно вести
 
 ### P1 — Provenance И Scope
 
-- [ ] Закрыть G0 и записать выбранный режим переноса.
+- [x] Закрыть G0 и записать выбранный режим переноса.
 - [ ] Подтвердить либо заменить имя `AddressRegistry`.
 - [ ] Определить, какие endpoints и CLI commands входят в первый release.
 - [ ] Зафиксировать намеренно deferred Data.Mos и OSM scope.
@@ -600,11 +611,12 @@ Library, application foundation и database fixture tracks можно вести
 
 ### P3 — Parity Dataset
 
-- [ ] Выбрать небольшой набор регионов и адресных hierarchy transitions.
-- [ ] Включить find-by-id, search ranking, city/district/street suggest,
-  not-found, ambiguous и malformed cases.
-- [ ] Зафиксировать способ загрузки fixture через migrations/SQL builder.
-- [ ] Исключить production dumps, персональные данные и случайную зависимость от
+- [x] Выбрать небольшой набор регионов и адресных hierarchy transitions.
+- [x] Включить data cases для find-by-id, search ranking,
+  city/district/street suggest, not-found и ambiguity; malformed input закрепить
+  отдельно в G2 transport contract.
+- [x] Зафиксировать способ загрузки fixture через migrations/SQL builder.
+- [x] Исключить production dumps, персональные данные и случайную зависимость от
   Nominatim internet state.
 
 Готовность: PostgreSQL adapters и оба search backends можно сравнивать на одном
@@ -1115,13 +1127,24 @@ artifact воспроизводим, три runtime graph компилируют
 
 ### D2 — Target-Owned Parity Fixture
 
-- [ ] Загрузить G3 dataset в canonical tables и `address_search`.
-- [ ] Добавить fixture version и checksum.
-- [ ] Проверить expected IDs, hierarchy, region codes и search documents.
-- [ ] Обеспечить быстрый reset между Integration suites.
+- [x] Загрузить G3 dataset в canonical tables и `address_search`.
+- [x] Добавить fixture version и checksum.
+- [x] Проверить expected IDs, hierarchy, region codes и search documents.
+- [x] Обеспечить быстрый reset между Integration suites.
 
 Готовность: каждый core HTTP slice воспроизводится локально и в CI без полного
 GAR import.
+
+- State: D2 закрыт `2026-11-04`; fixture полностью принадлежит target project и
+  не копирует source application fixtures или production data.
+- Fixture v1 содержит 11 canonical objects, 10 active objects и 14
+  `address_search` documents в регионах 77/78.
+- Идентичные район/город/улица/дом создают намеренную nationwide ambiguity;
+  region code и полный `path_arr` позволяют проверять scoped query path.
+- `AddressRegistryParityFixture` проверяет SHA-256, загружается одной transaction
+  и быстро очищает rows без rollback migration history.
+- Integration gate подтверждает UUID lookup, `adm`/`mun`, inactive exclusion,
+  generated `search_vector` и cleanup. Malformed input остаётся частью G2.
 
 ### V1 — `FindAddressById`
 
@@ -1328,8 +1351,9 @@ Scenario test. Worker library и `app/bin/worker` теперь
 direct runtime bootstrap сохранён для совместимости. D1 завершён: CLI root
 содержит изолированный Yiisoft migration graph и PDO PostgreSQL adapter, все 21
 migration проходят apply-from-zero и полный rollback на PostgreSQL 17/PostGIS.
-Следующий database slice D2 ждёт решений G2 и G3 по contract baseline и parity
-dataset. JSON stdout,
+D2 добавил target-owned fixture v1 с regional ambiguity, checksum и быстрым
+reset. Следующий HTTP slice V1 ждёт решений G1 и G2 по module name и executable
+contract baseline. JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
 последний package-polish slice после стабилизации фактической A3 composition.
@@ -1338,6 +1362,14 @@ dependency baseline поведения. G0 закрыт только для 21 m
 gate для application module source.
 
 ## История Документа
+
+### 0.46.0 — 2026-11-04
+
+- G3 принят как synthetic двухрегиональный fixture без production/source data;
+- version/checksum, regional hierarchy, UUID lookup, `adm`/`mun`, inactive
+  exclusion и generated search documents закреплены real PostgreSQL test;
+- destructive schema reset ограничен identity изолированного integration runtime;
+- D2 закрыт, V1 ожидает решений G1/G2 по module и HTTP contract.
 
 ### 0.45.0 — 2026-11-04
 

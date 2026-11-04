@@ -41,6 +41,7 @@ app/src/UserInterface/Http/            routes and JSON responses
 config/                                локальные настройки окружения
 docker/                                образы, Compose и smoke scripts
 docker/compose/dev/compose.yaml        development services
+app/tests/Fixture/Database/             versioned synthetic parity data
 Makefile                               стабильный интерфейс команд
 ```
 
@@ -156,6 +157,10 @@ make integration-down
 проверяет применение и полный rollback всех migrations на пустой базе и всегда
 выполняет cleanup через shell trap. Отдельные `integration-up/down` нужны для
 диагностики и ручного запуска тестов.
+
+Versioned fixture для будущих address scenarios описан в
+[docs/migration/parity-fixture.md](docs/migration/parity-fixture.md). Он содержит
+только synthetic data и отдельно проверяет региональные hierarchy cases.
 
 По умолчанию они доступны только на loopback-портах `55432` и `59200`.
 Параллельный запуск можно изолировать через `INTEGRATION_PROJECT_NAME`,

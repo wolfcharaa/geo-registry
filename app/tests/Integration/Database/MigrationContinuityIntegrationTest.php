@@ -4,31 +4,25 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Database;
 
-use Amp\Postgres\PostgresConnectionPool;
-use App\Application\DependencyInjection\CliRuntimeModule;
-use App\Application\Runtime\CliRuntime;
-use App\Config\EnvironmentSnapshot;
 use App\Database\Migration\MigrationHistoryContract;
 use App\Infrastructure\Postgres\PostgresPoolFactory;
+use App\Tests\Support\Database\IntegrationDatabase;
 use RuntimeException;
-use Symfony\Component\Console\Input\ArrayInput;
-use Symfony\Component\Console\Output\BufferedOutput;
 use Testo\Assert;
 use Testo\Test;
-use Thesis\Dic;
 
 #[Test]
 final class MigrationContinuityIntegrationTest
 {
     public function testItBuildsTheCurrentSchemaFromZeroAndRollsBack(): void
     {
-        $dsn = self::databaseDsn();
+        $dsn = IntegrationDatabase::dsn();
         $pool = PostgresPoolFactory::create($dsn, 1);
 
         try {
-            self::resetDatabase($pool);
+            IntegrationDatabase::resetSchema($pool);
 
-            self::runMigrationCommand($dsn, 'migrate:up', ['--force-yes' => true]);
+            IntegrationDatabase::runMigrationCommand($dsn, 'migrate:up', ['--force-yes' => true]);
 
             $history = [];
             $result = $pool->query('SELECT name FROM migration ORDER BY name');
@@ -76,7 +70,7 @@ SQL)->fetchRow();
 
             Assert::same($extensions, ['hstore', 'pg_trgm', 'postgis']);
 
-            self::runMigrationCommand($dsn, 'migrate:down', [
+            IntegrationDatabase::runMigrationCommand($dsn, 'migrate:down', [
                 '--all' => true,
                 '--force-yes' => true,
             ]);
@@ -95,48 +89,8 @@ SQL)->fetchRow();
             Assert::null($rollback['address_search'] ?? null);
             Assert::null($rollback['address_aliases'] ?? null);
         } finally {
-            self::resetDatabase($pool);
+            IntegrationDatabase::resetSchema($pool);
             $pool->close();
         }
-    }
-
-    /** @param array<string, bool> $options */
-    private static function runMigrationCommand(string $dsn, string $command, array $options): void
-    {
-        $output = new BufferedOutput();
-        $exitCode = Dic::run(
-            new CliRuntimeModule(new EnvironmentSnapshot([
-                'APP_NAME' => 'geo-registry-integration',
-                'APP_VERSION' => 'test',
-                'DATABASE_DSN' => $dsn,
-            ])),
-            static fn(CliRuntime $runtime): int => $runtime->run(
-                new ArrayInput([
-                    'command' => $command,
-                    '--no-ansi' => true,
-                    ...$options,
-                ]),
-                $output,
-            ),
-        );
-
-        if ($exitCode !== 0) {
-            throw new RuntimeException("{$command} failed with exit code {$exitCode}:\n{$output->fetch()}");
-        }
-    }
-
-    private static function resetDatabase(PostgresConnectionPool $pool): void
-    {
-        $pool->query('DROP SCHEMA IF EXISTS public CASCADE');
-        $pool->query('CREATE SCHEMA public');
-    }
-
-    private static function databaseDsn(): string
-    {
-        $dsn = getenv('INTEGRATION_DATABASE_DSN');
-
-        return is_string($dsn) && $dsn !== ''
-            ? $dsn
-            : 'host=127.0.0.1 port=55432 user=integration password=integration-only db=integration';
     }
 }
