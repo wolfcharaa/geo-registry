@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c8786c9bcd1c4ddc6956b342cae6985c",
+    "content-hash": "aa1a21e9dcf9b4b3f7f7bdd0d2d5278f",
     "packages": [
         {
             "name": "amphp/amp",
@@ -5365,7 +5365,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-28T22:38:53+00:00"
+            "time": "2026-10-28T22:38:53+00:00",
+            "published-time": "2026-10-28T22:39:06+00:00"
         },
         {
             "name": "phpstan/phpstan-strict-rules",
@@ -8002,8 +8003,9 @@
         "ext-pcntl": "*",
         "ext-pdo": "*",
         "ext-pdo_pgsql": "*",
-        "ext-pgsql": "*"
+        "ext-pgsql": "*",
+        "ext-xmlreader": "*"
     },
     "platform-dev": {},
-    "plugin-api-version": "2.9.0"
+    "plugin-api-version": "2.11.0"
 }

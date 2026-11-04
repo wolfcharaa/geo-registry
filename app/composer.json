@@ -10,6 +10,7 @@
         "ext-pdo": "*",
         "ext-pdo_pgsql": "*",
         "ext-pgsql": "*",
+        "ext-xmlreader": "*",
         "amphp/http-client": "^5.3",
         "amphp/http-server": "^3.4",
         "amphp/http-server-router": "^2.0",

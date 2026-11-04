@@ -1,6 +1,6 @@
 ---
 module: AddressRegistry
-version: 0.6.0
+version: 0.7.0
 updated: 2026-11-04
 language: ru
 ---
@@ -15,10 +15,81 @@ language: ru
 Модуль не владеет HTTP runtime, lifecycle PostgreSQL, Nominatim и OpenSearch.
 Canonical GAR tables остаются источником истины, а online-сценарии читают
 application-owned `address_search` и связанные иерархии через capability ports.
-Импорт и физическая перестройка partitioned projection относятся к отдельным
-CLI-сценариям следующих slices.
+Модуль также владеет состоянием CLI-операций импорта; физическая перестройка
+partitioned projection остаётся отдельным следующим сценарием.
 
 - **Postman collection:** [HTTP-контракты модуля](../../../../docs/api/postman/geo-registry.postman_collection.json).
+
+## Загрузка Данных GAR
+
+### Потоковый импорт XML — `Capability/ImportGar`
+
+Оператор загружает один поддерживаемый GAR XML-файл или каталог выгрузки.
+Каталог распознаёт известные семейства, упорядочивает справочники и зависимые
+региональные данные, а команда сообщает идентификатор операции и итоговые
+счётчики. Сценарий намеренно блокирующий и доступен только в CLI runtime.
+
+**Правила**
+
+- XML читается `XMLReader` только вперёд; в памяти одновременно находится не
+  больше выбранного batch и служебного состояния каталога.
+- Каждый batch одной PostgreSQL-транзакцией создаёт temporary staging table,
+  выполняет native `COPY FROM`, set-based upsert и обновляет checkpoint.
+- `gar_import_operations` и `gar_import_files` хранят progress/recovery state;
+  `parser_logs` не участвует в принятии решений о возобновлении.
+- Повтор завершённого неизменного manifest является успешным no-op. Незавершённая
+  операция продолжает тот же файл после числа уже зафиксированных строк.
+- Manifest связывает descriptor, относительный путь, размер и mtime файла.
+  Изменённый источник при активном checkpoint требует явного `--restart`.
+- `--restart` помечает незавершённую операцию `abandoned` и начинает новую; уже
+  зафиксированные canonical rows безопасно проходят повторный upsert.
+- Ошибка XML, COPY или merge помечает файл и операцию `failed`, возвращает
+  ненулевой exit code и оставляет только ранее завершённые batches. Temporary
+  staging откатывается вместе с текущим batch и удаляется при закрытии dedicated
+  CLI connection.
+- Advisory lock запрещает два одновременных импорта одного source. Общей
+  транзакции на всю выгрузку нет, поэтому partial state является намеренной
+  основой resume, а не скрытым rollback всего release.
+- Прямой XML-файл с неизвестным именем отклоняется. При обходе каталога файлы,
+  для которых в canonical schema нет descriptor, не импортируются.
+
+**Параметры запуска**
+
+- `source` — обязательный путь к одному поддерживаемому XML-файлу или каталогу
+  GAR; относительный путь разрешается в runtime-контексте.
+- `--batch-size` — число строк в атомарном COPY/merge/checkpoint batch; default
+  `5000`, допустимый диапазон `1..100000`. Меньшее значение чаще фиксирует
+  progress, большее уменьшает число round trips ценой памяти текущего batch.
+- `--restart` — не продолжать незавершённый checkpoint выбранного source, а
+  начать новую операцию. По умолчанию команда возобновляет совместимый manifest.
+- Стандартные Symfony Console flags управляют только консолью; их актуальный
+  список показывает `--help`.
+
+**Справка с хоста**
+
+```shell
+docker/compose/dev.sh run --rm --no-deps app php bin/console gar:import --help
+```
+
+**Справка внутри runtime-контекста**
+
+```shell
+php bin/console gar:import --help
+```
+
+**Результат запуска**
+
+Успех печатает status, operation id, число завершённых файлов, обработанных и
+merged rows и признак resume. Ошибка печатается в console output и возвращает
+exit code `1`.
+
+**Подключение/условие**
+
+- Команда зарегистрирована только `GarImportCliModule` внутри `CliRuntimeModule`.
+  `HttpRuntimeModule`, `WorkerRuntimeModule` и MessageBus registry не экспортируют
+  импортёр или его blocking `ext-pgsql` connection.
+- Runtime обязан иметь `ext-xmlreader` и `ext-pgsql`; перед импортом должны быть
+  применены migrations, создающие canonical GAR и operation tables.
 
 ## Поиск И Идентификация Адреса
 

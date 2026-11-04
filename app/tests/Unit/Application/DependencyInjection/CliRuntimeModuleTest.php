@@ -42,6 +42,7 @@ final class CliRuntimeModuleTest
         Assert::true(str_contains($console, 'migrate:down'));
         Assert::true(str_contains($console, 'migrate:history'));
         Assert::true(str_contains($console, 'migrate:mark'));
+        Assert::true(str_contains($console, 'gar:import'));
     }
 
     public function testItCompilesTheExplicitMessageBusRegistry(): void

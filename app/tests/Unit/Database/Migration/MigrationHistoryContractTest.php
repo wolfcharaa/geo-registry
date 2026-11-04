@@ -42,6 +42,6 @@ final class MigrationHistoryContractTest
             }
         }
 
-        Assert::same($transactional, 19);
+        Assert::same($transactional, 20);
     }
 }

@@ -46,6 +46,8 @@ SELECT
     to_regclass('public.address_aliases')::text AS address_aliases,
     to_regclass('public.idx_object_params_denorm_type_object_update')::text AS denorm_index,
     to_regclass('public.idx_address_search_region_hierarchy')::text AS region_index,
+    to_regclass('public.gar_import_operations')::text AS import_operations,
+    to_regclass('public.gar_import_files')::text AS import_files,
     (
         SELECT is_generated
         FROM information_schema.columns
@@ -65,6 +67,8 @@ SQL)->fetchRow();
             Assert::same($schema['denorm_index'] ?? null, 'idx_object_params_denorm_type_object_update');
             Assert::same($schema['region_index'] ?? null, 'idx_address_search_region_hierarchy');
             Assert::same($schema['region_generated'] ?? null, 'ALWAYS');
+            Assert::same($schema['import_operations'] ?? null, 'gar_import_operations');
+            Assert::same($schema['import_files'] ?? null, 'gar_import_files');
 
             $extensions = [];
             $result = $pool->query(

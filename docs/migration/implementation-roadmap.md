@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; V5 OpenSearch decorator complete, C1 GAR import next`
-- Версия документа: `0.53.0`
+- Статус: `Active; C1 GAR XML import complete, C2 regional read model next`
+- Версия документа: `0.54.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -1313,20 +1313,40 @@ PostgreSQL остаётся корректным fallback и source of truth.
   `0 violations / 0 uncovered`; Contract gate: `11 tests / 222 assertions`;
   Integration gate на PHP 8.4/PostgreSQL 17/OpenSearch:
   `9 tests / 66 assertions`.
-- Следующий vertical slice — C1 CLI GAR XML import.
+- Следующий vertical slice — C2 regional `address_search` rebuild.
 
 ## Wave 6 — CLI Data Pipeline
 
 ### C1 — GAR XML Import
 
-- [ ] Реализовать CLI-only XMLReader catalog/import pipeline.
-- [ ] Использовать bounded batches и native `ext-pgsql` COPY/staging/upsert.
-- [ ] Вынести progress/resume state в operation tables, не в log history.
-- [ ] Проверить cleanup, restart и partial-file failure.
-- [ ] Не регистрировать blocking import как HTTP/worker MessageBus handler.
+- [x] Реализовать CLI-only XMLReader catalog/import pipeline.
+- [x] Использовать bounded batches и native `ext-pgsql` COPY/staging/upsert.
+- [x] Вынести progress/resume state в operation tables, не в log history.
+- [x] Проверить cleanup, restart и partial-file failure.
+- [x] Не регистрировать blocking import как HTTP/worker MessageBus handler.
 
 Готовность: representative XML импортируется с ограниченной памятью и
 максимальной CLI throughput; HttpRuntime не может получить import adapters.
+
+Реализовано:
+
+- `gar:import` принимает один XML-файл или каталог, строит dependency-ordered
+  catalog для всех XML-семейств текущей canonical schema и запускается только из
+  `CliRuntime`.
+- `XMLReader` передаёт bounded text batches в native `pg_copy_from`; temporary
+  staging, set-based upsert и checkpoint фиксируются одной транзакцией.
+- `gar_import_operations` и `gar_import_files` отделяют progress/recovery от
+  diagnostic logs. Manifest и advisory lock защищают resume и параллельный
+  запуск одного source.
+- Повтор completed manifest является no-op; failed/running operation
+  возобновляется с последнего batch, а `--restart` сохраняет прежнюю операцию как
+  `abandoned` и начинает новую.
+- Representative и partial XML fixtures проверяют canonical mapping, type
+  resolution, hierarchy path, cleanup, resume и restart на PostgreSQL 17.
+- Fast gate: Testo `68 tests / 305 assertions`, PHPStan max, Deptrac
+  `0 violations / 0 uncovered`; Contract gate: `11 tests / 222 assertions`;
+  Integration gate на PHP 8.4/PostgreSQL 17/OpenSearch:
+  `10 tests / 97 assertions`.
 
 ### C2 — Regional `address_search` Rebuild
 
@@ -1472,7 +1492,9 @@ V3 реализовал current staged `SuggestAddress`, nested MessageBus orche
 и региональный candidate path. V4 добавил current optional `ReverseGeocode`,
 typed Nominatim boundary и GAR match через public `SearchAddress`. V5 подключил
 optional OpenSearch decorator с PostgreSQL fallback и real regional mapping
-gate. Следующий slice — C1 CLI GAR XML import.
+gate. C1 добавил CLI-only XMLReader/COPY importer с operation checkpoints и
+проверенным partial-file recovery. Следующий slice — C2 regional
+`address_search` rebuild.
 JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
@@ -1482,6 +1504,17 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.54.0 — 2026-11-04
+
+- завершён C1 CLI-only GAR XML catalog/import pipeline;
+- добавлены bounded native COPY/staging/upsert batches и прямой `ext-xmlreader`
+  platform requirement;
+- progress/resume перенесены в `gar_import_operations` и `gar_import_files`,
+  completed no-op, partial failure, resume, restart и cleanup проверены на
+  PostgreSQL 17;
+- blocking adapter остался вне HTTP/worker/MessageBus composition; следующий
+  slice — C2 regional `address_search` rebuild.
 
 ### 0.53.0 — 2026-11-04
 
