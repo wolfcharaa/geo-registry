@@ -7,6 +7,7 @@ namespace App\Application\DependencyInjection;
 use App\Application\Console\Command\MessageBusRegistryCheckCommand;
 use App\Application\MessageBus\ApplicationRegistryCompiler;
 use App\Application\MessageBus\MessageBusRegistrySource;
+use App\Application\Observability\CorrelationContext;
 use App\Application\Runtime\CliRuntime;
 use App\Config\ConsoleConfig;
 use App\Config\EnvironmentSnapshot;
@@ -32,6 +33,11 @@ final readonly class CliRuntimeModule implements Module
             static fn(): Application => new Application($config->name, $config->version),
         );
         $registrySource = $dic->value($this->messageBusRegistry ?? MessageBusRegistrySource::empty());
+        $correlationContext = $dic->object(CorrelationContext::class);
+        $messageBus = $dic->import(new ApplicationMessageBusModule(
+            $this->messageBusRegistry ?? MessageBusRegistrySource::empty(),
+            $correlationContext,
+        ));
         $registryCompiler = $dic->object(ApplicationRegistryCompiler::class);
         $registryCheck = $dic
             ->object(MessageBusRegistryCheckCommand::class)
@@ -43,6 +49,9 @@ final readonly class CliRuntimeModule implements Module
 
         return $dic
             ->object(CliRuntime::class)
-            ->arg('application', $application);
+            ->args([
+                'application' => $application,
+                'messageBus' => $messageBus,
+            ]);
     }
 }

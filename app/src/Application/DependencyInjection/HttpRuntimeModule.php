@@ -10,6 +10,7 @@ use App\Application\Health\HealthCheckDefinition;
 use App\Application\Health\HealthCheckPolicy;
 use App\Application\Health\HealthRegistry;
 use App\Application\Health\StartupState;
+use App\Application\MessageBus\MessageBusRegistrySource;
 use App\Application\Observability\CorrelationContext;
 use App\Application\Runtime\HttpRuntime;
 use App\Config\EnvironmentSnapshot;
@@ -37,7 +38,10 @@ use Thesis\Dic\Ref;
 /** @implements Module<Ref<HttpRuntime>> */
 final readonly class HttpRuntimeModule implements Module
 {
-    public function __construct(private EnvironmentSnapshot $environment) {}
+    public function __construct(
+        private EnvironmentSnapshot $environment,
+        private ?MessageBusRegistrySource $messageBusRegistry = null,
+    ) {}
 
     /** @return Ref<HttpRuntime> */
     public function configure(Dic $dic): Ref
@@ -49,6 +53,10 @@ final readonly class HttpRuntimeModule implements Module
         $openSearchConfig = OpenSearchConfig::fromEnvironment($this->environment);
 
         $correlationContext = $dic->object(CorrelationContext::class);
+        $messageBus = $dic->import(new ApplicationMessageBusModule(
+            $this->messageBusRegistry ?? MessageBusRegistrySource::empty(),
+            $correlationContext,
+        ));
         $loggerFactory = $dic
             ->object(StdoutLoggerFactory::class)
             ->arg('context', $correlationContext);
@@ -161,6 +169,7 @@ final readonly class HttpRuntimeModule implements Module
                 'logger' => $logger,
                 'routerFactory' => $routerFactory,
                 'startupState' => $startupState,
+                'messageBus' => $messageBus,
             ]);
     }
 }

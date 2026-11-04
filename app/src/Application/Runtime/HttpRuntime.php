@@ -12,6 +12,7 @@ use function Amp\trapSignal;
 use App\Application\Health\StartupState;
 use App\Config\HttpServerConfig;
 use App\UserInterface\Http\RouterFactory;
+use Fedor\MessageBus\MessageBusInterface;
 use Psr\Log\LoggerInterface;
 
 final readonly class HttpRuntime
@@ -21,6 +22,7 @@ final readonly class HttpRuntime
         private LoggerInterface $logger,
         private RouterFactory $routerFactory,
         private StartupState $startupState,
+        private MessageBusInterface $messageBus,
     ) {}
 
     public function run(): void
@@ -46,5 +48,10 @@ final readonly class HttpRuntime
         } finally {
             $server->stop();
         }
+    }
+
+    public function messageBus(): MessageBusInterface
+    {
+        return $this->messageBus;
     }
 }

@@ -245,10 +245,21 @@ compiled artifact и не выполняет filesystem scanning. Durable messag
 stable alias, stable binding ID, versioned JSON codec и непрерывную upcaster
 chain. PHP serialization не используется.
 
+Application-owned `ApplicationMessageBusModule` компилирует registry до сборки
+runtime graph, проверяет каждую handler/context/strategy/interceptor service
+reference по explicit service map и экспортирует один `MessageBus`. HTTP и CLI
+roots владеют этим export; произвольный runtime container lookup отсутствует.
+
 Один root dispatch открывает scope; nested dispatch переиспользует его. Worker
 открывает новый scope на каждую job и исполняет только authoritative binding из
 queue row. Interceptors остаются единственным cross-cutting pipeline contract;
 параллельный middleware API не вводится.
+
+Default sync flow включает application `CorrelationContextInterceptor`. Он
+переносит request/operation/job identifiers из текущего fiber context, а
+message/correlation identifiers берёт из immutable MessageBus envelope. Nested
+dispatch временно заменяет только message metadata и после завершения
+восстанавливает parent context.
 
 At-least-once delivery означает, что crash после business effect и до ack может
 повторить handler. Side-effecting scenarios обязаны явно выбрать idempotency,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\MessageBus;
 
+use Fedor\MessageBus\Flow\FlowDefinition;
 use Fedor\MessageBus\Flow\FlowRegistry;
 use InvalidArgumentException;
 use RuntimeException;
@@ -37,7 +38,13 @@ final readonly class MessageBusRegistrySource
 
     public static function empty(): self
     {
-        return new self([], []);
+        return new self(
+            [],
+            [],
+            new FlowRegistry(
+                FlowDefinition::sync('default')->middleware(CorrelationContextInterceptor::class),
+            ),
+        );
     }
 
     public static function fromFile(string $file): self

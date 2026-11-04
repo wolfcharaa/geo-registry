@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
 - Статус: `Active; A3 scope bridge next`
-- Версия документа: `0.40.0`
+- Версия документа: `0.41.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -971,10 +971,11 @@ network I/O, optional outage даёт `degraded`, process-specific resources н�
 
 - [x] Подключить выпущенный либо path-pinned development build core package.
 - [x] Описать application flows и registry source явно, без runtime scanning.
-- [ ] Добавить Thesis scope bridge и correlation/telemetry middleware seams.
+- [x] Добавить Thesis scope bridge и correlation interceptor seam.
+- [ ] Добавить telemetry interceptor поверх существующего pipeline contract.
 - [x] Включить registry compile в fast gate.
 - [ ] Включить registry compile в release gate после принятия G2.
-- [ ] Доказать nested dispatch и cancellation через representative target-owned
+- [x] Доказать nested dispatch и cancellation через representative target-owned
   test, не перенося business scenario раньше data foundation.
 
 Готовность: application dispatch работает через public bus interfaces, registry
@@ -995,8 +996,30 @@ artifact воспроизводим, три runtime graph компилируют
   `0 bindings`, пока target-owned scenarios ещё не добавлены.
 - Release gate остаётся G2-dependent и не считается закрытым только наличием
   fast command.
-- Следующий atom: application-owned Thesis scope bridge и существующий
-  interceptor contract для переноса correlation context.
+- Continuation: application-owned Thesis scope bridge и correlation
+  interceptor закрыты следующим A3.R2.
+
+#### A3.R2 — Thesis Scope Bridge И Correlation Interceptor
+
+- State: core application dispatch composition закрыта `2026-11-04`; A3
+  остаётся active до telemetry seam, worker root и G2-dependent release gate.
+- Application-owned `ApplicationMessageBusModule` использует public
+  `ThesisServiceResolver`/`ThesisServiceScopeFactory`; container dependency не
+  протекла в neutral core contracts.
+- Каждый handler, context factory, execution strategy и interceptor проверяется
+  по explicit service map при graph configuration; undeclared service ID или
+  несовместимый type завершают bootstrap fail-fast.
+- `HttpRuntime` и `CliRuntime` получают один compiled `MessageBus` export из
+  своих независимых DIC graphs; runtime scanning/container lookup отсутствуют.
+- Default sync flow использует существующий `InterceptorInterface` через
+  `CorrelationContextInterceptor`, без второго middleware abstraction.
+- Representative Scenario test доказывает новый nested message ID, общие
+  correlation/causation metadata, один DIC scope, disposal и inherited AMP
+  cancellation.
+- Fast gate: PHPStan max, Deptrac `0 violations / 0 uncovered`, registry compile
+  и Testo `27 tests / 82 assertions`.
+- Следующий atom: telemetry interceptor и реальный `WorkerRuntime` composition
+  на path-pinned worker package; фиктивный worker root по-прежнему запрещён.
 
 ## Wave 3 — Database Foundation И Первый HTTP Slice
 
@@ -1222,10 +1245,11 @@ Testo, Deptrac и real PostgreSQL/OpenSearch integration job; MODULE.md ждёт
 реальный `WorkerRuntime` одновременно с A3 package composition: worker root без
 `QueueWorkerRunner`, registry и scope bridge не создаётся как фиктивная
 заглушка. A3 уже подключил path-pinned core package, explicit application
-registry source и fast compile gate; следующий atom собирает Thesis scope bridge
-и correlation interceptor. JSON stdout, HTTP request/correlation lifecycle и
-graceful shutdown уже находятся в application shell; message/job fields будут
-seeded A3 scopes.
+registry source, fast compile gate, Thesis scope bridge и correlation
+interceptor; nested dispatch/cancellation доказаны target-owned Scenario test.
+Следующий atom добавляет telemetry interceptor и собирает реальный worker root.
+JSON stdout, HTTP request/correlation lifecycle и graceful shutdown уже
+находятся в application shell; job fields будут seeded worker scopes.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
 последний package-polish slice после стабилизации фактической A3 composition.
 Вопросы с вариантами открываются только для реально отсутствующего в v6 и
@@ -1233,6 +1257,17 @@ dependency baseline поведения. G0 и G1 остаются gates толь
 source.
 
 ## История Документа
+
+### 0.41.0 — 2026-11-04
+
+- добавлен application-owned Thesis DIC module поверх neutral core scope
+  contracts и explicit service map validation;
+- один compiled MessageBus включён в независимые HTTP и CLI runtime graphs;
+- default sync flow подключает correlation context через существующий
+  `InterceptorInterface`, без нового middleware API;
+- target-owned Scenario test доказал nested causation/correlation, общий scope,
+  disposal и inherited cancellation;
+- A3 frontier переведён на telemetry interceptor и реальный WorkerRuntime.
 
 ### 0.40.0 — 2026-11-04
 
