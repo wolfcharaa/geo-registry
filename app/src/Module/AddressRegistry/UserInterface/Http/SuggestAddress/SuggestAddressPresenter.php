@@ -102,6 +102,7 @@ final readonly class SuggestAddressPresenter
             score: $match->score,
             aliases: $match->aliases,
             matchedAlias: $match->matchedAlias,
+            backend: $match->backend,
         );
     }
 }

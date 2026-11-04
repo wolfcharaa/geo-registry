@@ -11,6 +11,7 @@ final readonly class OpenSearchConfig
     public function __construct(
         public string $url,
         public string $index,
+        public bool $searchEnabled,
         public ?string $username,
         public ?string $password,
     ) {
@@ -28,6 +29,7 @@ final readonly class OpenSearchConfig
         return new self(
             url: $environment->string('OPENSEARCH_URL', 'http://127.0.0.1:9200'),
             index: $environment->string('OPENSEARCH_INDEX', 'places'),
+            searchEnabled: $environment->boolean('OPENSEARCH_SEARCH_ENABLED', false),
             username: $environment->optionalString('OPENSEARCH_USERNAME'),
             password: $environment->optionalString('OPENSEARCH_PASSWORD'),
         );

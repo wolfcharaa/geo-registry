@@ -76,6 +76,20 @@ final readonly class EnvironmentSnapshot
         return $float;
     }
 
+    public function boolean(string $name, bool $default): bool
+    {
+        $value = $this->optionalString($name);
+        if ($value === null) {
+            return $default;
+        }
+
+        return match (strtolower($value)) {
+            '1', 'true', 'yes', 'on' => true,
+            '0', 'false', 'no', 'off' => false,
+            default => throw new InvalidArgumentException(sprintf('%s must be a boolean.', $name)),
+        };
+    }
+
     /** @return array<string, string> */
     public function redactedValues(): array
     {

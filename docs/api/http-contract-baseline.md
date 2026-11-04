@@ -1,6 +1,6 @@
 # HTTP Contract Baseline
 
-- Версия baseline: `0.5.0`
+- Версия baseline: `0.6.0`
 - Дата: `2026-11-04`
 - Structural source: [OpenAPI 3.1](openapi.yaml)
 - Executable companion: [Postman collection](postman/geo-registry.postman_collection.json)
@@ -42,6 +42,10 @@ Health operations, `POST /api/addresses/find-by-id`,
   публичный `SearchAddress`. Если GAR match отсутствует, Nominatim location
   возвращается отдельной suggestion с nullable GAR identity и
   `search_backend=nominatim`; она не становится core address document.
+- Search может вернуть `search_backend=opensearch`, когда optional projection
+  включена и дала непустой валидный результат. Disabled, empty, malformed или
+  unavailable OpenSearch прозрачно использует PostgreSQL без изменения HTTP
+  envelope; cancellation fallback не запускает.
 - Response examples не являются production data и сами по себе не доказывают
   наличие route в target. Исполняемость `find-by-id`, `search`, `suggest` и
   `reverse-geocode`

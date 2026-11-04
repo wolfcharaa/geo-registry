@@ -167,7 +167,7 @@
             "item": [
                 {
                     "name": "Search",
-                    "description": "OpenAPI operationId: searchAddresses\nMigration status: current; implemented by slice V2.",
+                    "description": "OpenAPI operationId: searchAddresses\nMigration status: current; PostgreSQL core implemented by V2, optional OpenSearch decorator by V5.",
                     "event": [
                         {
                             "listen": "test",

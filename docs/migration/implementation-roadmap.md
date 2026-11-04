@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; V4 ReverseGeocode complete, V5 OpenSearch decorator next`
-- Версия документа: `0.52.0`
+- Статус: `Active; V5 OpenSearch decorator complete, C1 GAR import next`
+- Версия документа: `0.53.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -1290,14 +1290,30 @@ GAR import.
 
 ### V5 — OpenSearch Search Decorator
 
-- [ ] Расширить native AMPHP client только используемыми typed operations.
-- [ ] Реализовать mapping/query parser и decorator над core search port.
-- [ ] Нормализовать hits в тот же contract, что PostgreSQL backend.
-- [ ] Проверить enabled/disabled/degraded fallback и per-request cancellation.
-- [ ] Покрыть mapping/query real OpenSearch integration tests.
+- [x] Расширить native AMPHP client только используемыми typed operations.
+- [x] Реализовать mapping/query parser и decorator над core search port.
+- [x] Нормализовать hits в тот же contract, что PostgreSQL backend.
+- [x] Проверить enabled/disabled/degraded fallback и per-request cancellation.
+- [x] Покрыть mapping/query real OpenSearch integration tests.
 
 Готовность: отключение или outage OpenSearch не меняет core API contract;
 PostgreSQL остаётся корректным fallback и source of truth.
+
+- State: V5 закрыт `2026-11-04`; feature включается только через
+  `OPENSEARCH_SEARCH_ENABLED`, не добавляет MessageBus binding и декорирует
+  существующий `SearchAddressPort` в HTTP composition.
+- Strict mapping и query factory сохраняют hierarchy/region predicates;
+  result mapper удаляет raw hit shape и маркирует typed matches backend-ом
+  `opensearch`.
+- Empty, malformed и unavailable projection переходят в PostgreSQL с безопасным
+  warning; cancellation пробрасывается без fallback.
+- Typed client дополнен только используемыми create/delete/index/refresh/search
+  operations. Streaming bulk и blue-green alias lifecycle остаются C3.
+- Fast gate: Testo `63 tests / 289 assertions`, PHPStan max, Deptrac
+  `0 violations / 0 uncovered`; Contract gate: `11 tests / 222 assertions`;
+  Integration gate на PHP 8.4/PostgreSQL 17/OpenSearch:
+  `9 tests / 66 assertions`.
+- Следующий vertical slice — C1 CLI GAR XML import.
 
 ## Wave 6 — CLI Data Pipeline
 
@@ -1454,8 +1470,9 @@ suites. V2 добавил current `SearchAddress`, региональный pred
 ranking, alias evidence и compatibility fallback без nationwide `DISTINCT`.
 V3 реализовал current staged `SuggestAddress`, nested MessageBus orchestration
 и региональный candidate path. V4 добавил current optional `ReverseGeocode`,
-typed Nominatim boundary и GAR match через public `SearchAddress`. Следующий
-online slice — V5 OpenSearch decorator.
+typed Nominatim boundary и GAR match через public `SearchAddress`. V5 подключил
+optional OpenSearch decorator с PostgreSQL fallback и real regional mapping
+gate. Следующий slice — C1 CLI GAR XML import.
 JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
@@ -1465,6 +1482,15 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.53.0 — 2026-11-04
+
+- завершён V5 optional OpenSearch decorator над core `SearchAddressPort`;
+- добавлены strict address mapping, regional query factory и typed hit mapper;
+- native AMPHP client расширен только реально используемыми typed operations;
+- disabled/empty/outage/malformed fallback и cancellation покрыты unit tests,
+  mapping/query — real OpenSearch integration test;
+- PostgreSQL сохранён source of truth; следующий slice — C1 GAR XML import.
 
 ### 0.52.0 — 2026-11-04
 

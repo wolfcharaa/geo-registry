@@ -12,6 +12,9 @@ use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressHandler;
 use App\Module\AddressRegistry\Capability\SuggestAddress\SuggestAddressHandler;
 use App\Module\AddressRegistry\Capability\SuggestAdministrativeArea\SuggestAdministrativeAreaHandler;
 use App\Module\AddressRegistry\Capability\SuggestThoroughfare\SuggestThoroughfareHandler;
+use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\OpenSearchAddressSearchQueryFactory;
+use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\OpenSearchAddressSearchResultMapper;
+use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\OpenSearchSearchAddressDecorator;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeHandler;
 use App\Module\AddressRegistry\Infrastructure\Postgres\PostgresAddressDocumentHydrator;
 use App\Module\AddressRegistry\Infrastructure\Postgres\PostgresAddressSuggestionReader;
@@ -25,6 +28,8 @@ final class AddressRegistryMessageBusServices
     /**
      * @param Ref<PostgresConnectionPool> $postgres
      * @param Ref<object>|null $reverseGeocodeLocator
+     * @param Ref<object>|null $openSearch
+     * @param Ref<object>|null $logger
      * @return array<string, Ref<object>>
      */
     public static function configure(
@@ -32,6 +37,9 @@ final class AddressRegistryMessageBusServices
         MessageBusRegistrySource $source,
         Ref $postgres,
         ?Ref $reverseGeocodeLocator = null,
+        ?Ref $openSearch = null,
+        ?string $openSearchIndex = null,
+        ?Ref $logger = null,
     ): array {
         $findById = ($source->services[FindAddressByIdHandler::class] ?? null) === FindAddressByIdHandler::class;
         $search = ($source->services[SearchAddressHandler::class] ?? null) === SearchAddressHandler::class;
@@ -73,6 +81,22 @@ final class AddressRegistryMessageBusServices
                 ->object(PostgresSearchAddressReader::class)
                 ->args(['postgres' => $postgres, 'hydrator' => $hydrator])
                 ->canBeScoped();
+            if ($openSearch !== null) {
+                if ($openSearchIndex === null || $logger === null) {
+                    throw new \LogicException('OpenSearch search decorator requires an index and logger.');
+                }
+                $reader = $dic
+                    ->object(OpenSearchSearchAddressDecorator::class)
+                    ->args([
+                        'client' => $openSearch,
+                        'index' => $openSearchIndex,
+                        'fallback' => $reader,
+                        'queries' => $dic->object(OpenSearchAddressSearchQueryFactory::class),
+                        'results' => $dic->object(OpenSearchAddressSearchResultMapper::class),
+                        'logger' => $logger,
+                    ])
+                    ->canBeScoped();
+            }
             $services[SearchAddressHandler::class] = $dic
                 ->object(SearchAddressHandler::class)
                 ->arg('reader', $reader)

@@ -4,10 +4,20 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\OpenSearch;
 
+use Amp\Cancellation;
+use Amp\NullCancellation;
 use App\Infrastructure\Http\AmpHttpClientFactory;
 use App\Infrastructure\OpenSearch\OpenSearchClientFactory;
+use App\Module\AddressRegistry\Capability\AddressHierarchy;
+use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressCriteria;
+use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressPort;
+use App\Module\AddressRegistry\Capability\SearchAddress\SearchProfile;
+use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\OpenSearchAddressIndexDefinition;
+use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\OpenSearchAddressSearchQueryFactory;
+use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\OpenSearchAddressSearchResultMapper;
+use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\OpenSearchSearchAddressDecorator;
+use Psr\Log\NullLogger;
 use RuntimeException;
-use stdClass;
 use Testo\Assert;
 use Testo\Test;
 
@@ -26,23 +36,39 @@ final class OpenSearchClientIntegrationTest
         $health = $client->health();
         Assert::true(in_array($health['status'] ?? null, ['green', 'yellow'], true));
 
-        try {
-            $created = $client->request('PUT', '/' . $index);
-            Assert::same($created['acknowledged'] ?? null, true);
+        $client->createIndex($index, OpenSearchAddressIndexDefinition::create());
 
-            $result = $client->search($index, ['match_all' => new stdClass()]);
-            $hits = $result['hits'] ?? null;
-            if (!is_array($hits)) {
-                throw new RuntimeException('OpenSearch search response does not contain a hits object.');
-            }
-            $total = $hits['total'] ?? null;
-            if (!is_array($total)) {
-                throw new RuntimeException('OpenSearch search response does not contain a total object.');
-            }
-            Assert::same($total['value'] ?? null, 0);
+        try {
+            $client->indexDocument($index, '770005-adm', self::document(77, 770005, 'Альфа'));
+            $client->indexDocument($index, '780005-adm', self::document(78, 780005, 'Бета'));
+            $client->refreshIndex($index);
+
+            $matches = (new OpenSearchSearchAddressDecorator(
+                client: $client,
+                index: $index,
+                fallback: new FailingSearchAddressPort(),
+                queries: new OpenSearchAddressSearchQueryFactory(),
+                results: new OpenSearchAddressSearchResultMapper(),
+                logger: new NullLogger(),
+            ))->search(new SearchAddressCriteria(
+                query: 'Тестоград Общая 10',
+                hierarchy: AddressHierarchy::Administrative,
+                profile: SearchProfile::Search,
+                limit: 5,
+                regionCode: 77,
+            ), new NullCancellation());
+
+            Assert::same(count($matches), 1);
+            $match = $matches[0] ?? null;
+            Assert::notNull($match);
+            Assert::same($match->document->objectId, 770005);
+            Assert::same($match->backend, 'opensearch');
+            Assert::same($match->document->aliasCount, 1);
+            $alias = $match->aliases[0] ?? null;
+            Assert::notNull($alias);
+            Assert::same($alias->source, 'osm');
         } finally {
-            $deleted = $client->request('DELETE', '/' . $index);
-            Assert::same($deleted['acknowledged'] ?? null, true);
+            $client->deleteIndex($index);
         }
     }
 
@@ -51,5 +77,39 @@ final class OpenSearchClientIntegrationTest
         $value = getenv($name);
 
         return is_string($value) && $value !== '' ? $value : $default;
+    }
+
+    /** @return array<string, mixed> */
+    private static function document(int $regionCode, int $objectId, string $region): array
+    {
+        return [
+            'object_id' => $objectId,
+            'object_guid' => sprintf('00000000-0000-4000-8000-%012d', $objectId),
+            'address' => "Регион {$region}, г. Тестоград, ул. Общая, д. 10",
+            'hierarchy_type' => 'adm',
+            'region_code' => $regionCode,
+            'level' => 8,
+            'postal_code' => (string) ($regionCode * 10000 + 1),
+            'geo_lat' => 55.750001,
+            'geo_lon' => 37.610001,
+            'source' => 'gar',
+            'alias_count' => 1,
+            'aliases' => [[
+                'value' => 'Тестоград, Общая улица, дом 10',
+                'kind' => 'alternative_address',
+                'source' => 'osm',
+                'source_object_type' => 'way',
+                'source_object_id' => $objectId,
+                'rank' => 2,
+            ]],
+        ];
+    }
+}
+
+final class FailingSearchAddressPort implements SearchAddressPort
+{
+    public function search(SearchAddressCriteria $criteria, Cancellation $cancellation): array
+    {
+        throw new RuntimeException('PostgreSQL fallback must not be called for a matching OpenSearch document.');
     }
 }

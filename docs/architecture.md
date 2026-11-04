@@ -56,6 +56,12 @@ MessageBus dispatch. Reverse feature получает typed Nominatim location �
 `WorkerRuntime` имеют отдельные DIC graphs; worker предоставляет управляемый
 run/control/status lifecycle.
 
+Optional OpenSearch search подключается в HTTP composition как decorator core
+`SearchAddressPort`. При выключенном feature, пустой выдаче или technical
+failure запрос исполняет PostgreSQL reader; cancellation не превращается в
+fallback. Feature нормализует raw hits до core `SearchAddressMatch`, поэтому
+transport и capability handler не зависят от OpenSearch payload.
+
 До появления остальных parity replacements сохраняются:
 
 - `GET /health/live`, `/health/startup` и `/health/ready` как ранний
@@ -340,7 +346,9 @@ HTTP compatibility fallback.
 OpenSearch индекс строится из canonical/read-model data и переключается через
 versioned physical index + alias только после успешной загрузки и parity check.
 OpenSearch outage не меняет canonical state и при принятой optional policy даёт
-readiness `degraded`, а не liveness failure.
+readiness `degraded`, а не liveness failure. Online decorator выключен по
+умолчанию и включается `OPENSEARCH_SEARCH_ENABLED=1`; до C3 оператор отвечает за
+наличие индекса с текущим strict mapping.
 
 Nominatim используется через application-owned typed client/feature port.
 Community Docker image допустим в development; production image/digest и data

@@ -15,5 +15,6 @@ final readonly class SearchAddressMatch
         public float $score,
         public array $aliases,
         public ?string $matchedAlias,
+        public string $backend = 'postgres',
     ) {}
 }

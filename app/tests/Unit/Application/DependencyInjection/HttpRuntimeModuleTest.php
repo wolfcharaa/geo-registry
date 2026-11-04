@@ -27,4 +27,17 @@ final class HttpRuntimeModuleTest
 
         Assert::same($runtimeClass, HttpRuntime::class);
     }
+
+    public function testItBuildsTheHttpRuntimeWithOpenSearchSearchEnabled(): void
+    {
+        $runtimeClass = Dic::run(
+            new HttpRuntimeModule(
+                new EnvironmentSnapshot(['OPENSEARCH_SEARCH_ENABLED' => 'true']),
+                MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_http.php'),
+            ),
+            static fn(HttpRuntime $runtime): string => $runtime::class,
+        );
+
+        Assert::same($runtimeClass, HttpRuntime::class);
+    }
 }

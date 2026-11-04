@@ -113,7 +113,7 @@ paths:
       operationId: searchAddresses
       tags: [Addresses]
       summary: Search normalized address documents
-      description: Current AMPHP V2 contract backed by the application PostgreSQL read model.
+      description: Current AMPHP contract backed by PostgreSQL with an optional OpenSearch V5 decorator and transparent PostgreSQL fallback.
       x-migration-status: current
       x-postman-folder: Addresses
       x-postman-request: Search

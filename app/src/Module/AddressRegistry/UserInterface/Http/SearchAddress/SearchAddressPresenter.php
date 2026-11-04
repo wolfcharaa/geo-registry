@@ -52,6 +52,7 @@ final readonly class SearchAddressPresenter
             score: $match->score,
             aliases: $match->aliases,
             matchedAlias: $match->matchedAlias,
+            backend: $match->backend,
         );
     }
 }

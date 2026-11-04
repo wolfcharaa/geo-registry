@@ -35,6 +35,7 @@ final class RuntimeConfigTest
             'NOMINATIM_LANGUAGE' => 'ru-RU',
             'OPENSEARCH_URL' => 'https://search.example:9200',
             'OPENSEARCH_INDEX' => 'addresses',
+            'OPENSEARCH_SEARCH_ENABLED' => 'true',
         ]);
 
         $http = HttpServerConfig::fromEnvironment($environment);
@@ -56,6 +57,7 @@ final class RuntimeConfigTest
         Assert::same($nominatim->language, 'ru-RU');
         Assert::same($openSearch->url, 'https://search.example:9200');
         Assert::same($openSearch->index, 'addresses');
+        Assert::same($openSearch->searchEnabled, true);
     }
 
     #[ExpectException(InvalidArgumentException::class)]
@@ -63,6 +65,14 @@ final class RuntimeConfigTest
     {
         OpenSearchConfig::fromEnvironment(new EnvironmentSnapshot([
             'OPENSEARCH_PASSWORD' => 'secret',
+        ]));
+    }
+
+    #[ExpectException(InvalidArgumentException::class)]
+    public function testOpenSearchSearchFlagMustBeBoolean(): void
+    {
+        OpenSearchConfig::fromEnvironment(new EnvironmentSnapshot([
+            'OPENSEARCH_SEARCH_ENABLED' => 'sometimes',
         ]));
     }
 

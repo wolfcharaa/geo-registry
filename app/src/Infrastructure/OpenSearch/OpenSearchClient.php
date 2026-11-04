@@ -33,6 +33,7 @@ final readonly class OpenSearchClient
 
     /**
      * @param array<string, mixed> $query
+     * @param list<array<string, mixed>|string> $sort
      * @return array<string, mixed>
      */
     public function search(
@@ -40,14 +41,19 @@ final readonly class OpenSearchClient
         array $query,
         int $size = 10,
         ?Cancellation $cancellation = null,
+        array $sort = [],
     ): array {
+        $body = [
+            'query' => $query,
+            'size' => max(1, min(100, $size)),
+        ];
+        if ($sort !== []) {
+            $body['sort'] = $sort;
+        }
         $response = $this->request(
             'POST',
             '/' . rawurlencode($index) . '/_search',
-            body: [
-                'query' => $query,
-                'size' => max(1, min(100, $size)),
-            ],
+            body: $body,
             cancellation: $cancellation,
         );
 
@@ -57,6 +63,59 @@ final readonly class OpenSearchClient
 
         /** @var array<string, mixed> $response */
         return $response;
+    }
+
+    /** @param array<string, mixed> $definition */
+    public function createIndex(string $index, array $definition, ?Cancellation $cancellation = null): void
+    {
+        $response = $this->request(
+            'PUT',
+            '/' . rawurlencode($index),
+            body: $definition,
+            cancellation: $cancellation,
+        );
+        if (($response['acknowledged'] ?? null) !== true) {
+            throw new OpenSearchException('OpenSearch did not acknowledge index creation.');
+        }
+    }
+
+    public function deleteIndex(string $index, ?Cancellation $cancellation = null): void
+    {
+        $response = $this->request(
+            'DELETE',
+            '/' . rawurlencode($index),
+            cancellation: $cancellation,
+        );
+        if (($response['acknowledged'] ?? null) !== true) {
+            throw new OpenSearchException('OpenSearch did not acknowledge index deletion.');
+        }
+    }
+
+    /** @param array<string, mixed> $document */
+    public function indexDocument(
+        string $index,
+        string $id,
+        array $document,
+        ?Cancellation $cancellation = null,
+    ): void {
+        $response = $this->request(
+            'PUT',
+            '/' . rawurlencode($index) . '/_doc/' . rawurlencode($id),
+            body: $document,
+            cancellation: $cancellation,
+        );
+        if (!in_array($response['result'] ?? null, ['created', 'updated'], true)) {
+            throw new OpenSearchException('OpenSearch did not index the document.');
+        }
+    }
+
+    public function refreshIndex(string $index, ?Cancellation $cancellation = null): void
+    {
+        $this->request(
+            'POST',
+            '/' . rawurlencode($index) . '/_refresh',
+            cancellation: $cancellation,
+        );
     }
 
     /**

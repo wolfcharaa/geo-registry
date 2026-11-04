@@ -75,8 +75,12 @@ Readiness возвращает `unavailable`/`503` только при отка�
 - `GET /geocode?q=Monte+Carlo&limit=5` — поиск через Nominatim.
 - `GET /search?q=example&limit=5` — поиск в `OPENSEARCH_INDEX`.
 
-OpenSearch начинает с пустого индекса. Mapping и ingestion следует добавлять
-вместе с первым бизнес-сценарием, а не фиксировать в общей оснастке.
+Публичный `GET /api/addresses/search` по умолчанию читает PostgreSQL. Значение
+`OPENSEARCH_SEARCH_ENABLED=1` подключает optional OpenSearch decorator: непустые
+валидные hits возвращаются с `search_backend=opensearch`, а empty/outage/
+malformed projection прозрачно использует PostgreSQL fallback. OpenSearch
+начинает с пустого индекса; перед включением feature индекс должен быть создан
+с текущим strict mapping. Его полный rebuild и alias cutover относятся к C3.
 
 ## Почему собственный OpenSearch client
 
@@ -159,7 +163,7 @@ make integration-down
 выполняет cleanup через shell trap. Отдельные `integration-up/down` нужны для
 диагностики и ручного запуска тестов.
 
-Versioned fixture для будущих address scenarios описан в
+Versioned fixture для address scenarios описан в
 [docs/migration/parity-fixture.md](docs/migration/parity-fixture.md). Он содержит
 только synthetic data и отдельно проверяет региональные hierarchy cases.
 

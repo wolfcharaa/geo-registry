@@ -1,6 +1,6 @@
 ---
 module: AddressRegistry
-version: 0.5.0
+version: 0.6.0
 updated: 2026-11-04
 language: ru
 ---
@@ -206,3 +206,36 @@ identity.
 - Feature binding объявлен только в `config/message_bus_http.php`. Базовый
   `message_bus_registry.php` для CLI/worker его не содержит; удаление binding-а
   из HTTP composition одновременно убирает handler и route.
+
+## Optional OpenSearch Search Feature
+
+### Декоратор полнотекстового поиска — `Feature/OpenSearch`
+
+При включённой projection composition оборачивает PostgreSQL
+`SearchAddressPort` декоратором OpenSearch. Feature строит region-aware query,
+нормализует hits в `SearchAddressMatch` и возвращает тот же HTTP envelope;
+PostgreSQL остаётся fallback и источником истины.
+
+**Правила**
+
+- Feature включается только через `OPENSEARCH_SEARCH_ENABLED=1`; значение по
+  умолчанию `0` оставляет core reader без decorator-а.
+- Query всегда фильтрует `hierarchy_type`, а переданный `region_code`
+  применяется до ranking. Порядок стабилизируют score, level, address и
+  `object_id`.
+- Strict index mapping содержит только поля core document, regional key и typed
+  aliases. Raw OpenSearch hit/response не покидает feature infrastructure.
+- Непустые hits получают `search_backend=opensearch`. Empty result, HTTP
+  failure или malformed payload вызывают PostgreSQL fallback; response body не
+  попадает в warning log.
+- Per-request cancellation передаётся OpenSearch client-у и не подменяется
+  fallback-вызовом.
+- Typed client operations V5 ограничены create/delete index, index document,
+  refresh и search. Streaming `_bulk` и alias cutover остаются за C3.
+
+**Подключение/условие**
+
+- Decorator собирается только в `HttpRuntimeModule`; CLI и worker продолжают
+  получать PostgreSQL `SearchAddressPort`.
+- Индекс должен быть создан с `OpenSearchAddressIndexDefinition`; до отдельного
+  C3 rebuild включение feature остаётся операторским решением.

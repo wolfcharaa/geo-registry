@@ -102,6 +102,17 @@ final readonly class HttpRuntimeModule implements Module
                 'userAgent' => $httpConfig->userAgent,
                 'language' => $nominatimConfig->language,
             ]);
+        $openSearchFactory = $dic
+            ->object(OpenSearchClientFactory::class)
+            ->arg('httpClient', $httpClient);
+        $openSearch = $dic
+            ->object(OpenSearchClient::class, [$openSearchFactory, 'create'])
+            ->args([
+                'baseUrl' => $openSearchConfig->url,
+                'userAgent' => $httpConfig->userAgent,
+                'username' => $openSearchConfig->username,
+                'password' => $openSearchConfig->password,
+            ]);
         $reverseGeocodeEnabled = ($registrySource->services[ReverseGeocodeHandler::class] ?? null)
             === ReverseGeocodeHandler::class;
         $reverseGeocodeLocator = $reverseGeocodeEnabled
@@ -115,20 +126,12 @@ final readonly class HttpRuntimeModule implements Module
                 $dic,
                 $registrySource,
                 $postgres,
-                $reverseGeocodeLocator,
+                reverseGeocodeLocator: $reverseGeocodeLocator,
+                openSearch: $openSearchConfig->searchEnabled ? $openSearch : null,
+                openSearchIndex: $openSearchConfig->searchEnabled ? $openSearchConfig->index : null,
+                logger: $openSearchConfig->searchEnabled ? $logger : null,
             ),
         ));
-        $openSearchFactory = $dic
-            ->object(OpenSearchClientFactory::class)
-            ->arg('httpClient', $httpClient);
-        $openSearch = $dic
-            ->object(OpenSearchClient::class, [$openSearchFactory, 'create'])
-            ->args([
-                'baseUrl' => $openSearchConfig->url,
-                'userAgent' => $httpConfig->userAgent,
-                'username' => $openSearchConfig->username,
-                'password' => $openSearchConfig->password,
-            ]);
         $startupState = $dic->object(StartupState::class);
         $postgresHealth = $dic
             ->object(PostgresHealthCheck::class)

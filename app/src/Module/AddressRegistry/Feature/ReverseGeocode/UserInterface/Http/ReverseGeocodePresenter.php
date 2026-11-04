@@ -62,6 +62,7 @@ final readonly class ReverseGeocodePresenter
             score: $match->score,
             aliases: $match->aliases,
             matchedAlias: $match->matchedAlias,
+            backend: $match->backend,
         );
     }
 
