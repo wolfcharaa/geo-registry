@@ -29,8 +29,8 @@ use Fedor\MessageBus\Worker\Control\DefaultWorkerControlService;
 use Fedor\MessageBus\Worker\Control\DefaultWorkerStatusService;
 use Fedor\MessageBus\Worker\Control\Postgres\PostgresWorkerControlGateway;
 use Fedor\MessageBus\Worker\Control\WorkerControlRuntime;
+use Fedor\MessageBus\Worker\Integration\Thesis\WorkerModule;
 use Fedor\MessageBus\Worker\Queue\Postgres\PostgresMessageConsumer;
-use Fedor\MessageBus\Worker\Queue\QueueWorkerRunner;
 use Fedor\MessageBus\Worker\Runtime\WorkerRuntime;
 use Monolog\Logger;
 use Thesis\Dic;
@@ -161,20 +161,11 @@ final readonly class WorkerRuntimeModule implements Module
         $scopeFactory = $dic
             ->object(ThesisServiceScopeFactory::class)
             ->arg('resolver', $dic->scoped($jobServices));
-        $runner = $dic
-            ->object(QueueWorkerRunner::class)
-            ->args([
-                'consumer' => $consumer,
-                'leaseControl' => $consumer,
-                'scopeFactory' => $scopeFactory,
-                'workerControlRuntime' => $controlRuntime,
-            ]);
-
-        return $dic
-            ->object(WorkerRuntime::class)
-            ->args([
-                'runner' => $runner,
-                'control' => $controlRuntime,
-            ]);
+        return $dic->import(new WorkerModule(
+            consumer: $consumer,
+            leaseControl: $consumer,
+            scopeFactory: $scopeFactory,
+            control: $controlRuntime,
+        ));
     }
 }

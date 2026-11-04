@@ -12,6 +12,7 @@ use App\Application\Observability\CorrelationContext;
 use Fedor\MessageBus\Clock\SystemClock;
 use Fedor\MessageBus\Codec\MessageCodecRegistry;
 use Fedor\MessageBus\Envelope\JsonEnvelopeSerializer;
+use Fedor\MessageBus\Integration\Thesis\MessageBusModule;
 use Fedor\MessageBus\Integration\Thesis\ThesisServiceResolver;
 use Fedor\MessageBus\Integration\Thesis\ThesisServiceScopeFactory;
 use Fedor\MessageBus\MessageBus;
@@ -58,26 +59,26 @@ final readonly class ApplicationMessageBusModule implements Module
             ->object(ThesisServiceScopeFactory::class)
             ->arg('resolver', $dic->scoped($resolver));
 
-        $arguments = [
-            'registry' => $dic->value($registry),
-            'scopeFactory' => $scopeFactory,
-        ];
+        $serializer = null;
+        $clock = null;
+        $queueProvider = null;
         if ($this->postgres !== null) {
             $codecs = $this->messageCodecs ?? new MessageCodecRegistry([]);
-            $arguments += [
-                'envelopeSerializer' => $dic
-                    ->object(JsonEnvelopeSerializer::class)
-                    ->arg('codecs', $dic->value($codecs)),
-                'clock' => $dic->object(SystemClock::class),
-                'queueProvider' => $dic
-                    ->object(PostgresQueueGateway::class)
-                    ->arg('postgres', $this->postgres),
-            ];
+            $serializer = $dic
+                ->object(JsonEnvelopeSerializer::class)
+                ->arg('codecs', $dic->value($codecs));
+            $clock = $dic->object(SystemClock::class);
+            $queueProvider = $dic
+                ->object(PostgresQueueGateway::class)
+                ->arg('postgres', $this->postgres);
         }
 
-        return $dic
-            ->object(MessageBus::class)
-            ->args($arguments);
+        return $dic->import(new MessageBusModule(
+            registry: $dic->value($registry),
+            scopeFactory: $scopeFactory,
+            envelopeSerializer: $serializer,
+            clock: $clock,
+            queueProvider: $queueProvider,
+        ));
     }
-
 }
