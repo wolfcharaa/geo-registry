@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; D2 complete, G1/G2 HTTP contract gates next`
-- Версия документа: `0.46.0`
+- Статус: `Active; G1 accepted, G2 HTTP contract gate next`
+- Версия документа: `0.47.0`
 - Обновлено: `2026-11-04`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -50,8 +50,8 @@ line с `0.1.0`; Git repository topology определяется gate G4:
 
 1. Миграция идёт вертикальными slices: transport, capability, port, adapter,
    composition, tests и документация завершаются вместе.
-2. Новый application-код живёт внутри принятого business module (предлагаемое
-   имя — `Module/AddressRegistry`) и следует направлению
+2. Новый application-код живёт внутри принятого business module
+   `Module/AddressRegistry` и следует направлению
    `UserInterface -> Capability <- Infrastructure`.
 3. `Application` содержит только process shell и composition; business flow там
    не размещается.
@@ -114,7 +114,7 @@ line с `0.1.0`; Git repository topology определяется gate G4:
 | Gate | Что должно быть подтверждено | Что блокирует | Статус |
 | --- | --- | --- | --- |
 | G0 Provenance | Право переноса под MIT либо clean-room реализация только по наблюдаемым контрактам | Копирование исходных PHP/SQL/test файлов | `Accepted` |
-| G1 Module name | `AddressRegistry` принят как окончательное имя | Создание module namespace и `MODULE.md` | `Open` |
+| G1 Module name | `AddressRegistry` принят как окончательное имя | Создание module namespace и `MODULE.md` | `Accepted` |
 | G2 Contract baseline | Зафиксированы Postman collection, OpenAPI draft, representative responses и ошибки | Первый HTTP parity slice | `Open` |
 | G3 Parity dataset | Определён маленький deterministic PostgreSQL dataset с регионами и hierarchy cases | Search/Suggest parity | `Accepted` |
 | G4 Package workspace | Два соседних Git repository: `MessageBusAsync` и `MessageBusAsyncWorker`; history v6 не изменяется | Реализация MessageBus 0.1.0 | `Accepted` |
@@ -163,6 +163,16 @@ Library, application foundation и database fixture tracks можно вести
 - State: 21 migration перенесена с исходными identifiers и SQL semantics;
   compatibility edits ограничены typed-вызовом quoter и проверкой строковых
   metadata keys, генерируемый SQL не изменён.
+
+### G1 — Module Name
+
+- User answer: `2026-11-04` — «вариант А».
+- Accepted: business module и PHP namespace называются `AddressRegistry` и
+  `App\Module\AddressRegistry`.
+- Boundary: `GeoRegistry` остаётся именем приложения, GAR — главным источником
+  данных, но не именем business owner.
+- State: создан `Module/AddressRegistry/MODULE.md` версии 0.1.0 без пустых layer
+  directories и вымышленных scenario cards; executable behavior пока отсутствует.
 
 ### G3 — Target-Owned Parity Dataset
 
@@ -590,7 +600,7 @@ Library, application foundation и database fixture tracks можно вести
 ### P1 — Provenance И Scope
 
 - [x] Закрыть G0 и записать выбранный режим переноса.
-- [ ] Подтвердить либо заменить имя `AddressRegistry`.
+- [x] Подтвердить либо заменить имя `AddressRegistry`.
 - [ ] Определить, какие endpoints и CLI commands входят в первый release.
 - [ ] Зафиксировать намеренно deferred Data.Mos и OSM scope.
 
@@ -936,7 +946,7 @@ Module class, а пользователи других DI/container решени
 ### A1 — Architecture, Test И CI Skeleton
 
 - [x] Создать устойчивый `docs/architecture.md`.
-- [ ] После принятия G1 создать `Module/AddressRegistry/MODULE.md` версии 0.1.0.
+- [x] После принятия G1 создать `Module/AddressRegistry/MODULE.md` версии 0.1.0.
 - [x] Разделить Testo suites на Unit, Scenario, Integration и Contract.
 - [x] Добавить Deptrac rules и project checks для запрещённых dependencies.
 - [x] Добавить Compose integration profile с ephemeral PostgreSQL/OpenSearch.
@@ -949,8 +959,8 @@ volumes.
 
 #### A1.R1 — Architecture И Executable Quality Gates
 
-- State: незаблокированная часть A1 закрыта `2026-11-03`; A1 остаётся partial
-  из-за G1/G2-dependent artifacts.
+- State: G1-dependent часть A1 закрыта `2026-11-04`; A1 остаётся partial из-за
+  G2-dependent contract/release artifacts.
 - `docs/architecture.md` стал целевым источником layer/runtime/data boundaries и
   явно отделяет transitional HTTP scaffold от placement нового business code.
 - Testo разделён на Unit, Scenario, Integration и Contract; fast gate запускает
@@ -969,8 +979,8 @@ volumes.
   CI вызывает те же Composer/Make entrypoints, что и local workflow.
 - `make contract` и `make smoke-release` не создаются как пустые команды: первый
   ждёт G2 OpenAPI/Postman contract, второй — состав принятого release smoke.
-- `MODULE.md` остаётся заблокирован G1. Следующий незаблокированный slice — A2
-  typed config и Thesis DIC runtime roots.
+- `AddressRegistry/MODULE.md` версии 0.1.0 фиксирует ownership и подтверждает
+  отсутствие executable module scenarios; Postman не создаётся до G2/V1.
 
 ### A2 — Typed Config, Thesis DIC И Runtime Roots
 
@@ -1339,8 +1349,9 @@ L4.R2 перенёс worker control storage/registry, L4.R3 подключил c
 machine к runner, L4.R4 закрыл scoped exact-binding execution без повторного
 enqueue, а L4.R5 добавил отдельный Console executable и optional signal adapter.
 L4 завершён. Незаблокированная часть A1 закрыла architecture source, tiered
-Testo, Deptrac и real PostgreSQL/OpenSearch integration job; MODULE.md ждёт G1,
-а contract/release smoke — G2. A2 получил typed settings и первый независимый
+Testo, Deptrac, real PostgreSQL/OpenSearch integration job и G1-dependent
+`AddressRegistry/MODULE.md`; contract/release smoke ждёт G2. A2 получил typed
+settings и первый независимый
 `HttpRuntime` Thesis DIC root с container-owned PostgreSQL lifecycle и отдельный
 `CliRuntime` с исполняемым Symfony Console entrypoint. A3 подключил path-pinned
 core/worker packages, explicit registry source, fast compile gate,
@@ -1352,16 +1363,26 @@ direct runtime bootstrap сохранён для совместимости. D1 
 содержит изолированный Yiisoft migration graph и PDO PostgreSQL adapter, все 21
 migration проходят apply-from-zero и полный rollback на PostgreSQL 17/PostGIS.
 D2 добавил target-owned fixture v1 с regional ambiguity, checksum и быстрым
-reset. Следующий HTTP slice V1 ждёт решений G1 и G2 по module name и executable
-contract baseline. JSON stdout,
+reset. G1 закрепил `AddressRegistry` как business owner и добавил первый
+source-verifiable `MODULE.md` без пустого code skeleton. Следующий HTTP slice V1
+ждёт решения G2 по executable contract baseline. JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker зафиксированы в L5 как намеренно
 последний package-polish slice после стабилизации фактической A3 composition.
 Вопросы с вариантами открываются только для реально отсутствующего в v6 и
-dependency baseline поведения. G0 закрыт только для 21 migration; G1 остаётся
-gate для application module source.
+dependency baseline поведения. G0 закрыт только для 21 migration; G1 принят для
+application module source.
 
 ## История Документа
+
+### 0.47.0 — 2026-11-04
+
+- вариантом А принято имя `AddressRegistry` и namespace
+  `App\Module\AddressRegistry`;
+- G1 закрыт, создан source-verifiable `MODULE.md` версии 0.1.0;
+- пустые layer directories, planned scenario cards и Postman без реального
+  module entrypoint намеренно не создавались;
+- следующий gate — G2 executable HTTP contract baseline.
 
 ### 0.46.0 — 2026-11-04
 

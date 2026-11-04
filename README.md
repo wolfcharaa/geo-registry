@@ -37,6 +37,7 @@ app/src/Database/Migration/            история схемы application Pos
 app/src/Infrastructure/Postgres/       async application DB pool
 app/src/Infrastructure/Nominatim/      async geocoding client
 app/src/Infrastructure/OpenSearch/     native async REST client and factory
+app/src/Module/AddressRegistry/        business module и его MODULE.md
 app/src/UserInterface/Http/            routes and JSON responses
 config/                                локальные настройки окружения
 docker/                                образы, Compose и smoke scripts

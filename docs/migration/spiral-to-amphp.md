@@ -98,17 +98,17 @@ feature composition и документация модуля.
 
 ### Владелец Бизнес-Логики
 
-Предлагаемый основной модуль — `AddressRegistry`.
+Принятый основной модуль — `AddressRegistry`.
 
 `Gar` не используется как имя корневого модуля: GAR является главным источником
 данных, но модуль также владеет адресным поиском, подсказками, Nominatim,
 OpenSearch, Data.Mos и OSM enrichment. `GeoRegistry` остаётся именем приложения,
 а `AddressRegistry` точнее описывает бизнес-владение.
 
-Решение о названии пока считается предлагаемым:
+Решение о названии принято `2026-11-04` вариантом А:
 
-- [ ] подтвердить `AddressRegistry`;
-- [ ] выбрать другое имя до первого scenario slice.
+- [x] использовать `AddressRegistry` и namespace `App\Module\AddressRegistry`;
+- [x] сохранить `GeoRegistry` именем приложения, а GAR — именем источника данных.
 
 ### Структура Приложения
 
@@ -405,7 +405,7 @@ heartbeat, recovery/control plane и worker CLI вынесены в отдель
 ### Phase 0 — Решения И Контрактная База
 
 - [ ] закрыть лицензионный gate;
-- [ ] подтвердить имя `AddressRegistry`;
+- [x] подтвердить имя `AddressRegistry`;
 - [ ] подтвердить PostgreSQL queue и способ non-blocking enqueue из HTTP;
 - [ ] решить, сохраняется ли Yiisoft DB Migration без переписывания миграций;
 - [ ] зафиксировать API compatibility policy;
@@ -418,7 +418,8 @@ heartbeat, recovery/control plane и worker CLI вынесены в отдель
 ### Phase 1 — Документация И Runtime Foundation
 
 - [ ] создать `docs/architecture.md` как source of truth целевого проекта;
-- [ ] создать `Module/AddressRegistry/MODULE.md` с версией и scenario catalog;
+- [x] создать `Module/AddressRegistry/MODULE.md` версии 0.1.0; scenario catalog
+  остаётся пустым до первого фактически реализованного capability;
 - [ ] адаптировать Postman collection под целевой base URL;
 - [ ] добавить PSR-11 container и DI definitions;
 - [ ] разделить HTTP, Console и Worker bootstrap;
@@ -590,7 +591,7 @@ tests, module knowledge и Postman обновляются вместе.
 
 | Решение | Предлагаемый вариант | Статус |
 | --- | --- | --- |
-| Основной модуль | `AddressRegistry` | Proposed |
+| Основной модуль | `AddressRegistry` | Accepted |
 | Лицензия | подтвердить право на MIT-перенос | Blocking |
 | DI container | `thesis/dic ^0.5.3`, три runtime roots | Accepted |
 | MessageBus | новые `message-bus-async` и `message-bus-async-worker` 0.1.x | Accepted |

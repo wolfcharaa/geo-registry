@@ -1,10 +1,11 @@
 # Архитектура Geo Registry
 
-- Версия документа: `0.1.0`
-- Обновлено: `2026-11-03`
+- Версия документа: `0.2.0`
+- Обновлено: `2026-11-04`
 - Статус: `Target architecture; scaffold is transitional`
 - План миграции: [migration/implementation-roadmap.md](migration/implementation-roadmap.md)
 - Принятые зависимости: [migration/application-libraries.md](migration/application-libraries.md)
+- Первый business module: [AddressRegistry](../app/src/Module/AddressRegistry/MODULE.md)
 
 Этот документ — основной источник архитектурных правил для нового кода Geo
 Registry. Он описывает целевую модель и допустимый путь от текущего AMPHP
@@ -44,8 +45,8 @@ boundary, а не четвёртым business layer. Обязательный `D
 для отдельного `HttpRuntime`. `RouterFactory` содержит демонстрационные health,
 Nominatim и OpenSearch routes и напрямую использует concrete adapters. Это
 разрешённый scaffold, но не эталон для новых business scenarios. Независимые
-`HttpRuntime` и `CliRuntime` уже имеют отдельные DIC graphs; `WorkerRuntime` ещё
-не добавлен.
+`HttpRuntime`, `CliRuntime` и `WorkerRuntime` имеют отдельные DIC graphs; worker
+предоставляет управляемый run/control/status lifecycle.
 
 До появления parity replacement сохраняются:
 
@@ -66,7 +67,8 @@ runtime composition. Demo routes удаляются только после по
 app/
 ├── bin/
 │   ├── server.php
-│   └── console
+│   ├── console
+│   └── worker
 ├── config/
 │   ├── di/
 │   ├── message_bus_registry.php
@@ -78,7 +80,7 @@ app/
 │   │   ├── Worker/
 │   │   └── DependencyInjection/
 │   ├── Module/
-│   │   └── <AcceptedModule>/
+│   │   └── AddressRegistry/
 │   │       ├── MODULE.md
 │   │       ├── UserInterface/
 │   │       ├── Capability/
@@ -95,8 +97,10 @@ app/
 └── var/                          # generated/cache, не source
 ```
 
-Предлагаемое имя первого module — `AddressRegistry`, но gate G1 остаётся
-открытым. До принятия имени каталог module и `MODULE.md` не создаются.
+Имя первого module принято: `AddressRegistry`, namespace
+`App\Module\AddressRegistry`. Пока в нём нет executable business scenarios,
+создан только source-verifiable `MODULE.md`; пустые layer directories не
+добавляются до соответствующего vertical slice.
 
 `Database/Migration` принадлежит приложению. Имена миграций и SQL показывают
 module ownership, но отдельная таблица сама по себе не создаёт новый module.
