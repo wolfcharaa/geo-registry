@@ -113,6 +113,9 @@ fiber-aware ожидание I/O, никаких Guzzle/PSR-18 adapters и сг�
 успехе и исключении. MessageBus сохраняет neutral resolver/scope contracts,
 поэтому application container не становится service locator внутри handlers.
 Внутренний контейнер Testo не является runtime-контейнером приложения.
+Правила выбора singleton/scoped/canBeScoped, устройство request/message/job
+scope и audit текущих composition roots описаны в
+[Thesis DIC guide](docs/development/thesis-dic.md).
 
 Durable delivery использует application PostgreSQL. Migration создаёт общую
 queue table и worker control plane; runtime DDL при старте не выполняется.

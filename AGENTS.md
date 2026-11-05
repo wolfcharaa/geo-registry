@@ -6,6 +6,9 @@ point for branch, staging, commit, history, tag, push, and pull-request rules.
 Until that global skill can be installed, its canonical prepared source is
 `skills/git-conventions/SKILL.md`.
 
+Before changing Thesis DIC composition, service lifetime, scope, provider, or
+disposer behavior, read `docs/development/thesis-dic.md`.
+
 ## Project Structure & Module Organization
 
 `app/bin/server.php` is the executable HTTP entrypoint and

@@ -1,10 +1,11 @@
 # Архитектура Geo Registry
 
-- Версия документа: `0.9.0`
-- Обновлено: `2026-11-04`
+- Версия документа: `0.9.1`
+- Обновлено: `2026-11-05`
 - Статус: `Target architecture; scaffold is transitional`
 - План миграции: [migration/implementation-roadmap.md](migration/implementation-roadmap.md)
 - Принятые зависимости: [migration/application-libraries.md](migration/application-libraries.md)
+- Thesis DIC lifecycle: [development/thesis-dic.md](development/thesis-dic.md)
 - Первый business module: [AddressRegistry](../app/src/Module/AddressRegistry/MODULE.md)
 
 Этот документ — основной источник архитектурных правил для нового кода Geo
