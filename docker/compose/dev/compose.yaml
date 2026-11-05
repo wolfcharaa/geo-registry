@@ -125,10 +125,59 @@ services:
 
   postgres:
     image: ghcr.io/cargosense/postgis:17-3.6-alpine@sha256:03374f4feb0267d755a9d81cc834f8a129f9a99734dd0a029f0bceb3f5689361
+    command:
+      - postgres
+      - -c
+      - "max_connections=${POSTGRES_MAX_CONNECTIONS:-50}"
+      - -c
+      - "shared_buffers=${POSTGRES_SHARED_BUFFERS:-512MB}"
+      - -c
+      - "effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-2GB}"
+      - -c
+      - "work_mem=${POSTGRES_WORK_MEM:-8MB}"
+      - -c
+      - "maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-256MB}"
+      - -c
+      - "autovacuum_work_mem=${POSTGRES_AUTOVACUUM_WORK_MEM:-128MB}"
+      - -c
+      - "autovacuum_max_workers=${POSTGRES_AUTOVACUUM_MAX_WORKERS:-3}"
+      - -c
+      - "wal_buffers=${POSTGRES_WAL_BUFFERS:-16MB}"
+      - -c
+      - "min_wal_size=${POSTGRES_MIN_WAL_SIZE:-1GB}"
+      - -c
+      - "max_wal_size=${POSTGRES_MAX_WAL_SIZE:-4GB}"
+      - -c
+      - "wal_compression=${POSTGRES_WAL_COMPRESSION:-on}"
+      - -c
+      - "checkpoint_timeout=${POSTGRES_CHECKPOINT_TIMEOUT:-15min}"
+      - -c
+      - "checkpoint_completion_target=${POSTGRES_CHECKPOINT_COMPLETION_TARGET:-0.9}"
+      - -c
+      - "checkpoint_warning=${POSTGRES_CHECKPOINT_WARNING:-2min}"
+      - -c
+      - "max_worker_processes=${POSTGRES_MAX_WORKER_PROCESSES:-8}"
+      - -c
+      - "max_parallel_workers=${POSTGRES_MAX_PARALLEL_WORKERS:-2}"
+      - -c
+      - "max_parallel_workers_per_gather=${POSTGRES_MAX_PARALLEL_WORKERS_PER_GATHER:-2}"
+      - -c
+      - "max_parallel_maintenance_workers=${POSTGRES_MAX_PARALLEL_MAINTENANCE_WORKERS:-2}"
+      - -c
+      - "effective_io_concurrency=${POSTGRES_EFFECTIVE_IO_CONCURRENCY:-32}"
+      - -c
+      - "maintenance_io_concurrency=${POSTGRES_MAINTENANCE_IO_CONCURRENCY:-16}"
+      - -c
+      - "huge_pages=${POSTGRES_HUGE_PAGES:-try}"
+      - -c
+      - "track_io_timing=${POSTGRES_TRACK_IO_TIMING:-on}"
+      - -c
+      - "track_wal_io_timing=${POSTGRES_TRACK_WAL_IO_TIMING:-on}"
     environment:
       POSTGRES_DB: "${POSTGRES_DB:-app}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-local-app-only}"
       POSTGRES_USER: "${POSTGRES_USER:-app}"
+    shm_size: "${POSTGRES_SHM_SIZE:-512mb}"
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -138,6 +187,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    stop_grace_period: 60s
 
   opensearch:
     image: opensearchproject/opensearch:3.9.0

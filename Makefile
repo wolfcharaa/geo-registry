@@ -2,6 +2,7 @@ SHELL := /bin/sh
 
 COMPOSE := docker/compose/dev.sh
 INTEGRATION_COMPOSE := docker/compose/integration.sh
+POSTGRES_TUNING_CHECK := docker/scripts/postgres-tuning-check.sh
 WORKER_CLI := $(COMPOSE) run --rm --no-deps app php bin/worker
 
 export HOST_UID ?= $(shell id -u)
@@ -104,9 +105,19 @@ fix: guard-user ## Apply PHP formatting
 .PHONY: fix
 
 doctor: ## Validate the resolved Compose configuration
+	POSTGRES_CAPACITY_CHECK=0 POSTGRES_TUNING_PROFILE=dev \
+		POSTGRES_PROFILE_FILE=config/postgres/dev.env COMPOSE_ENV_FILE=/dev/null \
+		SERVER_MIN_FREE_GB= SERVER_MIN_MEMORY_GB= $(POSTGRES_TUNING_CHECK)
+	POSTGRES_CAPACITY_CHECK=0 POSTGRES_TUNING_PROFILE=prod \
+		POSTGRES_PROFILE_FILE=config/postgres/prod.env COMPOSE_ENV_FILE=/dev/null \
+		SERVER_MIN_FREE_GB= SERVER_MIN_MEMORY_GB= $(POSTGRES_TUNING_CHECK)
 	$(COMPOSE) config --quiet
 	$(INTEGRATION_COMPOSE) config --quiet
 .PHONY: doctor
+
+postgres-doctor: guard-user ## Validate the selected PostgreSQL profile and host capacity
+	$(POSTGRES_TUNING_CHECK)
+.PHONY: postgres-doctor
 
 integration-up: guard-user ## Start isolated PostgreSQL and OpenSearch test resources
 	$(INTEGRATION_COMPOSE) up --detach --wait --no-build --remove-orphans

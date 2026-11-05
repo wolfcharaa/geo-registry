@@ -152,6 +152,7 @@ response headers. Fiber-local context очищается после запрос
 
 ```shell
 make doctor   # проверить Compose
+make postgres-doctor # проверить выбранный профиль PostgreSQL и ресурсы host
 make check    # formatter + strict PHPStan + Deptrac + fast Testo
 make architecture-check # отдельно проверить направления зависимостей
 app/bin/console list # показать CLI commands
@@ -174,6 +175,11 @@ make server-source-bundle # собрать проверяемый source workspa
 make server-preflight GAR_SOURCE=/data/gar SERVER_STORAGE_PATH=/data # read-only server gate
 make down     # остановить без удаления volumes
 ```
+
+Параметры application PostgreSQL, профили `dev`/`prod`, обязательные границы
+CPU/RAM/диска и безопасный порядок применения описаны в
+[postgresql-tuning.md](docs/postgresql-tuning.md). Изменение профиля не
+перезапускает работающую БД автоматически.
 
 Порядок перехода со старых RoadRunner/BoltDB queues и rollback описан в
 [worker-cutover.md](docs/migration/worker-cutover.md). Файлы старых queues нельзя

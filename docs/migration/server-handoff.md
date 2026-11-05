@@ -106,6 +106,16 @@ NOMINATIM_PBF_PATH=/nominatim/data/approved-snapshot.osm.pbf
 должен указывать на файл внутри `/nominatim/data`, а соответствующий host
 directory — существовать и быть читаемым до preflight.
 
+Для data server в ignored `config/.env` обязательно выбрать production-профиль
+application PostgreSQL:
+
+```dotenv
+POSTGRES_TUNING_PROFILE=prod
+```
+
+Профиль, его границы ресурсов и допустимые operator overrides описаны в
+[postgresql-tuning.md](../postgresql-tuning.md).
+
 До build/start/import выполнить только read-only preflight:
 
 ```shell
@@ -130,7 +140,9 @@ Preflight не запускает containers и не меняет данные. 
 - чистые repositories и совпадение library HEAD с Composer lock;
 - абсолютный читаемый GAR source и доступный data filesystem;
 - отсутствие development-only credentials и Monaco dataset в `.env`;
-- утверждённые minimum free space и Docker memory;
+- production-профиль PostgreSQL, его внутренний memory/WAL budget и capacity
+  host;
+- утверждённые minimum free space и Docker memory не ниже границ профиля;
 - корректность разрешённой Compose configuration.
 
 ## После Успешного Preflight

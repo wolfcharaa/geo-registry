@@ -1,9 +1,9 @@
 #!/bin/sh
 set -eu
 
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-project_root=$(CDPATH= cd -- "${script_dir}/../.." && pwd)
-workspace_root=$(CDPATH= cd -- "${project_root}/.." && pwd)
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
+workspace_root=$(CDPATH='' cd -- "${project_root}/.." && pwd)
 core_root="${workspace_root}/library/MessageBusAsync"
 worker_root="${workspace_root}/library/MessageBusAsyncWorker"
 lock_file="${project_root}/app/composer.lock"
@@ -64,6 +64,7 @@ environment_value() {
 locked_reference() {
     package_name=$1
 
+    # shellcheck disable=SC2016
     XDEBUG_MODE=off php -r '
         $lock = json_decode(file_get_contents($argv[1]), true, flags: JSON_THROW_ON_ERROR);
         foreach (array_merge($lock["packages"] ?? [], $lock["packages-dev"] ?? []) as $package) {
@@ -129,11 +130,16 @@ esac
 for environment_key in \
     DATABASE_DSN \
     POSTGRES_PASSWORD \
+    POSTGRES_TUNING_PROFILE \
     NOMINATIM_PASSWORD \
     NOMINATIM_REPLICATION_URL
 do
     require_environment_value "${environment_key}"
 done
+
+postgres_tuning_profile=$(environment_value POSTGRES_TUNING_PROFILE || true)
+[ "${postgres_tuning_profile}" = prod ] \
+    || fail "POSTGRES_TUNING_PROFILE must be prod for server deployment"
 
 nominatim_pbf_url=$(environment_value NOMINATIM_PBF_URL || true)
 nominatim_pbf_path=$(environment_value NOMINATIM_PBF_PATH || true)
@@ -208,6 +214,15 @@ esac
 minimum_free_kb=$((minimum_free_gb * 1024 * 1024))
 [ "${available_kb}" -ge "${minimum_free_kb}" ] \
     || fail "free space is below the approved ${minimum_free_gb} GiB budget"
+
+POSTGRES_CAPACITY_CHECK=1 \
+    POSTGRES_TUNING_PROFILE="${postgres_tuning_profile}" \
+    COMPOSE_ENV_FILE="${env_file}" \
+    SERVER_STORAGE_PATH="${storage_path}" \
+    SERVER_MIN_FREE_GB="${minimum_free_gb}" \
+    SERVER_MIN_MEMORY_GB="${minimum_memory_gb}" \
+    "${project_root}/docker/scripts/postgres-tuning-check.sh" \
+    || fail "PostgreSQL profile or host capacity is invalid"
 
 (
     cd "${project_root}"
