@@ -174,6 +174,18 @@ SQL,
         );
     }
 
+    public function prepareStage(GarXmlSourceFile $file): void
+    {
+        $columns = implode(', ', $file->descriptor->stageColumns());
+        $this->query('DROP TABLE IF EXISTS ' . self::STAGE_TABLE);
+        $this->query(sprintf(
+            'CREATE TEMP TABLE %s ON COMMIT DELETE ROWS AS SELECT %s FROM %s WITH NO DATA',
+            self::STAGE_TABLE,
+            $columns,
+            $file->descriptor->table,
+        ));
+    }
+
     /** @param list<string> $rows */
     public function mergeBatch(
         int $operationId,
@@ -188,14 +200,6 @@ SQL,
         $this->query('BEGIN');
 
         try {
-            $columns = implode(', ', $file->descriptor->stageColumns());
-            $this->query(sprintf(
-                'CREATE TEMP TABLE %s ON COMMIT DROP AS SELECT %s FROM %s WITH NO DATA',
-                self::STAGE_TABLE,
-                $columns,
-                $file->descriptor->table,
-            ));
-
             if (!pg_copy_from($this->connection, self::STAGE_TABLE, $rows)) {
                 throw new GarImportFailed('PostgreSQL COPY failed: ' . pg_last_error($this->connection));
             }
@@ -296,6 +300,22 @@ SQL,
             );
         } catch (Throwable) {
             // Preserve the original import failure when the connection is already lost.
+        }
+    }
+
+    public function failFile(int $operationId, string $fileKey, Throwable $error): void
+    {
+        try {
+            $this->queryParams(
+                <<<'SQL'
+UPDATE gar_import_files
+SET status = 'failed', failed_at = now(), updated_at = now(), error_message = $3
+WHERE operation_id = $1 AND file_key = $2 AND status <> 'completed'
+SQL,
+                [(string) $operationId, $fileKey, substr($error->getMessage(), 0, 2000)],
+            );
+        } catch (Throwable) {
+            // Preserve the worker failure when the connection is already lost.
         }
     }
 

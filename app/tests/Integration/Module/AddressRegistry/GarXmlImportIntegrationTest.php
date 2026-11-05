@@ -34,6 +34,7 @@ final class GarXmlImportIntegrationTest
             Assert::true(str_contains($output, 'status=completed'));
             Assert::true(str_contains($output, 'files=9/9'));
             Assert::true(str_contains($output, 'rows=9'));
+            Assert::true(str_contains($output, 'workers=2'));
 
             $imported = $pool->query(<<<'SQL'
 SELECT
@@ -116,6 +117,7 @@ SQL)->fetchRow();
             'command' => 'gar:import',
             'source' => $source,
             '--batch-size' => '1',
+            '--workers' => '2',
             '--no-ansi' => true,
         ];
         if ($restart) {

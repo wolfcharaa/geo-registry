@@ -1390,7 +1390,9 @@ PostgreSQL остаётся корректным fallback и source of truth.
   catalog для всех XML-семейств текущей canonical schema и запускается только из
   `CliRuntime`.
 - `XMLReader` передаёт bounded text batches в native `pg_copy_from`; temporary
-  staging, set-based upsert и checkpoint фиксируются одной транзакцией.
+  staging, set-based upsert и checkpoint фиксируются одной транзакцией. Каталог
+  исполняется процессным pool по dependency-фазам: у каждого worker собственное
+  PostgreSQL-соединение, а staging переиспользуется между COPY-batches файла.
 - `gar_import_operations` и `gar_import_files` отделяют progress/recovery от
   diagnostic logs. Manifest и advisory lock защищают resume и параллельный
   запуск одного source.

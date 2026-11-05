@@ -36,7 +36,14 @@ final class ImportGarCommand extends Command
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Rows per atomic COPY/merge/checkpoint batch (1..100000).',
-                '5000',
+                '50000',
+            )
+            ->addOption(
+                'workers',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Parallel GAR file worker processes per dependency phase (1..16).',
+                '2',
             )
             ->addOption(
                 'restart',
@@ -51,13 +58,22 @@ final class ImportGarCommand extends Command
         try {
             $source = $input->getArgument('source');
             $batchSize = $input->getOption('batch-size');
-            if (!is_string($source) || !is_string($batchSize) || preg_match('/^[0-9]+$/D', $batchSize) !== 1) {
-                throw new InvalidArgumentException('source and --batch-size must have valid scalar values.');
+            $workers = $input->getOption('workers');
+            if (
+                !is_string($source)
+                || !is_string($batchSize)
+                || !is_string($workers)
+                || preg_match('/^[0-9]+$/D', $batchSize) !== 1
+                || preg_match('/^[0-9]+$/D', $workers) !== 1
+            ) {
+                throw new InvalidArgumentException('source, --batch-size and --workers must have valid scalar values.');
             }
 
+            $workerCount = (int) $workers;
             $result = $this->runner->run(new ImportGar(
                 sourcePath: $source,
                 batchSize: (int) $batchSize,
+                workers: $workerCount,
                 restart: $input->getOption('restart') === true,
             ));
         } catch (InvalidArgumentException|GarImportFailed $error) {
@@ -68,13 +84,14 @@ final class ImportGarCommand extends Command
 
         $status = $result->alreadyCompleted ? 'already-completed' : 'completed';
         $output->writeln(sprintf(
-            'status=%s operation=%d files=%d/%d rows=%d merged=%d resumed=%s',
+            'status=%s operation=%d files=%d/%d rows=%d merged=%d workers=%d resumed=%s',
             $status,
             $result->operationId,
             $result->filesCompleted,
             $result->filesTotal,
             $result->rowsProcessed,
             $result->rowsMerged,
+            $workerCount,
             $result->resumed ? 'yes' : 'no',
         ));
 

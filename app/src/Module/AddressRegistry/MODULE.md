@@ -54,10 +54,17 @@ lifecycle — `Application/Worker`. Модуль владеет только mes
 
 **Правила**
 
-- XML читается `XMLReader` только вперёд; в памяти одновременно находится не
-  больше выбранного batch и служебного состояния каталога.
-- Каждый batch одной PostgreSQL-транзакцией создаёт temporary staging table,
-  выполняет native `COPY FROM`, set-based upsert и обновляет checkpoint.
+- XML читается `XMLReader` только вперёд; каждый worker держит в памяти не
+  больше выбранного batch и служебного состояния одного файла. Совокупная
+  верхняя граница растёт пропорционально `--workers`.
+- Supervisor сохраняет advisory lock и запускает отдельные worker-процессы с
+  собственными PostgreSQL-соединениями. Файлы одной dependency-фазы могут
+  обрабатываться параллельно; следующая фаза начинается только после завершения
+  всех workers текущей.
+- Worker создаёт temporary staging table один раз на XML-файл и переиспользует
+  её между batches. Каждый batch одной PostgreSQL-транзакцией выполняет native
+  `COPY FROM`, set-based upsert и обновляет checkpoint; `ON COMMIT DELETE ROWS`
+  очищает staging после успешного commit.
 - `gar_import_operations` и `gar_import_files` хранят progress/recovery state;
   `parser_logs` не участвует в принятии решений о возобновлении.
 - Повтор завершённого неизменного manifest является успешным no-op. Незавершённая
@@ -67,9 +74,11 @@ lifecycle — `Application/Worker`. Модуль владеет только mes
 - `--restart` помечает незавершённую операцию `abandoned` и начинает новую; уже
   зафиксированные canonical rows безопасно проходят повторный upsert.
 - Ошибка XML, COPY или merge помечает файл и операцию `failed`, возвращает
-  ненулевой exit code и оставляет только ранее завершённые batches. Temporary
-  staging откатывается вместе с текущим batch и удаляется при закрытии dedicated
-  CLI connection.
+  ненулевой exit code и оставляет только ранее завершённые batches. Остальные
+  workers текущей фазы получают завершение процесса: их незавершённая транзакция
+  откатывается, а новая dependency-фаза не запускается. `SIGINT`/`SIGTERM`
+  supervisor обрабатывает так же. Temporary staging удаляется при закрытии
+  dedicated worker connection.
 - Advisory lock запрещает два одновременных импорта одного source. Общей
   транзакции на всю выгрузку нет, поэтому partial state является намеренной
   основой resume, а не скрытым rollback всего release.
@@ -81,8 +90,11 @@ lifecycle — `Application/Worker`. Модуль владеет только mes
 - `source` — обязательный путь к одному поддерживаемому XML-файлу или каталогу
   GAR; относительный путь разрешается в runtime-контексте.
 - `--batch-size` — число строк в атомарном COPY/merge/checkpoint batch; default
-  `5000`, допустимый диапазон `1..100000`. Меньшее значение чаще фиксирует
+  `50000`, допустимый диапазон `1..100000`. Меньшее значение чаще фиксирует
   progress, большее уменьшает число round trips ценой памяти текущего batch.
+- `--workers` — максимальное число параллельных worker-процессов внутри одной
+  dependency-фазы; default `2`, допустимый диапазон `1..16`. Каждый worker имеет
+  отдельное PostgreSQL-соединение, XMLReader и temporary staging table.
 - `--restart` — не продолжать незавершённый checkpoint выбранного source, а
   начать новую операцию. По умолчанию команда возобновляет совместимый manifest.
 - Стандартные Symfony Console flags управляют только консолью; их актуальный

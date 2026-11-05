@@ -87,6 +87,47 @@ final class GarXmlCatalog
         return $source;
     }
 
+    public function file(string $sourcePath, string $relativePath): GarXmlSourceFile
+    {
+        $source = $this->canonicalSourcePath($sourcePath);
+        $normalizedRelativePath = str_replace('\\', '/', $relativePath);
+        if (
+            $normalizedRelativePath === ''
+            || str_starts_with($normalizedRelativePath, '/')
+            || str_contains($normalizedRelativePath, "\0")
+        ) {
+            throw new GarImportFailed('GAR import worker received an invalid relative XML path.');
+        }
+
+        if (is_file($source)) {
+            if ($normalizedRelativePath !== basename($source)) {
+                throw new GarImportFailed("GAR XML file is outside the import source: {$relativePath}");
+            }
+            $path = $source;
+        } else {
+            $candidate = realpath($source . DIRECTORY_SEPARATOR . $normalizedRelativePath);
+            if (
+                $candidate === false
+                || !is_file($candidate)
+                || !str_starts_with($candidate, $source . DIRECTORY_SEPARATOR)
+            ) {
+                throw new GarImportFailed("GAR XML file is outside the import source: {$relativePath}");
+            }
+            $path = $candidate;
+            $resolvedRelativePath = str_replace('\\', '/', substr($path, strlen($source) + 1));
+            if ($resolvedRelativePath !== $normalizedRelativePath) {
+                throw new GarImportFailed("GAR XML relative path is not canonical: {$relativePath}");
+            }
+        }
+
+        $descriptor = $this->descriptorFor(basename($path));
+        if ($descriptor === null) {
+            throw new GarImportFailed("GAR XML file is not supported by the catalog: {$relativePath}");
+        }
+
+        return $this->sourceFile($path, $normalizedRelativePath, $descriptor);
+    }
+
     /** @param list<GarXmlSourceFile> $files */
     public function manifestHash(array $files): string
     {
