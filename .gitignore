@@ -8,5 +8,8 @@
 /.agents/
 /.idea/
 /compose.override.yaml
-/docker/data/
+/docker/data/*
+!/docker/data/nominatim/
+/docker/data/nominatim/*
+!/docker/data/nominatim/.gitkeep
 /geo-registry-server-source-*.tar

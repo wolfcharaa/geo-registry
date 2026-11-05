@@ -1,4 +1,4 @@
-name: geo-registry
+name: geo-registry-amp
 
 services:
   app:
@@ -162,7 +162,8 @@ services:
     environment:
       IMPORT_STYLE: "${NOMINATIM_IMPORT_STYLE:-address}"
       NOMINATIM_PASSWORD: "${NOMINATIM_PASSWORD:-local-nominatim-only}"
-      PBF_URL: "${NOMINATIM_PBF_URL:-https://download.geofabrik.de/europe/monaco-latest.osm.pbf}"
+      PBF_PATH: "${NOMINATIM_PBF_PATH:-}"
+      PBF_URL: "${NOMINATIM_PBF_URL-https://download.geofabrik.de/europe/monaco-latest.osm.pbf}"
       POSTGRES_AUTOVACUUM_WORK_MEM: 128MB
       POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
       POSTGRES_MAINTENANCE_WORK_MEM: 512MB
@@ -174,6 +175,7 @@ services:
     ports:
       - "${NOMINATIM_PORT:-8081}:8080"
     volumes:
+      - "${NOMINATIM_DATA_PATH:-../../../docker/data/nominatim}:/nominatim/data:ro"
       - nominatim-data:/var/lib/postgresql/16/main
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/status"]

@@ -94,6 +94,18 @@ development credentials, Monaco PBF/update URLs и остальные значе
 утверждённую server configuration. Секреты не должны попадать в shell history,
 manifest или Git.
 
+Для зафиксированного локального Nominatim PBF используется read-only каталог:
+
+```dotenv
+NOMINATIM_PBF_URL=
+NOMINATIM_DATA_PATH=/absolute/host/path/to/pbf-directory
+NOMINATIM_PBF_PATH=/nominatim/data/approved-snapshot.osm.pbf
+```
+
+`NOMINATIM_PBF_URL` и `NOMINATIM_PBF_PATH` взаимоисключающие. Локальный path
+должен указывать на файл внутри `/nominatim/data`, а соответствующий host
+directory — существовать и быть читаемым до preflight.
+
 До build/start/import выполнить только read-only preflight:
 
 ```shell

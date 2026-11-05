@@ -44,6 +44,23 @@ require_environment_value() {
         || fail "${key} must be set explicitly in ${env_file}"
 }
 
+environment_value() {
+    key=$1
+
+    awk -F= -v key="${key}" '
+        $1 == key {
+            print substr($0, index($0, "=") + 1)
+            found = 1
+            exit
+        }
+        END {
+            if (!found) {
+                exit 1
+            }
+        }
+    ' "${env_file}"
+}
+
 locked_reference() {
     package_name=$1
 
@@ -80,6 +97,18 @@ case "${gar_source}" in
 esac
 [ -e "${gar_source}" ] || fail "GAR source does not exist: ${gar_source}"
 [ -r "${gar_source}" ] || fail "GAR source is not readable: ${gar_source}"
+if [ -f "${gar_source}" ]; then
+    case "$(basename -- "${gar_source}")" in
+        AS_*.XML|AS_*.xml) ;;
+        *) fail "GAR source file must be a supported XML file" ;;
+    esac
+elif [ -d "${gar_source}" ]; then
+    find "${gar_source}" -type f \( -name 'AS_*.XML' -o -name 'AS_*.xml' \) -print -quit \
+        | grep -q . \
+        || fail "GAR source directory does not contain supported XML files"
+else
+    fail "GAR source must be an XML file or a directory"
+fi
 
 storage_path=${SERVER_STORAGE_PATH:-${project_root}}
 case "${storage_path}" in
@@ -101,11 +130,42 @@ for environment_key in \
     DATABASE_DSN \
     POSTGRES_PASSWORD \
     NOMINATIM_PASSWORD \
-    NOMINATIM_PBF_URL \
     NOMINATIM_REPLICATION_URL
 do
     require_environment_value "${environment_key}"
 done
+
+nominatim_pbf_url=$(environment_value NOMINATIM_PBF_URL || true)
+nominatim_pbf_path=$(environment_value NOMINATIM_PBF_PATH || true)
+if [ -n "${nominatim_pbf_url}" ] && [ -n "${nominatim_pbf_path}" ]; then
+    fail "NOMINATIM_PBF_URL and NOMINATIM_PBF_PATH cannot both be set"
+fi
+if [ -z "${nominatim_pbf_url}" ] && [ -z "${nominatim_pbf_path}" ]; then
+    fail "either NOMINATIM_PBF_URL or NOMINATIM_PBF_PATH must be set"
+fi
+if [ -n "${nominatim_pbf_path}" ]; then
+    nominatim_data_path=$(environment_value NOMINATIM_DATA_PATH || true)
+    case "${nominatim_data_path}" in
+        /*) ;;
+        *) fail "NOMINATIM_DATA_PATH must be absolute when NOMINATIM_PBF_PATH is used" ;;
+    esac
+    [ -d "${nominatim_data_path}" ] \
+        || fail "NOMINATIM_DATA_PATH does not exist: ${nominatim_data_path}"
+    [ -r "${nominatim_data_path}" ] \
+        || fail "NOMINATIM_DATA_PATH is not readable: ${nominatim_data_path}"
+    case "${nominatim_pbf_path}" in
+        /nominatim/data/*) ;;
+        *) fail "NOMINATIM_PBF_PATH must be inside /nominatim/data" ;;
+    esac
+    nominatim_pbf_relative_path=${nominatim_pbf_path#/nominatim/data/}
+    case "${nominatim_pbf_relative_path}" in
+        ''|/*|..|../*|*/..|*/../*) fail "NOMINATIM_PBF_PATH must identify a file below /nominatim/data" ;;
+    esac
+    [ -f "${nominatim_data_path}/${nominatim_pbf_relative_path}" ] \
+        || fail "Nominatim PBF does not exist below NOMINATIM_DATA_PATH"
+    [ -r "${nominatim_data_path}/${nominatim_pbf_relative_path}" ] \
+        || fail "Nominatim PBF is not readable below NOMINATIM_DATA_PATH"
+fi
 
 if grep -Eq 'local-app-only|local-nominatim-only' "${env_file}"; then
     fail "development-only database credentials remain in ${env_file}"
