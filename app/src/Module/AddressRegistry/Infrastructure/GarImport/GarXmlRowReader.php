@@ -48,10 +48,10 @@ final class GarXmlRowReader
 
                 $values = [];
                 foreach ($file->descriptor->attributes as $column => $attribute) {
-                    $value = $reader->getAttribute($attribute);
-                    if ($value === '') {
-                        $value = null;
+                    if (!is_string($column)) {
+                        throw new GarImportFailed('GAR XML descriptor contains a non-string stage column.');
                     }
+                    $value = $file->descriptor->normalizeValue($column, $reader->getAttribute($attribute));
                     $values[] = $column === 'path_arr' ? self::pathArray($value) : $value;
                 }
 

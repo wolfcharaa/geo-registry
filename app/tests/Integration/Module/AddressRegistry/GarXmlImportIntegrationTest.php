@@ -32,13 +32,14 @@ final class GarXmlImportIntegrationTest
             [$exitCode, $output] = self::runImport($dsn, $representative, false);
             Assert::same($exitCode, 0);
             Assert::true(str_contains($output, 'status=completed'));
-            Assert::true(str_contains($output, 'files=6/6'));
-            Assert::true(str_contains($output, 'rows=6'));
+            Assert::true(str_contains($output, 'files=9/9'));
+            Assert::true(str_contains($output, 'rows=9'));
 
             $imported = $pool->query(<<<'SQL'
 SELECT
     (SELECT count(*) FROM address_objects WHERE reestr_object_id = 770001) AS address_objects,
     (SELECT addr_type_id FROM address_objects WHERE reestr_object_id = 770001) AS addr_type_id,
+    (SELECT orgname FROM normative_docs WHERE id = 3851715) AS normative_doc_orgname,
     (SELECT path_arr::text FROM administrative_reestr_hierarchy WHERE object_id = 770001) AS path_arr,
     (SELECT status FROM gar_import_operations ORDER BY id DESC LIMIT 1) AS operation_status,
     (SELECT count(*) FROM gar_import_files WHERE status = 'completed') AS completed_files
@@ -46,9 +47,10 @@ SQL)->fetchRow();
             Assert::notNull($imported);
             Assert::same((int) ($imported['address_objects'] ?? -1), 1);
             Assert::same((int) ($imported['addr_type_id'] ?? -1), 1);
+            Assert::same($imported['normative_doc_orgname'] ?? null, '');
             Assert::same($imported['path_arr'] ?? null, '{770001}');
             Assert::same($imported['operation_status'] ?? null, 'completed');
-            Assert::same((int) ($imported['completed_files'] ?? -1), 6);
+            Assert::same((int) ($imported['completed_files'] ?? -1), 9);
 
             [$exitCode, $output] = self::runImport($dsn, $representative, false);
             Assert::same($exitCode, 0);

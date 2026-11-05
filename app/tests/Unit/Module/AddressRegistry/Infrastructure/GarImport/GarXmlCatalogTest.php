@@ -19,9 +19,12 @@ final class GarXmlCatalogTest
             array_map(static fn($file): string => $file->descriptor->table, $files),
             [
                 'address_object_types',
+                'normative_doc_kinds',
+                'normative_doc_types',
                 'object_levels',
                 'operation_types',
                 'reestr_objects',
+                'normative_docs',
                 'address_objects',
                 'administrative_reestr_hierarchy',
             ],

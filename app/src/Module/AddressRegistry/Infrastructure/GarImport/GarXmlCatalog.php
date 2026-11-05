@@ -158,6 +158,7 @@ final class GarXmlCatalog
             'is_actual' => 'ISACTUAL',
             'is_active' => 'ISACTIVE',
         ];
+        $unitZeroAsNullColumns = ['change_id', 'prev_id', 'next_id'];
 
         return [
             self::descriptor('house-types', '~^AS_HOUSE_TYPES(?:_.*)?\\.XML$~i', 'house_types', 10, $standardTypeColumns),
@@ -192,28 +193,42 @@ final class GarXmlCatalog
                 'is_active' => 'ISACTIVE', 'level_id' => 'LEVELID', 'create_date' => 'CREATEDATE',
                 'update_date' => 'UPDATEDATE',
             ]),
-            self::descriptor('normative-documents', '~^AS_NORMATIVE_DOCS(?!_(?:KINDS|TYPES))(?:_.*)?\\.XML$~i', 'normative_docs', 30, [
-                'id' => 'ID', 'name' => 'NAME', 'date' => 'DATE', 'number' => 'NUMBER', 'type_id' => 'TYPE',
-                'kind_id' => 'KIND', 'update_date' => 'UPDATEDATE', 'orgname' => 'ORGNAME', 'accdate' => 'ACCDATE',
-            ]),
+            self::descriptor(
+                'normative-documents',
+                '~^AS_NORMATIVE_DOCS(?!_(?:KINDS|TYPES))(?:_.*)?\\.XML$~i',
+                'normative_docs',
+                30,
+                [
+                    'id' => 'ID', 'name' => 'NAME', 'date' => 'DATE', 'number' => 'NUMBER', 'type_id' => 'TYPE',
+                    'kind_id' => 'KIND', 'update_date' => 'UPDATEDATE', 'orgname' => 'ORGNAME', 'accdate' => 'ACCDATE',
+                ],
+                defaults: ['orgname' => ''],
+            ),
             self::descriptor('change-history', '~^AS_CHANGE_HISTORY(?:_.*)?\\.XML$~i', 'change_history', 40, [
                 'id' => 'CHANGEID', 'reestr_object_id' => 'OBJECTID', 'addr_object_guid' => 'ADROBJECTID',
                 'oper_type_id' => 'OPERTYPEID', 'ndoc_id' => 'NDOCID', 'change_date' => 'CHANGEDATE',
-            ]),
+            ], zeroAsNullColumns: ['ndoc_id']),
             self::descriptor('object-parameters', '~^AS_(?:ADDR_OBJ|APARTMENTS|CARPLACES|HOUSES|ROOMS|STEADS)_PARAMS(?:_.*)?\\.XML$~i', 'object_params', 50, [
                 'id' => 'ID', 'object_id' => 'OBJECTID', 'change_id' => 'CHANGEID', 'change_id_end' => 'CHANGEIDEND',
                 'type_id' => 'TYPEID', 'value' => 'VALUE', 'update_date' => 'UPDATEDATE',
                 'start_date' => 'STARTDATE', 'end_date' => 'ENDDATE',
-            ]),
+            ], zeroAsNullColumns: ['change_id', 'change_id_end']),
             self::addressObjectsDescriptor(),
             self::descriptor('address-object-divisions', '~^AS_ADDR_OBJ_DIVISION(?:_.*)?\\.XML$~i', 'address_object_divisions', 70, [
                 'id' => 'ID', 'parent_id' => 'PARENTID', 'child_id' => 'CHILDID', 'change_id' => 'CHANGEID',
-            ]),
+            ], zeroAsNullColumns: ['change_id']),
             self::descriptor('apartments', '~^AS_APARTMENTS(?!_PARAMS)(?:_.*)?\\.XML$~i', 'apartments', 70, [
                 ...$unitColumns,
                 'apart_type_id' => 'APARTTYPE',
-            ]),
-            self::descriptor('car-places', '~^AS_CARPLACES(?!_PARAMS)(?:_.*)?\\.XML$~i', 'car_places', 70, $unitColumns),
+            ], zeroAsNullColumns: [...$unitZeroAsNullColumns, 'apart_type_id']),
+            self::descriptor(
+                'car-places',
+                '~^AS_CARPLACES(?!_PARAMS)(?:_.*)?\\.XML$~i',
+                'car_places',
+                70,
+                $unitColumns,
+                zeroAsNullColumns: $unitZeroAsNullColumns,
+            ),
             self::descriptor('houses', '~^AS_HOUSES(?!_PARAMS)(?:_.*)?\\.XML$~i', 'houses', 70, [
                 'id' => 'ID', 'reestr_object_id' => 'OBJECTID', 'reestr_object_guid' => 'OBJECTGUID',
                 'change_id' => 'CHANGEID', 'house_num' => 'HOUSENUM', 'add_num1' => 'ADDNUM1', 'add_num2' => 'ADDNUM2',
@@ -221,17 +236,17 @@ final class GarXmlCatalog
                 'oper_type_id' => 'OPERTYPEID', 'prev_id' => 'PREVID', 'next_id' => 'NEXTID',
                 'update_date' => 'UPDATEDATE', 'start_date' => 'STARTDATE', 'end_date' => 'ENDDATE',
                 'is_actual' => 'ISACTUAL', 'is_active' => 'ISACTIVE',
-            ]),
+            ], zeroAsNullColumns: ['change_id', 'house_type_id', 'add_type1_id', 'add_type2_id', 'prev_id', 'next_id']),
             self::descriptor('rooms', '~^AS_ROOMS(?!_PARAMS)(?:_.*)?\\.XML$~i', 'rooms', 70, [
                 ...$unitColumns,
                 'room_type_id' => 'ROOMTYPE',
-            ]),
+            ], zeroAsNullColumns: [...$unitZeroAsNullColumns, 'room_type_id']),
             self::descriptor('steads', '~^AS_STEADS(?!_PARAMS)(?:_.*)?\\.XML$~i', 'steads', 70, [
                 'id' => 'ID', 'object_id' => 'OBJECTID', 'object_guid' => 'OBJECTGUID', 'change_id' => 'CHANGEID',
                 'number' => 'NUMBER', 'oper_type_id' => 'OPERTYPEID', 'prev_id' => 'PREVID', 'next_id' => 'NEXTID',
                 'update_date' => 'UPDATEDATE', 'start_date' => 'STARTDATE', 'end_date' => 'ENDDATE',
                 'is_actual' => 'ISACTUAL', 'is_active' => 'ISACTIVE',
-            ]),
+            ], zeroAsNullColumns: ['change_id', 'prev_id', 'next_id']),
             self::descriptor('administrative-hierarchy', '~^AS_ADM_HIERARCHY(?:_.*)?\\.XML$~i', 'administrative_reestr_hierarchy', 80, [
                 'id' => 'ID', 'object_id' => 'OBJECTID', 'parent_obj_id' => 'PARENTOBJID', 'change_id' => 'CHANGEID',
                 'region_code' => 'REGIONCODE', 'area_code' => 'AREACODE', 'city_code' => 'CITYCODE',
@@ -239,25 +254,39 @@ final class GarXmlCatalog
                 'prev_id' => 'PREVID', 'next_id' => 'NEXTID', 'update_date' => 'UPDATEDATE',
                 'start_date' => 'STARTDATE', 'end_date' => 'ENDDATE', 'is_active' => 'ISACTIVE',
                 'path' => 'PATH', 'path_arr' => 'PATH',
-            ]),
+            ], zeroAsNullColumns: ['parent_obj_id', 'change_id', 'prev_id', 'next_id']),
             self::descriptor('municipal-hierarchy', '~^AS_MUN_HIERARCHY(?:_.*)?\\.XML$~i', 'municipal_reestr_hierarchy', 80, [
                 'id' => 'ID', 'object_id' => 'OBJECTID', 'parent_obj_id' => 'PARENTOBJID', 'change_id' => 'CHANGEID',
                 'oktmo' => 'OKTMO', 'prev_id' => 'PREVID', 'next_id' => 'NEXTID', 'update_date' => 'UPDATEDATE',
                 'start_date' => 'STARTDATE', 'end_date' => 'ENDDATE', 'is_active' => 'ISACTIVE',
                 'path' => 'PATH', 'path_arr' => 'PATH',
-            ]),
+            ], zeroAsNullColumns: ['parent_obj_id', 'change_id', 'prev_id', 'next_id']),
         ];
     }
 
-    /** @param array<string, string> $attributes */
+    /**
+     * @param array<string, string> $attributes
+     * @param array<string, string> $defaults
+     * @param list<string> $zeroAsNullColumns
+     */
     private static function descriptor(
         string $key,
         string $pattern,
         string $table,
         int $priority,
         array $attributes,
+        array $defaults = [],
+        array $zeroAsNullColumns = [],
     ): GarXmlFileDescriptor {
-        return new GarXmlFileDescriptor($key, $pattern, $table, $priority, $attributes);
+        return new GarXmlFileDescriptor(
+            key: $key,
+            filenamePattern: $pattern,
+            table: $table,
+            priority: $priority,
+            attributes: $attributes,
+            defaults: $defaults,
+            zeroAsNullColumns: $zeroAsNullColumns,
+        );
     }
 
     private static function addressObjectsDescriptor(): GarXmlFileDescriptor
@@ -285,6 +314,7 @@ final class GarXmlCatalog
                 's.level_id', 's.oper_type_id', 's.prev_id', 's.next_id', 's.update_date', 's.start_date',
                 's.end_date', 's.is_actual', 's.is_active',
             ],
+            zeroAsNullColumns: ['change_id', 'prev_id', 'next_id'],
         );
     }
 }

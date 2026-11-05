@@ -30,6 +30,9 @@ final class GarXmlRowReaderTest
 
         Assert::same(count($rows), 1);
         Assert::same($rows[0][0] ?? null, '77000101');
+        Assert::same(count($rows[0]), 18);
+        Assert::same(array_slice($rows[0], 2, 2), [null, null]);
+        Assert::same(array_slice($rows[0], 10, 2), [null, null]);
         Assert::same($rows[0][16] ?? null, '770001');
         Assert::same($rows[0][17] ?? null, '{770001}');
         Assert::same(iterator_to_array(new GarXmlRowReader()->rows($hierarchy, 1)), []);
