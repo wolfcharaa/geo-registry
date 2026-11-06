@@ -15,6 +15,7 @@ final readonly class PostgresFindAddressByIdReader implements FindAddressByIdPor
 {
     private const SELECT = <<<'SQL'
 SELECT
+    s.region_code,
     s.object_id,
     s.object_guid::text AS object_guid,
     s.address_string,

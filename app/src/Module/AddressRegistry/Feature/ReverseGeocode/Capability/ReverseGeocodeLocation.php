@@ -12,5 +12,6 @@ final readonly class ReverseGeocodeLocation
         public float $longitude,
         public ?string $sourceType,
         public ?int $sourceId,
+        public ?ReverseGeocodeAddress $address = null,
     ) {}
 }

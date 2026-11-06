@@ -1584,6 +1584,111 @@ Scope подтверждён после core parity; full-data import выпол
 - Команды, настройки, maintenance cost и parity SQL описаны в
   [address-source-enrichment.md](address-source-enrichment.md).
 
+### E2 — Закрытие Legacy Surface
+
+Read-only аудит и первая live semantic сверка выполнены `2026-11-06` после
+Data.Mos/OSM enrichment. Legacy остаётся запущенным на `8899`, target — на
+`8900`; сравнение выполнялось на одном GAR identity и московских данных.
+
+#### E2.1 — HTTP Semantic Parity
+
+- [x] Подтвердить `find-by-id` parity на representative object `80329459`:
+  обе реализации вернули те же две `adm`/`mun` строки и GAR GUID.
+- [x] Подтвердить первый `search` result для `Москва Тверская 1`: обе
+  реализации выбрали object `80329459` по OSM alias.
+- [x] Восстановить legacy transition для городов федерального значения:
+  Москва, Санкт-Петербург и Севастополь переходят сразу к `thoroughfare`.
+- [ ] Решить, является ли дополнительная fuzzy suggestion `Московка`
+  допустимым расширением либо target должен повторить legacy candidate set.
+- [ ] Зафиксировать representative top-N fixture для домов и помещений; текущий
+  target PostgreSQL и legacy OpenSearch пересеклись на `2/5` результатов.
+- [ ] После включения target OpenSearch повторить fixture и закрыть house/unit
+  ranking через structured fields или application-side reranking.
+
+`OPENSEARCH_SEARCH_ENABLED=0` сохраняется до решения последнего пункта. Нельзя
+считать совпадение первого документа достаточным relevance gate.
+
+#### E2.2 — Nominatim И Coordinate Enrichment
+
+- [x] Подтвердить, что target reverse-geocode code path и conditional route
+  реализованы, а legacy Nominatim healthy. Import provenance legacy нельзя
+  считать воспроизводимым: runtime env ссылается на отсутствующий
+  `central-fed-district-latest.osm.pbf`, тогда как read-only mount содержит
+  отдельные актуальные extracts Москвы и Московской области.
+- [x] Зафиксировать фактический gap: target Nominatim выключен, поэтому
+  `/api/addresses/reverse-geocode` сейчас отсутствует и возвращает `404`.
+- [x] Поднять target-owned Nominatim на отдельном volume из объединённого
+  immutable snapshot регионов 77/50; одновременное подключение двух PostgreSQL
+  processes к legacy volume запрещено. Текущий target snapshot собран из
+  `moscow-latest.osm.pbf` и `moscow_oblast-latest.osm.pbf`, имеет размер 300 MiB
+  и SHA-256 `ba44e02d9599a6419055bd9dc82b77237185cd45d1b44715649eb69916266107`.
+- [x] Выполнить representative reverse parity и проверить публикацию
+  `AddressCoordinatesResolved` в PostgreSQL worker queue.
+- [ ] Нормализовать положение типа улицы перед exact route filter, например
+  `Можайское шоссе` из OSM и `Шоссе Можайское` из GAR; до этого строгий фильтр
+  безопасно возвращает Nominatim fallback, но теряет допустимый GAR match.
+- [ ] Перенести bulk `gar:geocode` как bounded, resumable CLI/worker operation
+  либо явно исключить массовое обогащение из release scope.
+
+Target Nominatim `5.3.3` прошёл database check и health; replication отключён
+явно (`REPLICATION_URL` пуст, `UPDATE_MODE=none`). На Арбате, 1 legacy и target
+выбрали первым один GAR object `66941203`; различается только candidate tail и
+raw OSM identity из-за невоспроизводимого legacy snapshot. На Королёве,
+проспект Космонавтов, 1 target создал пять regional events, runtime worker
+завершил их с первой попытки и обновил обе `adm`/`mun` строки partition 50.
+Повторный reverse не создал новых jobs. В ходе проверки удалена неверная
+эвристика `OKATO prefix = GAR region`: event теперь получает `region_code`
+непосредственно из regional address document.
+
+#### E2.3 — Operational CLI
+
+- [ ] Добавить `gar:status`: manifest/source inventory, operation checkpoints,
+  regional table/projection counts и Data.Mos/alias coverage.
+- [ ] Добавить `gar:integrity` с region-aware quick/deep checks и fail-closed
+  exit code для release gate.
+- [ ] Добавить `opensearch:status`: cluster health, alias targets, document
+  parity и inactive versioned indexes.
+- [ ] Решить scope `gar:activity`: активные PostgreSQL statements и состояния
+  target-owned import/rebuild/worker operations без legacy `parser_logs`.
+- [ ] Оставить `gar:releases` optional download-metadata utility; он не должен
+  блокировать release с уже зафиксированным GAR manifest.
+
+Не переносятся буквально `data:prepare`, `gar:bootstrap`, `gar:denormalize`,
+`gar:address-search:indexes` и `app:about`: их функции закрыты runbook,
+раздельными resumable commands, shadow rebuild и стандартным `bin/app list`.
+Legacy `gar:indexes` возвращается в scope только при доказанной необходимости
+nationwide import; региональный 50/77 path завершился без него.
+
+#### E2.4 — Workers И Queue Cutover
+
+- [x] Снять текущий legacy evidence: RoadRunner `gar` и `runtime` имеют
+  `queue=0`, `active=0`, `delayed=0`, `reserved=0`; это snapshot, не cutover.
+- [x] Снять target evidence: `worker:status` пуст, worker services не запущены.
+- [x] Запустить оба target worker services на той же application revision через
+  общий настраиваемый `APP_IMAGE`; оба зарегистрированы как `running/idle`.
+- [x] Проверить enqueue/consume, heartbeat и отсутствие повторной публикации на
+  full stack через `AddressCoordinatesResolved` для partition 50.
+- [ ] Проверить pause/resume, drain/restart и stale recovery на full stack.
+- [ ] В release window повторно доказать пустые legacy BoltDB queues, запретить
+  новые legacy publications и сохранить operator approval.
+
+#### E2.5 — Production Delivery И Decommission
+
+- [ ] Добавить production Compose/image topology отдельно от data-migration dev
+  topology, включая resource limits, health policy и immutable image refs.
+- [ ] Перенести либо заменить legacy offline release archive, manifest,
+  release switch и rollback procedure.
+- [ ] Зафиксировать backup/restore для application PostgreSQL, target
+  Nominatim и rebuildable OpenSearch отдельно.
+- [ ] Обновить `release-scope.md`, `spiral-to-amphp.md`, server context и README
+  после закрытия каждого фактического gate.
+- [ ] После rollback window удалить transitional `/geocode` и `/search`,
+  остановить Spiral/RoadRunner и архивировать старые MessageBus packages.
+
+Приоритет выполнения: `E2.1 federal-city parity -> E2.2 target Nominatim ->
+R1 Postman/legacy comparison -> E2.3 operator commands -> E2.4 workers ->
+E2.5 production delivery/cutover`.
+
 ### R1 — Release Parity
 
 - [x] Выполнить fast и real-service integration gates.
@@ -1720,7 +1825,8 @@ RoadRunner queues остаются release execution на сервере с по
 До этого локально продолжаются schema, synthetic integration и contract slices.
 Прямой restore legacy `address_search.dump` не считается готовым data path:
 после canonical restore/import обязателен C2 rebuild с региональной parity. E1
-Data.Mos/OSM extensions остаются deferred до отдельного подтверждения scope.
+Data.Mos/OSM extensions реализованы и проверены на full dataset регионов 50/77;
+текущий остаток переноса и decommission gates ведутся в E2.
 JSON stdout,
 HTTP request/correlation и worker job lifecycle находятся в application shell.
 Default Thesis DIC modules для core и worker реализованы в L5 как последний

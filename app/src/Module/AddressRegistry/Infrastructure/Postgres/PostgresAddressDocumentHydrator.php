@@ -34,6 +34,7 @@ final readonly class PostgresAddressDocumentHydrator
             cadastralNumbers: $this->stringList($row['datamos_kad_n'] ?? null),
             landCadastralNumbers: $this->stringList($row['datamos_kad_zu'] ?? null),
             aliasCount: $this->integer($row, 'address_alias_count'),
+            regionCode: $this->integer($row, 'region_code'),
         );
     }
 

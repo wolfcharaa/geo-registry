@@ -99,11 +99,11 @@ manifest или Git.
 ```dotenv
 NOMINATIM_PBF_URL=
 NOMINATIM_DATA_PATH=/absolute/host/path/to/pbf-directory
-NOMINATIM_PBF_PATH=/nominatim/data/approved-snapshot.osm.pbf
+NOMINATIM_PBF_PATH=/data/nominatim/approved-snapshot.osm.pbf
 ```
 
 `NOMINATIM_PBF_URL` и `NOMINATIM_PBF_PATH` взаимоисключающие. Локальный path
-должен указывать на файл внутри `/nominatim/data`, а соответствующий host
+должен указывать на файл внутри `/data/nominatim`, а соответствующий host
 directory — существовать и быть читаемым до preflight.
 
 Для data server в ignored `config/.env` обязательно выбрать production-профиль

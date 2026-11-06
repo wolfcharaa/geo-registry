@@ -16,6 +16,7 @@ use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressMatch;
 use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressPort;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\MissingAddressCoordinatesPublisher;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocode;
+use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeAddress;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeHandler;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeLocation;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodePort;
@@ -48,7 +49,7 @@ final class ReverseGeocodeScenarioTest
 
         Assert::same($port->coordinates, [[55.750001, 37.610001]]);
         Assert::notNull($port->searchCriteria);
-        Assert::same($port->searchCriteria->query, 'Регион Альфа, Тестоград, Общая улица, 10');
+        Assert::same($port->searchCriteria->query, 'Регион Альфа Тестоград Общая улица д 10');
         Assert::same($port->searchCriteria->hierarchy, AddressHierarchy::Municipal);
         Assert::same($port->searchCriteria->limit, 3);
         Assert::same(count($result->matches), 1);
@@ -88,6 +89,29 @@ final class ReverseGeocodeScenarioTest
         );
 
         Assert::same($port->publishedObjectIds, []);
+    }
+
+    public function testItKeepsOnlyExactRouteAndHouseMatchesAndPublishesAllOfThem(): void
+    {
+        $port = new RecordingReverseGeocodePort(
+            withMatch: true,
+            matchingDocumentCount: 2,
+            withDistractors: true,
+        );
+
+        $result = Dic::run(
+            new ReverseGeocodeScenarioModule($port),
+            static fn(MessageBus $messageBus): ReverseGeocodeResult => $messageBus->ask(new ReverseGeocode(
+                latitude: 55.750001,
+                longitude: 37.610001,
+            )),
+        );
+
+        Assert::same(array_map(
+            static fn(SearchAddressMatch $match): int => $match->document->objectId,
+            $result->matches,
+        ), [770005, 770006]);
+        Assert::same($port->publishedObjectIds, [770005, 770006]);
     }
 }
 
@@ -143,6 +167,8 @@ final class RecordingReverseGeocodePort implements
     public function __construct(
         private readonly bool $withMatch,
         private readonly bool $documentHasCoordinates = false,
+        private readonly int $matchingDocumentCount = 1,
+        private readonly bool $withDistractors = false,
     ) {}
 
     public function locate(
@@ -159,6 +185,11 @@ final class RecordingReverseGeocodePort implements
             longitude: 37.610001,
             sourceType: 'way',
             sourceId: 770005,
+            address: new ReverseGeocodeAddress(
+                query: 'Регион Альфа Тестоград Общая улица д 10',
+                route: 'Общая улица',
+                houseNumber: '10',
+            ),
         );
     }
 
@@ -170,12 +201,41 @@ final class RecordingReverseGeocodePort implements
             return [];
         }
 
-        return [new SearchAddressMatch(
+        $matches = [];
+        if ($this->withDistractors) {
+            $matches[] = $this->match(
+                770003,
+                'Регион Альфа, г. Тестоград, Общая улица, д. 11',
+                $criteria->hierarchy,
+            );
+            $matches[] = $this->match(
+                770004,
+                'Регион Альфа, г. Тестоград, Другая улица, д. 10',
+                $criteria->hierarchy,
+            );
+        }
+        for ($offset = 0; $offset < $this->matchingDocumentCount; ++$offset) {
+            $matches[] = $this->match(
+                770005 + $offset,
+                'Регион Альфа, г. Тестоград, Общая улица, д. 10',
+                $criteria->hierarchy,
+            );
+        }
+
+        return $matches;
+    }
+
+    private function match(
+        int $objectId,
+        string $address,
+        AddressHierarchy $hierarchy,
+    ): SearchAddressMatch {
+        return new SearchAddressMatch(
             document: new AddressDocument(
-                objectId: 770005,
-                objectGuid: '00000000-0000-4000-8000-000000770005',
-                address: 'Регион Альфа, г. Тестоград, ул. Общая, д. 10',
-                hierarchy: $criteria->hierarchy,
+                objectId: $objectId,
+                objectGuid: sprintf('00000000-0000-4000-8000-%012d', $objectId),
+                address: $address,
+                hierarchy: $hierarchy,
                 level: 8,
                 postalCode: '770001',
                 okato: '77001000000',
@@ -196,7 +256,7 @@ final class RecordingReverseGeocodePort implements
             score: 1.0,
             aliases: [],
             matchedAlias: null,
-        )];
+        );
     }
 
     public function publishIfMissing(

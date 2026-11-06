@@ -36,6 +36,12 @@ final class NominatimReverseGeocodeAdapterTest
             'lon' => '37.610001',
             'osm_type' => 'way',
             'osm_id' => 770005,
+            'address' => [
+                'house_number' => '10к2',
+                'road' => 'Общая улица',
+                'city' => 'Тестоград',
+                'state' => 'Регион Альфа',
+            ],
         ], JSON_THROW_ON_ERROR));
 
         $location = $this->adapter($http)->locate(55.750001, 37.610001, new NullCancellation());
@@ -46,6 +52,10 @@ final class NominatimReverseGeocodeAdapterTest
         Assert::same($location->longitude, 37.610001);
         Assert::same($location->sourceType, 'way');
         Assert::same($location->sourceId, 770005);
+        Assert::notNull($location->address);
+        Assert::same($location->address->query, 'Регион Альфа Тестоград Общая улица д 10 к 2');
+        Assert::same($location->address->route, 'Общая улица');
+        Assert::same($location->address->houseNumber, '10к2');
         Assert::notNull($http->request);
         Assert::true(str_contains(
             (string) $http->request->getUri(),

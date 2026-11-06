@@ -31,5 +31,6 @@ final readonly class AddressDocument
         public array $cadastralNumbers,
         public array $landCadastralNumbers,
         public int $aliasCount,
+        public ?int $regionCode = null,
     ) {}
 }

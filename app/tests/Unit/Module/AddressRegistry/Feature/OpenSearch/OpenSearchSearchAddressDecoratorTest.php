@@ -42,6 +42,7 @@ final class OpenSearchSearchAddressDecoratorTest
                     '_score' => 12.5,
                     '_source' => [
                         'object_id' => 770005,
+                        'region_code' => 77,
                         'object_guid' => '00000000-0000-4000-8000-000000770005',
                         'address' => 'Регион Альфа, г. Тестоград, ул. Общая, д. 10',
                         'hierarchy_type' => 'mun',

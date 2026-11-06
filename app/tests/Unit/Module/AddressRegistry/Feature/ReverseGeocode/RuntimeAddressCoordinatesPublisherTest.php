@@ -45,7 +45,7 @@ final class RuntimeAddressCoordinatesPublisherTest
         $event = $context->events[0] ?? null;
         Assert::true($event instanceof AddressCoordinatesResolved);
         Assert::same($event->objectId, 770005);
-        Assert::same($event->regionCode, 77);
+        Assert::same($event->regionCode, 50);
         Assert::same($event->source, 'nominatim');
         Assert::same($event->osmType, 'way');
         Assert::same($event->osmId, 770005);
@@ -60,7 +60,7 @@ final class RuntimeAddressCoordinatesPublisherTest
             hierarchy: AddressHierarchy::Administrative,
             level: 8,
             postalCode: '770001',
-            okato: '77001000000',
+            okato: '46001000000',
             oktmo: '77001001000',
             latitude: $latitude,
             longitude: $longitude,
@@ -74,6 +74,7 @@ final class RuntimeAddressCoordinatesPublisherTest
             cadastralNumbers: [],
             landCadastralNumbers: [],
             aliasCount: 0,
+            regionCode: 50,
         );
     }
 }

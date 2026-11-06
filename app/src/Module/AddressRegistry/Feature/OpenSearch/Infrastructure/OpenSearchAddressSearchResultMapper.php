@@ -53,6 +53,7 @@ final class OpenSearchAddressSearchResultMapper
                     cadastralNumbers: self::stringList($source['cadastral_numbers'] ?? []),
                     landCadastralNumbers: self::stringList($source['land_cadastral_numbers'] ?? []),
                     aliasCount: self::optionalInteger($source, 'alias_count', count($aliases)),
+                    regionCode: self::integer($source, 'region_code'),
                 ),
                 score: self::score($hit['_score'] ?? null),
                 aliases: $aliases,

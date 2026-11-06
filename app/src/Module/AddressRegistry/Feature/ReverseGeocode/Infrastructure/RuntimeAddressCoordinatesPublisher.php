@@ -36,7 +36,7 @@ final readonly class RuntimeAddressCoordinatesPublisher implements MissingAddres
                 osmType: $location->sourceType,
                 osmId: $location->sourceId,
                 source: 'nominatim',
-                regionCode: self::regionCode($document->okato),
+                regionCode: $document->regionCode,
             ));
         } catch (CancelledException $exception) {
             throw $exception;
@@ -58,14 +58,4 @@ final readonly class RuntimeAddressCoordinatesPublisher implements MissingAddres
         }
     }
 
-    private static function regionCode(?string $okato): ?int
-    {
-        if ($okato === null || preg_match('/^[0-9]{2}/D', $okato, $matches) !== 1) {
-            return null;
-        }
-
-        $regionCode = (int) $matches[0];
-
-        return $regionCode >= 1 && $regionCode <= 99 ? $regionCode : null;
-    }
 }

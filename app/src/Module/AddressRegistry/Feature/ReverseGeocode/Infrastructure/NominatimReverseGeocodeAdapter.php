@@ -7,6 +7,7 @@ namespace App\Module\AddressRegistry\Feature\ReverseGeocode\Infrastructure;
 use Amp\Cancellation;
 use Amp\CancelledException;
 use App\Infrastructure\Nominatim\NominatimClient;
+use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeAddress;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeLocation;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodePort;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeUnavailable;
@@ -54,7 +55,62 @@ final readonly class NominatimReverseGeocodeAdapter implements ReverseGeocodePor
             longitude: $longitude,
             sourceType: self::sourceType($payload['osm_type'] ?? null),
             sourceId: self::sourceId($payload['osm_id'] ?? $payload['place_id'] ?? null),
+            address: self::address($payload['address'] ?? null),
         );
+    }
+
+    private static function address(mixed $value): ?ReverseGeocodeAddress
+    {
+        if (!is_array($value)) {
+            return null;
+        }
+
+        $houseNumber = self::string($value['house_number'] ?? null);
+        $route = self::string($value['road'] ?? null) ?? self::string($value['pedestrian'] ?? null);
+        if ($houseNumber === null || $route === null) {
+            return null;
+        }
+
+        $state = self::string($value['state'] ?? null);
+        $locality = null;
+        foreach (['city', 'town', 'village', 'hamlet'] as $key) {
+            $locality = self::string($value[$key] ?? null);
+            if ($locality !== null) {
+                break;
+            }
+        }
+
+        $parts = [];
+        if ($state !== null && ($locality === null || mb_strtolower($state) !== mb_strtolower($locality))) {
+            $parts[] = $state;
+        }
+        if ($locality !== null) {
+            $parts[] = $locality;
+        }
+        $parts[] = $route;
+        $parts[] = 'д ' . self::normalizeHouseNumber($houseNumber);
+
+        return new ReverseGeocodeAddress(
+            query: implode(' ', $parts),
+            route: $route,
+            houseNumber: $houseNumber,
+        );
+    }
+
+    private static function string(mixed $value): ?string
+    {
+        if (!is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return trim($value);
+    }
+
+    private static function normalizeHouseNumber(string $houseNumber): string
+    {
+        $houseNumber = (string) preg_replace('/([а-яА-Яa-zA-Z])(\d)/u', '$1 $2', $houseNumber);
+
+        return (string) preg_replace('/(\d)([а-яА-Яa-zA-Z])/u', '$1 $2', $houseNumber);
     }
 
     private static function coordinate(mixed $value, float $minimum, float $maximum): ?float

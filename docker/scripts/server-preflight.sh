@@ -160,12 +160,12 @@ if [ -n "${nominatim_pbf_path}" ]; then
     [ -r "${nominatim_data_path}" ] \
         || fail "NOMINATIM_DATA_PATH is not readable: ${nominatim_data_path}"
     case "${nominatim_pbf_path}" in
-        /nominatim/data/*) ;;
-        *) fail "NOMINATIM_PBF_PATH must be inside /nominatim/data" ;;
+        /data/nominatim/*) ;;
+        *) fail "NOMINATIM_PBF_PATH must be inside /data/nominatim" ;;
     esac
-    nominatim_pbf_relative_path=${nominatim_pbf_path#/nominatim/data/}
+    nominatim_pbf_relative_path=${nominatim_pbf_path#/data/nominatim/}
     case "${nominatim_pbf_relative_path}" in
-        ''|/*|..|../*|*/..|*/../*) fail "NOMINATIM_PBF_PATH must identify a file below /nominatim/data" ;;
+        ''|/*|..|../*|*/..|*/../*) fail "NOMINATIM_PBF_PATH must identify a file below /data/nominatim" ;;
     esac
     [ -f "${nominatim_data_path}/${nominatim_pbf_relative_path}" ] \
         || fail "Nominatim PBF does not exist below NOMINATIM_DATA_PATH"

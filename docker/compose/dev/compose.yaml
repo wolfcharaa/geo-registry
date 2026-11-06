@@ -2,6 +2,7 @@ name: geo-registry-amp
 
 services:
   app:
+    image: "${APP_IMAGE:-geo-registry-amp-app}"
     build:
       context: ../../..
       dockerfile: docker/php/Dockerfile
@@ -58,6 +59,7 @@ services:
 
   worker-address:
     profiles: [worker]
+    image: "${APP_IMAGE:-geo-registry-amp-app}"
     build:
       context: ../../..
       dockerfile: docker/php/Dockerfile
@@ -91,6 +93,7 @@ services:
 
   worker-runtime:
     profiles: [worker]
+    image: "${APP_IMAGE:-geo-registry-amp-app}"
     build:
       context: ../../..
       dockerfile: docker/php/Dockerfile
@@ -225,13 +228,13 @@ services:
       POSTGRES_MAINTENANCE_WORK_MEM: 512MB
       POSTGRES_SHARED_BUFFERS: 512MB
       POSTGRES_WORK_MEM: 16MB
-      REPLICATION_URL: "${NOMINATIM_REPLICATION_URL:-https://download.geofabrik.de/europe/monaco-updates/}"
+      REPLICATION_URL: "${NOMINATIM_REPLICATION_URL-https://download.geofabrik.de/europe/monaco-updates/}"
       THREADS: "${NOMINATIM_THREADS:-2}"
       UPDATE_MODE: "${NOMINATIM_UPDATE_MODE:-none}"
     ports:
       - "${NOMINATIM_PORT:-8081}:8080"
     volumes:
-      - "${NOMINATIM_DATA_PATH:-../../../docker/data/nominatim}:/nominatim/data:ro"
+      - "${NOMINATIM_DATA_PATH:-../../../docker/data/nominatim}:/data/nominatim:ro"
       - nominatim-data:/var/lib/postgresql/16/main
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/status"]

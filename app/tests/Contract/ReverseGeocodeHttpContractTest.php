@@ -19,6 +19,7 @@ use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressMatch;
 use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressPort;
 use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressUnavailable;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\MissingAddressCoordinatesPublisher;
+use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeAddress;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeHandler;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeLocation;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodePort;
@@ -231,6 +232,11 @@ final readonly class ContractReverseGeocodePort implements
             longitude: $longitude,
             sourceType: 'way',
             sourceId: 770005,
+            address: new ReverseGeocodeAddress(
+                query: 'Регион Альфа Тестоград ул. Общая д 10',
+                route: 'ул. Общая',
+                houseNumber: '10',
+            ),
         );
     }
 

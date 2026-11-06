@@ -82,6 +82,27 @@ JSON);
         Assert::same($context['parent_id'] ?? null, 770003);
     }
 
+    public function testItKeepsTheFederalCityTransitionCompatible(): void
+    {
+        $response = $this->response(<<<'JSON'
+{
+  "suggest": "Москва",
+  "stage": "administrative_area",
+  "hierarchy": "mun",
+  "count": 5
+}
+JSON);
+        $payload = $this->payload($response);
+        $suggestions = $this->array($payload['suggestions'] ?? null);
+        $suggestion = $this->array($suggestions[0] ?? null);
+        $data = $this->array($suggestion['data'] ?? null);
+
+        Assert::same($response->getStatus(), 200);
+        Assert::same($suggestion['value'] ?? null, 'г. Москва');
+        Assert::same($data['next_stage'] ?? null, 'thoroughfare');
+        Assert::same($data['ready_for_search'] ?? null, false);
+    }
+
     public function testItPresentsStableValidationContextAndStorageErrors(): void
     {
         $invalidStage = $this->response(
@@ -226,6 +247,10 @@ final readonly class ContractSuggestionPort implements
         Cancellation $cancellation,
     ): array {
         $this->guard($cancellation);
+
+        if ($criteria->query === 'Москва') {
+            return [$this->suggestion(1405113, 'Москва', 'г.', 1, $criteria->hierarchy)];
+        }
 
         return [$this->suggestion(770003, 'Тестоград', 'г.', 5, $criteria->hierarchy)];
     }

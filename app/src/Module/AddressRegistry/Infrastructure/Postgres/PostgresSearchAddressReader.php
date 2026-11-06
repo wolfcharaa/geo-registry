@@ -131,6 +131,7 @@ alias_matches AS MATERIALIZED (
 ),
 limited AS MATERIALIZED (
     SELECT
+        s.region_code,
         s.object_id,
         s.object_guid,
         s.address_string,
@@ -177,6 +178,7 @@ limited AS MATERIALIZED (
     LIMIT :limit
 )
 SELECT
+    limited.region_code,
     limited.object_id,
     limited.object_guid::text AS object_guid,
     limited.address_string,
