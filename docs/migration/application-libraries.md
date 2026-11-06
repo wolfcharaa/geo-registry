@@ -1,8 +1,8 @@
 # Библиотеки Geo Registry: журнал решений
 
 - Статус: `Dependency baseline accepted`
-- Версия документа: `0.32.1`
-- Обновлено: `2026-11-04`
+- Версия документа: `0.33.0`
+- Обновлено: `2026-11-06`
 - Родительский план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Режим работы: решения принимаются интерактивно; этот документ не разрешает
   установку зависимостей или изменение application-кода
@@ -68,8 +68,8 @@ scenario slice.
 | Факт | Evidence | Следствие |
 | --- | --- | --- |
 | В целевом проекте уже напрямую подключены AMPHP HTTP server/router/client, AMPHP PostgreSQL, AMPHP logging и Monolog | `app/composer.json` | Эти категории не переоткрываются без обнаруженного конфликта |
-| Текущий `Bootstrap` вручную создаёт config, logger, HTTP client, PostgreSQL pool, integration clients, router и server | `app/src/Bootstrap.php` | Ручная сборка уже понятна, но будет расти при переносе handlers, CLI и workers |
-| В целевом scaffold пока есть только HTTP entrypoint `app/bin/server.php`; CLI и worker entrypoints отсутствуют, а весь lifecycle HTTP runtime собран в одном `Bootstrap::run()` | `app/bin/`, `app/src/Bootstrap.php` | Три runtime composition roots можно спроектировать явно до появления compatibility burden, переиспользуя общие modules без универсального process container |
+| На момент первоначального baseline `Bootstrap` вручную создавал config, logger, HTTP client, PostgreSQL pool, integration clients, router и server | исторические `app/src/Bootstrap.php` и `0.1.0` | Ручная сборка была понятна, но росла бы при переносе handlers, CLI и workers; заменена DIC modules |
+| На момент первоначального baseline в scaffold был только HTTP entrypoint `app/bin/server.php` | исторические `app/bin/` и `0.1.0` | Три runtime graph спроектированы явно; с `0.65.0` они доступны через общий lazy `bin/app` без общего resource lifecycle |
 | В исходном приложении 18 команд наследуют `Spiral\Console\Command`; команды уже используют Symfony Console input arguments/options, а единый `app.php` передаёт управление Spiral kernel | `phpfiasgeocoder/app/src/**/*Command.php`, `phpfiasgeocoder/app/app.php` | При переносе нужен полноценный console framework, но Spiral command base/discovery следует заменить application-owned registration без изменения пользовательской формы arguments/options |
 | Текущий `AppConfig::fromEnvironment()` напрямую читает `getenv()` и собирает 11 параметров HTTP и integrations в один объект; Compose уже загружает `config/.env` и передаёт приложению явный набор environment variables | `app/src/Config/AppConfig.php`, `config/.env.example`, `docker/compose/dev.sh`, `docker/compose/dev/compose.yaml` | PHP runtime не обязан повторно читать `.env`; конфигурацию можно один раз преобразовать в typed runtime/integration objects на composition boundary |
 | Symfony Config предназначен для структуры, validation и merge нескольких config formats/sources, а Symfony Dotenv и `vlucas/phpdotenv` загружают `.env` в process environment | [Symfony Config](https://symfony.com/doc/current/components/config.html), [Symfony Dotenv](https://symfony.com/packages/dotenv), [`vlucas/phpdotenv`](https://github.com/vlucas/phpdotenv) | При единственном external source — environment, уже подготовленном Compose/orchestrator, эти packages не дают достаточной ценности для обязательной runtime dependency |
@@ -847,7 +847,7 @@ recoverability текущей очереди.
 
 ### Decision 11 — Как разделить application CLI и worker CLI?
 
-- Status: accepted
+- Status: `superseded 2026-11-06` единым executable с lazy runtime boundaries
 - Context: исходное приложение переносит 18 полноценных команд, уже использующих
   Symfony Console arguments/options через Spiral Console. Одновременно Decision
   5 отнесла worker control plane и его Console integration к optional worker
@@ -872,19 +872,23 @@ recoverability текущей очереди.
   graphs и release surface; при этом обе стороны используют зрелые Symfony
   Console contracts без скрытой транзитивной зависимости. Регистрация команд
   остаётся явной частью соответствующего Thesis Dic root.
-- User answer: `2026-11-01` — «вариант Б».
-- Accepted: вариант Б — приложение напрямую зависит от `symfony/console` и
-  владеет `app/bin/console`; worker package предоставляет отдельный executable и
-  Console application для operational commands. Команды разрешаются только из
-  соответствующего `CliRuntime` или `WorkerRuntime`.
-- Consequences: при Б `symfony/console` становится прямой application dependency
-  для `CliRuntime` и прямой dependency worker package для его executable.
-  Application command classes остаются transport adapters и делегируют сценарии
-  capabilities/MessageBus; worker commands не импортируются в application
-  console автоматически.
-- Conflict check: Б следует Decisions 5 и 10 и ограничению о прямых
-  dependencies. А технически возможен, но заново склеивает разделённые runtimes.
-  В нарушает dependency ownership, Г не оправдан существующей command surface.
+- Первоначальный user answer: `2026-11-01` — «вариант Б» с раздельными
+  executables.
+- Superseding user answer: `2026-11-06` — использовать единый `bin/app` как
+  console entrypoint для всех действий и подключить официальный
+  `thesis/symfony-console-module`.
+- Accepted: вариант А в уточнённой форме — один application executable и один
+  lazy command registry, но не один runtime graph. `server:run` resolve-ит
+  `HttpRuntime` только при выполнении; worker commands через
+  `BootstrapResolver` открывают отдельный managed `WorkerRuntimeProvider`;
+  blocking application commands остаются в CLI-only modules.
+- Consequences: `symfony/console` и `thesis/symfony-console-module` являются
+  прямыми application dependencies. Старые `bin/server.php`, `bin/console` и
+  `bin/worker` удалены. Lazy `CommandTag`/`LegacyCommandTag` не создают pools,
+  clients или job scopes невыбранной команды.
+- Conflict check: общий executable больше не склеивает lifecycle, поскольку
+  command provider является только отложенной границей resolve, а worker
+  provider по-прежнему владеет собственным `Dic::run()` и disposal.
 
 ### Decision 12 — Как устроить configuration layer?
 
@@ -1644,10 +1648,10 @@ recoverability текущей очереди.
 10. Application composition имеет три явных root export: `HttpRuntime`,
     `CliRuntime` и `WorkerRuntime`. Они переиспользуют общие modules/refs, но
     независимо валидируют graph и управляют process-specific lifecycle.
-11. Application напрямую использует `symfony/console` через собственный
-    `app/bin/console` и `CliRuntime`; worker package имеет отдельный executable,
-    Console application и `WorkerRuntime`, не импортируемые автоматически в
-    прикладной CLI.
+11. Application использует `symfony/console` и
+    `thesis/symfony-console-module` через единый `app/bin/app`; lazy commands
+    сохраняют отдельные `HttpRuntime`, `CliRuntime` и managed `WorkerRuntime`
+    lifecycle boundaries.
 12. Configuration layer не получает отдельную dependency: immutable environment
     snapshot один раз преобразуется в typed runtime/integration settings, а
     `.env` loading остаётся обязанностью Compose/orchestrator tooling.

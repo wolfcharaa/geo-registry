@@ -8,7 +8,7 @@ services:
     init: true
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     working_dir: /app
-    command: ["php", "bin/server.php"]
+    command: ["bin/app"]
     environment:
       APP_LISTEN: "${APP_LISTEN:-0.0.0.0:8080}"
       APP_NAME: "${APP_NAME:-geo-registry}"
@@ -58,8 +58,7 @@ services:
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     working_dir: /app
     command:
-      - php
-      - bin/worker
+      - bin/app
       - worker:run
       - --transport=postgres
       - --queue=address
@@ -92,8 +91,7 @@ services:
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     working_dir: /app
     command:
-      - php
-      - bin/worker
+      - bin/app
       - worker:run
       - --transport=postgres
       - --queue=runtime

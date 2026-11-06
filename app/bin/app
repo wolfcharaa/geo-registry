@@ -17,6 +17,7 @@ exit(Dic::run(
         EnvironmentSnapshot::capture(),
         MessageBusRegistrySource::fromFile(dirname(__DIR__) . '/config/message_bus_registry.php'),
         MessageCodecRegistryLoader::fromFile(dirname(__DIR__) . '/config/message_bus_codecs.php'),
+        MessageBusRegistrySource::fromFile(dirname(__DIR__) . '/config/message_bus_http.php'),
     ),
     static fn(CliRuntime $runtime): int => $runtime->run(),
 ));

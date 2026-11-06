@@ -115,8 +115,7 @@ OpenSearch, Data.Mos и OSM enrichment. `GeoRegistry` остаётся имен�
 ```text
 app/
 ├── bin/
-│   ├── server.php
-│   └── console
+│   └── app
 ├── config/
 │   ├── di/
 │   │   ├── application.php
@@ -389,13 +388,13 @@ heartbeat, recovery/control plane и worker CLI вынесены в отдель
 | ResolveSuggestionContext | Core Capability | nested sync | `gar.address.resolve_suggestion_context` | Done |
 | SuggestAdministrativeArea | Core Capability | nested sync | `gar.address.suggest_administrative_area` | Done |
 | SuggestThoroughfare | Core Capability | nested sync | `gar.address.suggest_thoroughfare` | Done |
-| ImportGarXml | Core Capability | CLI/worker | `gar.import` | Not started |
-| BuildAddressSearch | Core Capability | CLI/worker | `gar.address_search.build` | Not started |
+| ImportGarXml | Core Capability | CLI/worker | `gar.import` | Done |
+| BuildAddressSearch | Core Capability | CLI/worker | `gar.address_search.build` | Done |
 | BootstrapGar | Core Capability | CLI/worker | `gar.bootstrap` | Not started |
-| ReverseGeocode | Feature | HTTP sync | `gar.address.reverse_geocode` | Not started |
-| AddressCoordinatesResolved | Feature | HTTP producer/worker | `gar.address_coordinates.resolved` | Not started |
-| OpenSearch search decorator | Feature | HTTP sync | `SearchAddressPort` decoration | Not started |
-| OpenSearch reindex | Feature | CLI | derived index rebuild | Not started |
+| ReverseGeocode | Feature | HTTP sync | `gar.address.reverse_geocode` | Done |
+| AddressCoordinatesResolved | Feature | HTTP producer/worker | `gar.address_coordinates.resolved` | Done |
+| OpenSearch search decorator | Feature | HTTP sync | `SearchAddressPort` decoration | Done |
+| OpenSearch reindex | Feature | CLI | derived index rebuild | Done |
 | Nominatim coordinate enrichment | Feature | CLI/worker | `gar:geocode` | Not started |
 | Data.Mos import/enrichment | Feature | CLI | source-specific enrichment | Deferred |
 | OSM alias import | Feature | CLI | source-specific enrichment | Deferred |
@@ -404,28 +403,28 @@ heartbeat, recovery/control plane и worker CLI вынесены в отдель
 
 ### Phase 0 — Решения И Контрактная База
 
-- [ ] закрыть лицензионный gate;
+- [x] закрыть лицензионный gate;
 - [x] подтвердить имя `AddressRegistry`;
-- [ ] подтвердить PostgreSQL queue и способ non-blocking enqueue из HTTP;
-- [ ] решить, сохраняется ли Yiisoft DB Migration без переписывания миграций;
-- [ ] зафиксировать API compatibility policy;
-- [ ] сохранить исходную Postman collection и representative response fixtures;
-- [ ] определить dataset/fixtures для parity testing.
+- [x] подтвердить PostgreSQL queue и способ non-blocking enqueue из HTTP;
+- [x] решить, сохраняется ли Yiisoft DB Migration без переписывания миграций;
+- [x] зафиксировать API compatibility policy;
+- [x] сохранить исходную Postman collection и representative response fixtures;
+- [x] определить dataset/fixtures для parity testing.
 
 Готовность: решения записаны в этом документе или отдельных ADR, перенос source
 может выполняться без скрытых архитектурных предположений.
 
 ### Phase 1 — Документация И Runtime Foundation
 
-- [ ] создать `docs/architecture.md` как source of truth целевого проекта;
+- [x] создать `docs/architecture.md` как source of truth целевого проекта;
 - [x] создать `Module/AddressRegistry/MODULE.md` версии 0.1.0; scenario catalog
   остаётся пустым до первого фактически реализованного capability;
-- [ ] адаптировать Postman collection под целевой base URL;
-- [ ] добавить PSR-11 container и DI definitions;
-- [ ] разделить HTTP, Console и Worker bootstrap;
-- [ ] добавить generic MessageBus и registry compilation;
-- [ ] добавить единый error mapping и transport request parsing;
-- [ ] добавить checks для architecture direction и registry compile.
+- [x] адаптировать Postman collection под целевой base URL;
+- [x] добавить Thesis DIC modules и explicit composition definitions;
+- [x] разделить HTTP, Console и Worker runtime boundaries;
+- [x] добавить generic MessageBus и registry compilation;
+- [x] добавить единый error mapping и transport request parsing;
+- [x] добавить checks для architecture direction и registry compile.
 
 Готовность: приложение стартует, registry компилируется, health endpoints и
 console работают через новую composition без бизнес-сценариев в bootstrap.
@@ -457,25 +456,25 @@ blocking I/O в HTTP path.
 
 ### Phase 4 — Optional Search И Geocode Features
 
-- [ ] подключить OpenSearch как decorator над core search port;
-- [ ] перенести mapping/query/ranking logic;
-- [ ] отдельно согласовать bulk streaming/retry/auth design до reindex;
-- [ ] реализовать reverse geocode как feature-local executable flow;
-- [ ] распространить request cancellation/deadlines;
-- [ ] проверить fallback OpenSearch -> PostgreSQL и Nominatim -> typed error/result.
+- [x] подключить OpenSearch как decorator над core search port;
+- [x] перенести mapping/query/ranking logic;
+- [x] отдельно согласовать bulk streaming/retry/auth design до reindex;
+- [x] реализовать reverse geocode как feature-local executable flow;
+- [x] распространить request cancellation/deadlines;
+- [x] проверить fallback OpenSearch -> PostgreSQL и Nominatim -> typed error/result.
 
 Готовность: feature можно отключить без изменения core capability, а parity
 подтверждён для enabled и disabled modes.
 
 ### Phase 5 — CLI И Data Pipelines
 
-- [ ] добавить Symfony Console application;
+- [x] подключить Thesis Symfony Console Module и единый `bin/app`;
 - [ ] перенести status/releases/integrity/index maintenance commands;
-- [ ] перенести GAR XML import в blocking CLI/worker runtime;
-- [ ] перенести build/shadow rebuild `address_search`;
-- [ ] перенести OpenSearch blue-green reindex;
-- [ ] заменить дочерний `php app.php` на новый console entrypoint;
-- [ ] проверить cleanup/recovery при частичном failure;
+- [x] перенести GAR XML import в blocking CLI/worker runtime;
+- [x] перенести build/shadow rebuild `address_search`;
+- [x] перенести OpenSearch blue-green reindex;
+- [x] заменить дочерний `php app.php` на новый console entrypoint;
+- [x] проверить cleanup/recovery при частичном failure;
 - [ ] добавить smoke-команды для import -> build -> search.
 
 Готовность: полный dataset можно подготовить без Spiral/RoadRunner, HTTP process
@@ -483,12 +482,12 @@ blocking I/O в HTTP path.
 
 ### Phase 6 — Durable Workers И Runtime Enrichment
 
-- [ ] создать PostgreSQL queue/worker-control schema;
-- [ ] добавить Compose worker services;
-- [ ] перенести `address_async` и `runtime_async` bindings;
-- [ ] реализовать non-blocking HTTP producer или утверждённую альтернативу;
-- [ ] проверить retry, idempotency, stale recovery и graceful shutdown;
-- [ ] описать drain/restart/cutover процедуру;
+- [x] создать PostgreSQL queue/worker-control schema;
+- [x] добавить Compose worker services;
+- [x] перенести `address_async` и `runtime_async` bindings;
+- [x] реализовать non-blocking HTTP producer или утверждённую альтернативу;
+- [x] проверить retry, idempotency, stale recovery и graceful shutdown;
+- [x] описать drain/restart/cutover процедуру;
 - [ ] опустошить RoadRunner BoltDB queues перед переключением.
 
 Готовность: async contracts выполняются без RoadRunner, registry producer/worker

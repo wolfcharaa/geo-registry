@@ -103,13 +103,13 @@ lifecycle — `Application/Worker`. Модуль владеет только mes
 **Справка с хоста**
 
 ```shell
-docker/compose/dev.sh run --rm --no-deps app php bin/console gar:import --help
+docker/compose/dev.sh run --rm --no-deps app bin/app gar:import --help
 ```
 
 **Справка внутри runtime-контекста**
 
 ```shell
-php bin/console gar:import --help
+bin/app gar:import --help
 ```
 
 **Результат запуска**
@@ -175,13 +175,13 @@ exit code `1`.
 **Справка с хоста**
 
 ```shell
-docker/compose/dev.sh run --rm --no-deps app php bin/console gar:address-search:rebuild --help
+docker/compose/dev.sh run --rm --no-deps app bin/app gar:address-search:rebuild --help
 ```
 
 **Справка внутри runtime-контекста**
 
 ```shell
-php bin/console gar:address-search:rebuild --help
+bin/app gar:address-search:rebuild --help
 ```
 
 **Результат запуска**
@@ -516,8 +516,8 @@ alias. Команда сохраняет имя `opensearch:reindex` из про
 **Справка**
 
 ```shell
-docker/compose/dev.sh run --rm --no-deps app php bin/console opensearch:reindex --help
-php bin/console opensearch:reindex --help
+docker/compose/dev.sh run --rm --no-deps app bin/app opensearch:reindex --help
+bin/app opensearch:reindex --help
 ```
 
 **Результат запуска**
@@ -550,7 +550,7 @@ cutover.
 **Вход**
 
 ```shell
-php bin/console opensearch:index:cleanup \
+bin/app opensearch:index:cleanup \
   --index=places-v20261104123456789 \
   --confirm=places-v20261104123456789
 ```

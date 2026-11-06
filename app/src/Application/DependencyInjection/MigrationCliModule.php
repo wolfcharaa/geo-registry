@@ -10,6 +10,7 @@ use Symfony\Component\Console\Command\Command;
 use Thesis\Dic;
 use Thesis\Dic\Module;
 use Thesis\Dic\Ref;
+use Thesis\SymfonyConsoleModule\AutoconfigureCommands;
 use Yiisoft\Db\Migration\Command\CreateCommand;
 use Yiisoft\Db\Migration\Command\DownCommand;
 use Yiisoft\Db\Migration\Command\HistoryCommand;
@@ -39,6 +40,8 @@ final readonly class MigrationCliModule implements Module
     /** @return list<Ref<Command>> */
     public function configure(Dic $dic): array
     {
+        $dic->apply(new AutoconfigureCommands());
+
         $driverFactory = $dic->object(MigrationPostgresDriverFactory::class);
         $driver = $dic
             ->object(Driver::class, [$driverFactory, 'create'])

@@ -22,6 +22,7 @@
         "symfony/console": "^8.1",
         "symfony/validator": "^8.1",
         "thesis/dic": "^0.5.3",
+        "thesis/symfony-console-module": "^0.1.0",
         "yiisoft/db-migration": "^2.2",
         "yiisoft/db-pgsql": "^2.0"
     },
@@ -80,7 +81,7 @@
         "cs-fix": "php-cs-fixer fix --diff --sequential --using-cache=no",
         "deptrac": "deptrac --no-progress --fail-on-uncovered",
         "phpstan": "phpstan analyse --memory-limit=1G",
-        "registry:check": "php bin/console message-bus:registry:check --no-interaction",
+        "registry:check": "bin/app message-bus:registry:check --no-interaction",
         "test": "testo --suite=Unit --suite=Scenario",
         "test:integration": "testo --suite=Integration",
         "test:contract": "testo --suite=Contract"

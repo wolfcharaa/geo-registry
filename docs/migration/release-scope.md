@@ -25,7 +25,9 @@ readiness/parity approval.
 
 ## Application CLI Surface
 
-Release procedure поддерживает следующие application commands:
+Все operations запускаются через единый executable `app/bin/app`; без аргументов
+он выполняет default `server:run`. Release procedure поддерживает следующие
+application commands:
 
 | Команда | Release role |
 | --- | --- |
@@ -45,7 +47,9 @@ surface, а не application contract.
 
 ## Worker CLI Surface
 
-Worker package входит в общую совместимую `0.1.x` release line. Поддерживаются:
+Worker package входит в общую совместимую `0.1.x` release line. Его commands
+также зарегистрированы в `app/bin/app`, но при выполнении открывают отдельный
+managed worker runtime. Поддерживаются:
 
 - `worker:run` и `worker:status`;
 - общий `worker:control`;

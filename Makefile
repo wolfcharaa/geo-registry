@@ -3,7 +3,7 @@ SHELL := /bin/sh
 COMPOSE := docker/compose/dev.sh
 INTEGRATION_COMPOSE := docker/compose/integration.sh
 POSTGRES_TUNING_CHECK := docker/scripts/postgres-tuning-check.sh
-WORKER_CLI := $(COMPOSE) run --rm --no-deps app php bin/worker
+WORKER_CLI := $(COMPOSE) run --rm --no-deps app bin/app
 
 export HOST_UID ?= $(shell id -u)
 export HOST_GID ?= $(shell id -g)
@@ -39,7 +39,7 @@ restart: down up ## Restart the development stack
 .PHONY: restart
 
 migrate: guard-user ## Apply application database migrations
-	$(COMPOSE) run --rm --no-deps app php bin/console migrate:up --force-yes
+	$(COMPOSE) run --rm --no-deps app bin/app migrate:up --force-yes
 .PHONY: migrate
 
 worker-up: guard-user ## Migrate and start both durable worker services

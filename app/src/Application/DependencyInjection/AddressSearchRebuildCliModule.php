@@ -12,6 +12,7 @@ use Symfony\Component\Console\Command\Command;
 use Thesis\Dic;
 use Thesis\Dic\Module;
 use Thesis\Dic\Ref;
+use Thesis\SymfonyConsoleModule\AutoconfigureCommands;
 
 /** @implements Module<Ref<Command>> */
 final readonly class AddressSearchRebuildCliModule implements Module
@@ -23,6 +24,8 @@ final readonly class AddressSearchRebuildCliModule implements Module
     /** @return Ref<Command> */
     public function configure(Dic $dic): Ref
     {
+        $dic->apply(new AutoconfigureCommands());
+
         $adapter = $dic
             ->object(PostgresAddressSearchRebuildAdapter::class)
             ->arg('databaseDsn', $dic->value($this->postgresConfig->dsn));

@@ -1,8 +1,8 @@
 # Roadmap реализации Geo Registry на AMPHP
 
 - Статус: `Active; local R1 preparation continues, full-data execution deferred to data server`
-- Версия документа: `0.64.0`
-- Обновлено: `2026-11-04`
+- Версия документа: `0.65.0`
+- Обновлено: `2026-11-06`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
 
@@ -1050,15 +1050,17 @@ volumes.
   - [x] `HttpRuntime` собирается application-owned Thesis DIC module;
   - [x] `CliRuntime` собирается отдельным Thesis DIC module;
   - [x] `WorkerRuntime` содержит queue runner, control plane и job scopes.
-- [x] Добавить Symfony Console application и `app/bin/console`.
+- [x] Подключить Thesis Symfony Console Module и единый executable `app/bin/app`
+  для HTTP, application CLI и managed worker commands.
 - [x] Вынести JSON logging, correlation context и graceful shutdown в
   application shell.
 - [x] Реализовать live/ready/startup registry с required/optional policy.
 - [x] Проверить три DIC graph без внешних сервисов.
 
-Готовность: server и console запускаются из DIC composition; liveness не делает
-network I/O, optional outage даёт `degraded`, process-specific resources не
-попадают в чужой graph.
+Готовность: `bin/app` запускает lazy command из DIC composition; default
+`server:run`, application CLI и managed worker operations сохраняют отдельные
+runtime graphs. Liveness не делает network I/O, optional outage даёт
+`degraded`, process-specific resources не попадают в чужой graph.
 
 ### A3 — MessageBus Application Integration
 
@@ -1150,7 +1152,7 @@ artifact воспроизводим, три runtime graph компилируют
 - Application `ApplicationWorkerRuntimeProvider` оборачивает реальный
   `WorkerRuntimeModule` в `Dic::run()`, поэтому PostgreSQL pool и scoped
   services закрываются на success и failure.
-- `app/bin/worker` использует стандартный `config/message_bus_worker.php` и на
+- `app/bin/app` использует стандартный `config/message_bus_worker.php` и через
   Symfony Console 8.1 экспортирует worker run/control/status/schema surface.
 - Worker library gates: PHPUnit `31 tests / 141 assertions`, PHPStan max;
   application fast gate: Testo `31 tests / 102 assertions`, PHPStan max,
@@ -1671,7 +1673,7 @@ settings и первый независимый
 core/worker packages, explicit registry source, fast compile gate,
 correlation/telemetry interceptors и реальный `WorkerRuntime` с PostgreSQL
 consumer/control plane; nested dispatch/cancellation доказаны target-owned
-Scenario test. Worker library и `app/bin/worker` теперь
+Scenario test. Worker library и worker commands в `app/bin/app` теперь
 поддерживают managed `Dic::run()` provider lifecycle с гарантированным teardown;
 direct runtime bootstrap сохранён для совместимости. D1 завершён: CLI root
 содержит изолированный Yiisoft migration graph и PDO PostgreSQL adapter, все 21
@@ -1715,6 +1717,18 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.65.0 — 2026-11-06
+
+- подключён официальный `thesis/symfony-console-module 0.1.0` с lazy command
+  tags и локальной `#[AsCommand]` autoconfiguration;
+- `app/bin/app` с shebang стал единым executable для default `server:run`,
+  migrations, GAR/OpenSearch operations и managed worker commands;
+- прежние `bin/server.php`, `bin/console`, `bin/worker` и HTTP-only `Bootstrap`
+  удалены; process-specific resources по-прежнему создаются только выбранной
+  lazy command;
+- Docker, Makefile, Composer scripts и operator documentation переведены на
+  новый command surface.
 
 ### 0.64.0 — 2026-11-04
 
@@ -1946,7 +1960,8 @@ contract artifacts, но не implementation code.
 - worker library получил backward-compatible managed runtime provider contract;
 - все worker CLI operations удерживают runtime внутри provider lifecycle;
 - приложение добавило `ApplicationWorkerRuntimeProvider`, стандартный bootstrap
-  и executable `app/bin/worker` без `Dic::build()`;
+  и первоначальный executable `app/bin/worker` без `Dic::build()`; в 0.65.0
+  этот surface перенесён в единый `app/bin/app`;
 - Symfony Console 8.1 command surface проверена application-side smoke test;
 - A3 оставлен partial только по G2-dependent release gate, frontier переведён
   на D1 migration continuity.
@@ -2008,7 +2023,8 @@ contract artifacts, но не implementation code.
 ### 0.37.0 — 2026-11-03
 
 - добавлен независимый `CliRuntime` Thesis DIC root;
-- `app/bin/console` запускает Symfony Console с explicit process exit code;
+- первоначальный `app/bin/console` запускает Symfony Console с explicit process
+  exit code; в 0.65.0 он заменён единым `app/bin/app`;
 - console name/version вынесены в immutable settings из общего environment
   snapshot;
 - executable `list` contract и DIC graph teardown покрыты fast test;

@@ -1,8 +1,8 @@
 # Контекст Для Продолжения На Data Server
 
 - Назначение: `handoff в новую Codex-сессию после переноса repositories`
-- Состояние на момент записи: `source/config verified; GAR extracted; clean revision and server preflight pending`
-- Обновлено: `2026-11-05`
+- Состояние на момент записи: `regions 50/77 imported; partitioned search live; release parity incomplete`
+- Обновлено: `2026-11-06`
 - Основной roadmap: [implementation-roadmap.md](implementation-roadmap.md)
 - Server runbook: [server-handoff.md](server-handoff.md)
 
@@ -43,7 +43,7 @@ workspace/
 
 | Repository | Branch | Commit |
 | --- | --- | --- |
-| `geo-registry` | `docs/async-migration-roadmap` | `78f92321924ffbca15b27c158ba698bf974eca00` |
+| `geo-registry` | `docs/async-migration-roadmap` | `23e7f129a82bb7a0a2da64e712ac334b16226c69` |
 | `MessageBusAsync` | `feature/async-core-registry` | `9d25f26cabe5f69c08aff331eea2ef985ff37bc3` |
 | `MessageBusAsyncWorker` | `main` | `306ff70a634772bd51b0b9feb53cb79e20492d19` |
 
@@ -77,13 +77,13 @@ sha256=dac2b59f34cbf6eaebf128f20b5577a092f7088efe105039cb0e6e0de06abdaf
 - strict Postman release runner, release scope и worker cutover runbooks;
 - source-only server archive и read-only `make server-preflight`.
 
-Последние подтверждённые локальные gates на application revision перед source
-handoff:
+Последние подтверждённые gates на data server:
 
 ```text
-make check             81 tests / 368 assertions; PHPStan и Deptrac clean
+make check             85 tests / 404 assertions; PHPStan и Deptrac clean
 make contract          12 tests / 227 assertions
-make test-integration  15 tests / 218 assertions
+make test-integration  16 tests / 223 assertions
+make smoke             passed against http://127.0.0.1:8900
 composer audit         no known security advisories
 make doctor            Compose configuration valid
 ```
@@ -134,20 +134,27 @@ rebuild с parity check.
 
 ## Что Ещё Не Выполнено
 
-R1/G5 не закрыты. На сервере с реальными данными остаются:
+R1/G5 не закрыты. Canonical GAR subset регионов 50/77 импортирован и
+partitioned `address_search` переключён, но остаются:
 
-1. проверить source identity, server capacity и configuration;
-2. повторить gates на одной server revision;
-3. подготовить full Nominatim dataset той же географии;
-4. выполнить canonical GAR import с checkpoints;
-5. перестроить regional `address_search` и доказать parity;
-6. выполнить OpenSearch blue-green rebuild и alias cutover;
-7. заполнить representative Postman environment без secrets;
-8. сравнить legacy Spiral и AMPHP semantics;
-9. проверить health, graceful shutdown, worker drain/restart и stale recovery;
-10. отдельно подтвердить drain либо осознанное списание legacy RoadRunner/
-    BoltDB queues;
-11. получить operator approval перед traffic cutover.
+1. импортировать Data.Mos/OSM aliases либо явно принять отсутствие legacy alias
+   parity; сейчас `address_aliases=0`;
+2. запустить target Nominatim с согласованным dataset и проверить reverse flow;
+3. запустить target OpenSearch на `9201`, выполнить target-owned blue-green
+   rebuild и только после parity включить search/coordinate feature flags;
+4. исправить readiness deadline: при недоступных optional integrations
+   `/health/ready` фактически завершается примерно за 18 секунд вместо 2;
+5. повторить representative legacy/target semantic parity после aliases и
+   OpenSearch; текущий search top-10 пересекается только по одному object ID;
+6. решить судьбу legacy operational commands `gar:status`, `gar:activity`,
+   `gar:releases`, `gar:integrity`, `opensearch:status`, bulk `gar:geocode` и
+   orchestration `data:prepare`/`gar:bootstrap`;
+7. выполнить strict full Nominatim/Postman smoke и worker drain/restart/stale
+   recovery evidence;
+8. отдельно подтвердить drain либо осознанное списание legacy RoadRunner/
+   BoltDB queues;
+9. получить operator approval перед traffic cutover и удалить transitional
+   `/geocode`/`/search` только после approval.
 
 Текущий Compose является development/data-migration topology, а не готовым
 production image release. Успешный import или Postman smoke не разрешает
@@ -211,13 +218,32 @@ TARGET_BASE_URL=<release candidate endpoint>
 доступно `507500642304` bytes. Рабочие thresholds `350 GiB` free и `48 GiB`
 Docker memory фактически выполняются, но остаются pending operator approval.
 
-Target ports свободны, containers/volumes Compose project `geo-registry-amp`
-ещё не создавались. Legacy `geo-registry` app/database/Nominatim/OpenSearch
-остались `Up` и healthy после подготовки.
+На `2026-11-05` target ports были свободны, containers/volumes Compose project
+`geo-registry-amp` ещё не создавались. Этот historical checkpoint заменён
+следующим разделом.
 
-Полный `make server-preflight` остаётся pending до фиксации source changes в
-clean revision и явного утверждения
-`SERVER_MIN_FREE_GB`/`SERVER_MIN_MEMORY_GB`.
+## Проверено На Data Server 2026-11-06
+
+- canonical GAR импорт ограничен регионами 50 и 77;
+- active partitioned `address_search` содержит `14 607 719` строк региона 50 и
+  `13 976 843` строк региона 77;
+- `address_aliases` пуст (`0` строк); Data.Mos и OSM alias import не выполнены;
+- target HTTP/PostgreSQL работают как `geo-registry-amp-app-1` и
+  `geo-registry-amp-postgres-1`; `GET /health/live` возвращает `200`;
+- target Nominatim и OpenSearch containers сейчас не запущены; target port
+  `9201` недоступен;
+- port `9200` принадлежит legacy OpenSearch: alias
+  `geo_registry_addresses` указывает на индекс из `28 692 782` документов и не
+  является target projection;
+- target config сохраняет `OPENSEARCH_INDEX=places`, search и coordinate update
+  flags выключены;
+- PostgreSQL search `Москва Тверская 1` по региону 77 выполняется примерно за
+  `0.19 s`; symmetric pruning benchmark дал около `9%` выигрыша;
+- новый единый `app/bin/app` использует
+  `thesis/symfony-console-module 0.1.0`; default `server:run`, migrations, GAR,
+  OpenSearch и worker commands видны в одном lazy command registry;
+- commit `23e7f12` содержит оптимизацию PostgreSQL search; переход на `bin/app`
+  пока находится в рабочем дереве и требует отдельного commit после review.
 
 ## Первый Шаг Новой Сессии
 

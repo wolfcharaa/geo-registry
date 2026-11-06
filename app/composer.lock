@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "aa1a21e9dcf9b4b3f7f7bdd0d2d5278f",
+    "content-hash": "68dc9e5540213b51f6c2bcf6bb466aef",
     "packages": [
         {
             "name": "amphp/amp",
@@ -3679,6 +3679,71 @@
                 }
             ],
             "time": "2026-04-13T19:08:22+00:00"
+        },
+        {
+            "name": "thesis/symfony-console-module",
+            "version": "0.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/thesis-php/symfony-console-module.git",
+                "reference": "9e85276c52df8541738fed013f1853f4789036fc"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/thesis-php/symfony-console-module/zipball/9e85276c52df8541738fed013f1853f4789036fc",
+                "reference": "9e85276c52df8541738fed013f1853f4789036fc",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.4",
+                "symfony/console": "^6 || ^7 || ^8",
+                "thesis/dic": "^0.5.0"
+            },
+            "require-dev": {
+                "symfony/polyfill-php85": "^1.38.1",
+                "symfony/var-dumper": "^6 || ^7 || ^8.1.1",
+                "testo/assert": "^0.1.9",
+                "testo/codecov": "^0.1.11",
+                "testo/data": "^0.1.6",
+                "testo/test": "^0.1.5",
+                "testo/testo": "^0.10.33"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Thesis\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "kafkiansky",
+                    "email": "vadimzanfir@gmail.com"
+                },
+                {
+                    "name": "Valentin Udaltsov",
+                    "email": "udaltsov.valentin@gmail.com"
+                },
+                {
+                    "name": "Thesis Team",
+                    "homepage": "https://github.com/orgs/thesis-php/people"
+                }
+            ],
+            "description": "Thesis Symfony Console Module",
+            "support": {
+                "issues": "https://github.com/thesis-php/symfony-console-module/issues",
+                "source": "https://github.com/thesis-php/symfony-console-module/tree/0.1.0"
+            },
+            "funding": [
+                {
+                    "url": "https://www.tinkoff.ru/cf/5MqZQas2dk7",
+                    "type": "custom"
+                }
+            ],
+            "time": "2026-06-30T07:32:29+00:00"
         },
         {
             "name": "typhoon/type",

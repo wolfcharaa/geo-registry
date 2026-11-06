@@ -21,6 +21,7 @@ use Symfony\Component\Console\Command\Command;
 use Thesis\Dic;
 use Thesis\Dic\Module;
 use Thesis\Dic\Ref;
+use Thesis\SymfonyConsoleModule\LegacyCommandTag;
 
 /** @implements Module<list<Ref<Command>>> */
 final readonly class GarImportCliModule implements Module
@@ -53,7 +54,7 @@ final readonly class GarImportCliModule implements Module
             ->object(GarImportWorkerPool::class)
             ->args([
                 'databaseDsn' => $dic->value($this->postgresConfig->dsn),
-                'consolePath' => $dic->value(dirname(__DIR__, 3) . '/bin/console'),
+                'consolePath' => $dic->value(dirname(__DIR__, 3) . '/bin/app'),
                 'plan' => $dic->object(GarImportWorkerPlan::class),
             ]);
         $adapter = $dic
@@ -70,10 +71,19 @@ final readonly class GarImportCliModule implements Module
         return [
             $dic
                 ->object(ImportGarCommand::class)
-                ->arg('runner', $runner),
+                ->arg('runner', $runner)
+                ->tag(new LegacyCommandTag(
+                    'gar:import',
+                    'Import supported GAR XML files through bounded PostgreSQL COPY batches.',
+                )),
             $dic
                 ->object(RunGarImportWorkerCommand::class)
-                ->arg('runner', $workerRunner),
+                ->arg('runner', $workerRunner)
+                ->tag(new LegacyCommandTag(
+                    'gar:import:worker',
+                    'Run one internal GAR XML import worker assignment.',
+                    isHidden: true,
+                )),
         ];
     }
 }

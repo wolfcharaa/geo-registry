@@ -13,4 +13,4 @@ WORKDIR /app
 
 EXPOSE 8080
 
-CMD ["php", "bin/server.php"]
+CMD ["bin/app"]

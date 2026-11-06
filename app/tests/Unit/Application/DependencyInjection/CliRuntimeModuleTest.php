@@ -48,6 +48,20 @@ final class CliRuntimeModuleTest
         Assert::true(str_contains($console, 'gar:address-search:rebuild'));
         Assert::true(str_contains($console, 'opensearch:reindex'));
         Assert::true(str_contains($console, 'opensearch:index:cleanup'));
+        Assert::true(str_contains($console, 'server:run'));
+        Assert::true(str_contains($console, 'worker:run'));
+        Assert::true(str_contains($console, 'worker:status'));
+        Assert::false(str_contains($console, 'gar:import:worker'));
+    }
+
+    public function testTheExecutableAppIsTheSingleConsoleEntrypoint(): void
+    {
+        $path = dirname(__DIR__, 4) . '/bin/app';
+        $source = file_get_contents($path);
+
+        Assert::true(is_executable($path));
+        Assert::true(is_string($source));
+        Assert::true(str_starts_with($source, "#!/usr/bin/env php\n"));
     }
 
     public function testItCompilesTheExplicitMessageBusRegistry(): void

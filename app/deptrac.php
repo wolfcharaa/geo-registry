@@ -57,6 +57,9 @@ return static function (DeptracConfig $config): void {
             $thesisDic = Layer::withName('Thesis DIC')->collectors(
                 ClassLikeConfig::create('^Thesis\\Dic(?:\\|$)'),
             ),
+            $thesisConsole = Layer::withName('Thesis Symfony Console')->collectors(
+                ClassLikeConfig::create('^Thesis\\SymfonyConsoleModule(?:\\|$)'),
+            ),
             $ampCore = Layer::withName('AMPHP Core')->collectors(
                 ClassLikeConfig::create(
                     '^Amp\\(?:Cancellation|CancelledException|DeferredCancellation|Future|NullCancellation|TimeoutCancellation)$',
@@ -100,6 +103,7 @@ return static function (DeptracConfig $config): void {
                 $messageBusCore,
                 $messageBusWorker,
                 $thesisDic,
+                $thesisConsole,
                 $ampCore,
                 $httpServer,
                 $httpClient,
@@ -185,6 +189,7 @@ return static function (DeptracConfig $config): void {
             Ruleset::forLayer($messageBusCore),
             Ruleset::forLayer($messageBusWorker)->accesses($messageBusCore),
             Ruleset::forLayer($thesisDic),
+            Ruleset::forLayer($thesisConsole)->accesses($thesisDic, $console),
             Ruleset::forLayer($ampCore),
             Ruleset::forLayer($httpServer),
             Ruleset::forLayer($httpClient),

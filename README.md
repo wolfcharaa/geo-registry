@@ -29,10 +29,7 @@ make logs SERVICE=nominatim
 
 ```text
 app/                                   сердце приложения: код, тесты, Composer
-app/bin/server.php                     HTTP entrypoint
-app/bin/console                        CLI entrypoint
-app/bin/worker                         managed worker entrypoint
-app/src/Bootstrap.php                  composition root
+app/bin/app                            единый executable для HTTP/CLI/worker
 app/src/Application/                   process runtimes и DIC modules
 app/src/Config/                        environment contract
 app/src/Database/Migration/            история схемы application PostgreSQL
@@ -105,12 +102,13 @@ fiber-aware ожидание I/O, никаких Guzzle/PSR-18 adapters и сг�
 
 ## Контейнер приложения
 
-`app/src/Bootstrap.php` запускает application-owned Thesis DIC module отдельного
-`HttpRuntime`; PostgreSQL pool закрывается disposer-ом контейнера. Независимый
-`CliRuntime` доступен через `app/bin/console`, а реальный `WorkerRuntime` — через
-`app/bin/worker`. Worker executable выполняет run/control/status operation
-внутри managed `Dic::run()` lifecycle, поэтому pool и scopes закрываются при
-успехе и исключении. MessageBus сохраняет neutral resolver/scope contracts,
+`app/bin/app` запускает application-owned `CliRuntime` через `Dic::run()` и
+Thesis Symfony Console Module. Default-команда `server:run` лениво собирает
+отдельный `HttpRuntime`; migrations, GAR, OpenSearch и worker-команды доступны
+через тот же executable. Worker commands открывают реальный `WorkerRuntime`
+через managed provider только на время operation, поэтому pool и scopes
+закрываются при успехе и исключении. MessageBus сохраняет neutral
+resolver/scope contracts,
 поэтому application container не становится service locator внутри handlers.
 Внутренний контейнер Testo не является runtime-контейнером приложения.
 Правила выбора singleton/scoped/canBeScoped, устройство request/message/job
@@ -158,12 +156,13 @@ make doctor   # проверить Compose
 make postgres-doctor # проверить выбранный профиль PostgreSQL и ресурсы host
 make check    # formatter + strict PHPStan + Deptrac + fast Testo
 make architecture-check # отдельно проверить направления зависимостей
-app/bin/console list # показать CLI commands
-app/bin/console migrate:new --all # показать неприменённые migrations
-app/bin/console migrate:up --force-yes # применить migrations к application PostgreSQL
-app/bin/console opensearch:reindex --help # blue-green rebuild и alias cutover
-app/bin/console opensearch:index:cleanup --help # подтверждённая очистка inactive index
-app/bin/worker list  # показать worker run/control/status commands
+app/bin/app          # запустить HTTP server через default server:run
+app/bin/app list     # показать все HTTP/CLI/worker commands
+app/bin/app migrate:new --all # показать неприменённые migrations
+app/bin/app migrate:up --force-yes # применить migrations к application PostgreSQL
+app/bin/app opensearch:reindex --help # blue-green rebuild и alias cutover
+app/bin/app opensearch:index:cleanup --help # подтверждённая очистка inactive index
+app/bin/app worker:status --all # показать worker status
 make worker-up       # применить migrations и запустить address/runtime workers
 make worker-status   # показать persisted status обоих workers
 make worker-pause    # перестать брать новые jobs

@@ -42,8 +42,10 @@ boundary, а не четвёртым business layer. Обязательный `D
 
 ## Текущее Переходное Состояние
 
-Сейчас `app/src/Bootstrap.php` запускает application-owned Thesis DIC module
-для отдельного `HttpRuntime`. Первые vertical slices
+Сейчас `app/bin/app` запускает application-owned `CliRuntime` через
+`Dic::run()` и официальный Thesis Symfony Console Module. Default-команда
+`server:run` лениво собирает отдельный `HttpRuntime`, а worker commands открывают
+свой managed provider только при выполнении. Первые vertical slices
 `AddressRegistry/FindAddressById`, `AddressRegistry/SearchAddress`, staged
 `AddressRegistry/SuggestAddress` и optional `ReverseGeocode` проходят через
 transport DTO, MessageBus, capability-owned ports и AMPHP adapters. Suggest
@@ -53,9 +55,9 @@ MessageBus dispatch. Reverse feature получает typed Nominatim location �
 подключаются только HTTP composition. `RouterFactory` также содержит
 демонстрационные health, legacy Nominatim и OpenSearch routes, напрямую
 использующие concrete adapters. Они остаются разрешённым scaffold, но не
-являются эталоном для новых business scenarios. Независимые `HttpRuntime`, `CliRuntime` и
-`WorkerRuntime` имеют отдельные DIC graphs; worker предоставляет управляемый
-run/control/status lifecycle.
+являются эталоном для новых business scenarios. `HttpRuntime`, `CliRuntime` и
+`WorkerRuntime` сохраняют отдельные lazy DIC graphs, несмотря на общий
+executable; worker предоставляет управляемый run/control/status lifecycle.
 
 Optional OpenSearch search подключается в HTTP composition как decorator core
 `SearchAddressPort`. При выключенном feature, пустой выдаче или technical
@@ -86,9 +88,7 @@ runtime composition. Demo routes удаляются только после по
 ```text
 app/
 ├── bin/
-│   ├── server.php
-│   ├── console
-│   └── worker
+│   └── app
 ├── config/
 │   ├── di/
 │   ├── message_bus_codecs.php
@@ -331,8 +331,10 @@ canonical update и не переводит job в retry, а replay повтор
 принятое событие даже при нулевом числе PostgreSQL updates. Это осознанная
 at-least-once policy, а не общий запрет retries для MessageBus.
 
-`app/bin/worker` использует library `WorkerRuntimeProviderInterface` и держит
-run/control/status operation целиком внутри application `Dic::run()`. Поэтому
+`app/bin/app` регистрирует worker commands рядом с application commands через
+Thesis Symfony Console Module. Library `WorkerRuntimeProviderInterface` держит
+run/control/status operation целиком внутри отдельного managed `Dic::run()`.
+Поэтому
 container scope, PostgreSQL pool и disposers живут ровно время CLI operation;
 `Dic::build()` и runtime, выведенный за пределы managed lifecycle, запрещены.
 

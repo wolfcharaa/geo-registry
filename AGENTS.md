@@ -11,8 +11,9 @@ disposer behavior, read `docs/development/thesis-dic.md`.
 
 ## Project Structure & Module Organization
 
-`app/bin/server.php` is the executable HTTP entrypoint and
-`app/src/Bootstrap.php` is the composition root. Keep environment parsing in
+`app/bin/app` is the executable Symfony Console entrypoint; its default
+`server:run` command starts the HTTP runtime, and all CLI/worker operations use
+the same executable. Keep environment parsing in
 `app/src/Config`, external systems in `app/src/Infrastructure/<Integration>`,
 and HTTP routing/presentation in `app/src/UserInterface/Http`. Tests mirror
 source namespaces under `app/tests/`.

@@ -23,6 +23,7 @@ use Symfony\Component\Console\Command\Command;
 use Thesis\Dic;
 use Thesis\Dic\Module;
 use Thesis\Dic\Ref;
+use Thesis\SymfonyConsoleModule\AutoconfigureCommands;
 
 /** @implements Module<list<Ref<Command>>> */
 final readonly class OpenSearchProjectionCliModule implements Module
@@ -37,6 +38,8 @@ final readonly class OpenSearchProjectionCliModule implements Module
     /** @return list<Ref<Command>> */
     public function configure(Dic $dic): array
     {
+        $dic->apply(new AutoconfigureCommands());
+
         $httpClient = $dic->object(
             HttpClient::class,
             fn(): HttpClient => AmpHttpClientFactory::create($this->openSearchConfig->timeoutSeconds),

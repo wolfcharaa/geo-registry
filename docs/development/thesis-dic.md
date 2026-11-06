@@ -246,6 +246,26 @@ route-autoconfigurator через `apply()`, поэтому convention види�
 Не следует ожидать, что binding родителя автоматически виден импортированному
 module. Это намеренная локальность Thesis DIC, а не ошибка autowiring.
 
+## Symfony Console Module
+
+`thesis/symfony-console-module 0.1.0` является владельцем Symfony
+`Application` и собирает команды из глобальных DIC tags во время build:
+
+- `CommandTag` оборачивает callable в lazy `Command`;
+- `LegacyCommandTag` подключает наследника Symfony `Command`; заданное имя
+  делает его lazy, отсутствие имени требует eager instantiation;
+- `AutoconfigureCommands` читает `#[AsCommand]`, но как любой configurator
+  действует только в том DIC configuration scope, где был вызван через
+  `apply()`.
+
+Geo Registry использует один executable `bin/app`. Его `CliRuntimeModule`
+импортирует `SymfonyConsoleModule`, а feature CLI modules либо применяют
+`AutoconfigureCommands` рядом с регистрацией команд, либо задают explicit tags.
+Default-команда `server:run` лениво resolve-ит отдельный `HttpRuntime`; worker
+commands аналогично открывают собственный managed provider только при запуске.
+Таким образом единый command surface не превращается в единый runtime graph:
+неиспользуемые PostgreSQL pools, HTTP clients и worker scopes не создаются.
+
 ## Disposal
 
 Disposer принадлежит lifetime экземпляра:
@@ -276,7 +296,7 @@ services: публичный контракт его не обещает. Cleanu
 | Nested MessageBus dispatch | Переиспользует scope внешнего dispatch | Корректно; scenario test проверяет один scope и один dispose. |
 | `WorkerJobServiceResolver` | Explicit `scoped()` | Корректно: содержит mutable cached `QueueWorkerInterface`, принадлежащий job. |
 | Worker consumer/control/runtime | Singleton | Корректные process services, обслуживающие последовательность jobs. |
-| CLI commands и migration services | Singleton в `Dic::run()` одного CLI invocation | Допустимо: container и root scope завершаются вместе с командой. |
+| `bin/app`, CLI commands и migration services | Lazy commands; singleton в `Dic::run()` одного invocation | Допустимо: container и root scope завершаются вместе с выбранной командой. |
 
 ### Найденный Архитектурный Пробел
 
@@ -329,6 +349,8 @@ fibers.
 
 - [Thesis DIC 0.5.3](https://github.com/thesis-php/dic/tree/0.5.3) — public API,
   lifetime/disposal docs, container implementation и tests.
+- [Thesis Symfony Console Module 0.1.0](https://github.com/thesis-php/symfony-console-module/tree/0.1.0)
+  — command tags, lazy providers и `#[AsCommand]` autoconfiguration.
 - [Packagist: thesis/dic](https://packagist.org/packages/thesis/dic) — release,
   PHP requirements и commit distribution.
 - `ApplicationMessageBusModuleTest` — nested dispatch использует один scope и

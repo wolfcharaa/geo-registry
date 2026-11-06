@@ -100,13 +100,13 @@ restore/import и C2 rebuild ниже.
 ```shell
 docker/compose/dev.sh run --rm --no-deps \
   --volume "${GAR_SOURCE}:/data/gar:ro" \
-  app php bin/console gar:import /data/gar
+  app bin/app gar:import /data/gar
 
 docker/compose/dev.sh run --rm --no-deps \
-  app php bin/console gar:address-search:rebuild
+  app bin/app gar:address-search:rebuild
 
 docker/compose/dev.sh run --rm --no-deps \
-  app php bin/console opensearch:reindex
+  app bin/app opensearch:reindex
 ```
 
 Каждая команда обязана завершиться нулевым exit code и своим parity check.
