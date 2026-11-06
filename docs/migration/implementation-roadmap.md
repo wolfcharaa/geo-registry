@@ -1562,12 +1562,27 @@ online queries читают только выбранный регион.
 
 ### E1 — Data.Mos И OSM Aliases
 
-Выполняется только после core parity и отдельного подтверждения scope.
+Scope подтверждён после core parity; full-data import выполнен для Москвы без
+изменения partition Московской области.
 
-- [ ] Перенести Data.Mos import/enrichment как optional feature.
-- [ ] Перенести OSM aliases import как optional feature.
-- [ ] Не расширять core contracts raw source-specific fields.
-- [ ] Проверить implications для rebuild/search fixtures.
+- [x] Перенести Data.Mos import/enrichment как optional feature.
+- [x] Перенести OSM aliases import как optional feature.
+- [x] Не расширять core contracts raw source-specific fields.
+- [x] Проверить implications для rebuild/search fixtures.
+
+Реализовано и проверено на полном локальном dataset:
+
+- CLI-only source graph подключён к `bin/app`; файлы монтируются read-only и не
+  попадают в Git/image.
+- Data.Mos staging parity: `440 399` уникальных строк; enrichment parity с
+  legacy: `11 572 796` updated и `64 676` inserted.
+- Region 50 не изменён. OSM matching ограничен region 77 и устранил `62`
+  out-of-region/unknown legacy aliases; target содержит `794` московских alias.
+- Mapping/ranking OpenSearch ставит exact term, exact phrase и strict token
+  matches выше fuzzy fallback; повторный full projection rebuild и benchmark
+  зафиксированы в [opensearch-benchmark.md](opensearch-benchmark.md).
+- Команды, настройки, maintenance cost и parity SQL описаны в
+  [address-source-enrichment.md](address-source-enrichment.md).
 
 ### R1 — Release Parity
 

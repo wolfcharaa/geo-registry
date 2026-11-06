@@ -87,8 +87,62 @@ final class OpenSearchSearchAddressDecoratorTest
             ['term' => ['hierarchy_type' => 'mun']],
             ['term' => ['region_code' => 77]],
         ]);
+        Assert::same($bool['minimum_should_match'] ?? null, 1);
+        $ranking = self::list($bool['should'] ?? null);
+        Assert::same(count($ranking), 10);
+        Assert::same($ranking[0] ?? null, [
+            'term' => [
+                'address.keyword' => [
+                    'value' => 'Тестоград Общая 10',
+                    'case_insensitive' => true,
+                    'boost' => 100,
+                ],
+            ],
+        ]);
+        Assert::same($ranking[2] ?? null, [
+            'match' => [
+                'aliases.value.literal' => [
+                    'query' => 'Тестоград Общая 10',
+                    'minimum_should_match' => '-1',
+                    'boost' => 120,
+                ],
+            ],
+        ]);
+        Assert::same($ranking[7] ?? null, [
+            'multi_match' => [
+                'query' => 'Тестоград Общая 10',
+                'fields' => ['address.literal^12', 'aliases.value.literal^8'],
+                'type' => 'cross_fields',
+                'operator' => 'and',
+                'boost' => 8,
+            ],
+        ]);
+        Assert::same($ranking[8] ?? null, [
+            'multi_match' => [
+                'query' => 'Тестоград Общая 10',
+                'fields' => ['address^8', 'aliases.value^5'],
+                'type' => 'cross_fields',
+                'operator' => 'and',
+                'boost' => 4,
+            ],
+        ]);
+        Assert::same($ranking[9] ?? null, [
+            'multi_match' => [
+                'query' => 'Тестоград Общая 10',
+                'fields' => ['address^2', 'aliases.value'],
+                'fuzziness' => 'AUTO',
+                'prefix_length' => 1,
+                'operator' => 'and',
+                'boost' => 1,
+            ],
+        ]);
         Assert::same($body['size'] ?? null, 5);
-        Assert::same(count(self::list($body['sort'] ?? null)), 4);
+        Assert::same(self::list($body['sort'] ?? null), [
+            ['_score' => ['order' => 'desc']],
+            ['address.keyword' => ['order' => 'asc']],
+            ['level' => ['order' => 'desc']],
+            ['object_id' => ['order' => 'asc']],
+        ]);
     }
 
     public function testItFallsBackOnEmptyMalformedAndUnavailableProjection(): void

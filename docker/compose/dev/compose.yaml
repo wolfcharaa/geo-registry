@@ -13,6 +13,7 @@ services:
       APP_LISTEN: "${APP_LISTEN:-0.0.0.0:8080}"
       APP_NAME: "${APP_NAME:-geo-registry}"
       APP_USER_AGENT: "${APP_USER_AGENT:-geo-registry/0.1}"
+      DATAMOS_ADDRESS_REGISTRY_SOURCE: "${DATAMOS_ADDRESS_REGISTRY_SOURCE:-/data/datamos/addressreestr.bson.gz}"
       COMPOSER_HOME: /tmp/composer
       DATABASE_DSN: "${DATABASE_DSN:-host=postgres port=5432 user=app password=local-app-only db=app application_name=geo-registry}"
       DATABASE_POOL_SIZE: "${DATABASE_POOL_SIZE:-10}"
@@ -21,6 +22,8 @@ services:
       NOMINATIM_ENABLED: "${NOMINATIM_ENABLED:-1}"
       NOMINATIM_LANGUAGE: "${NOMINATIM_LANGUAGE:-ru}"
       NOMINATIM_URL: "${NOMINATIM_URL:-http://nominatim:8080}"
+      MOSCOW_REGION_CODE: "${MOSCOW_REGION_CODE:-77}"
+      OSM_ADDRESS_ALIASES_SOURCE: "${OSM_ADDRESS_ALIASES_SOURCE:-/data/geodata/moscow-address-aliases.jsonl}"
       OPENSEARCH_ENABLED: "${OPENSEARCH_ENABLED:-1}"
       OPENSEARCH_INDEX: "${OPENSEARCH_INDEX:-places}"
       OPENSEARCH_SEARCH_ENABLED: "${OPENSEARCH_SEARCH_ENABLED:-0}"
@@ -40,6 +43,7 @@ services:
     volumes:
       - ../../../app:/app
       - ../../../docs:/docs:ro
+      - "${ADDRESS_SOURCE_DATA_PATH:-../../../docker/data}:/data:ro"
       - ../../../../library/MessageBusAsync:/library/MessageBusAsync:ro
       - ../../../../library/MessageBusAsyncWorker:/library/MessageBusAsyncWorker:ro
     depends_on:

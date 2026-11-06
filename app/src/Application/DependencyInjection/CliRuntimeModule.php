@@ -10,6 +10,7 @@ use App\Application\Console\Command\RunHttpServerCommand;
 use App\Application\MessageBus\ApplicationRegistryCompiler;
 use App\Application\MessageBus\MessageBusRegistrySource;
 use App\Application\Runtime\CliRuntime;
+use App\Config\AddressSourceConfig;
 use App\Config\ConsoleConfig;
 use App\Config\EnvironmentSnapshot;
 use App\Config\OpenSearchConfig;
@@ -37,6 +38,7 @@ final readonly class CliRuntimeModule implements Module
     public function configure(Dic $dic): Ref
     {
         $config = ConsoleConfig::fromEnvironment($this->environment);
+        $addressSourceConfig = AddressSourceConfig::fromEnvironment($this->environment);
         $postgresConfig = PostgresConfig::fromEnvironment($this->environment);
         $openSearchConfig = OpenSearchConfig::fromEnvironment($this->environment);
         $source = $this->messageBusRegistry ?? MessageBusRegistrySource::empty();
@@ -76,6 +78,7 @@ final readonly class CliRuntimeModule implements Module
         $dic->import(new MigrationCliModule($postgresConfig));
         $dic->import(new GarImportCliModule($postgresConfig));
         $dic->import(new AddressSearchRebuildCliModule($postgresConfig));
+        $dic->import(new AddressSourceCliModule($postgresConfig, $addressSourceConfig));
         $dic->import(new OpenSearchProjectionCliModule($postgres, $config, $openSearchConfig));
         $dic->import(new WorkerCliModule());
 

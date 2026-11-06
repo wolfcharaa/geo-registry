@@ -26,7 +26,10 @@ final class OpenSearchAddressIndexDefinition
                     'address' => [
                         'type' => 'text',
                         'analyzer' => 'russian',
-                        'fields' => ['keyword' => ['type' => 'keyword', 'ignore_above' => 2048]],
+                        'fields' => [
+                            'keyword' => ['type' => 'keyword', 'ignore_above' => 2048],
+                            'literal' => ['type' => 'text', 'analyzer' => 'standard'],
+                        ],
                     ],
                     'hierarchy_type' => ['type' => 'keyword'],
                     'region_code' => ['type' => 'short'],
@@ -48,7 +51,14 @@ final class OpenSearchAddressIndexDefinition
                     'alias_count' => ['type' => 'integer'],
                     'aliases' => [
                         'properties' => [
-                            'value' => ['type' => 'text', 'analyzer' => 'russian'],
+                            'value' => [
+                                'type' => 'text',
+                                'analyzer' => 'russian',
+                                'fields' => [
+                                    'keyword' => ['type' => 'keyword', 'ignore_above' => 2048],
+                                    'literal' => ['type' => 'text', 'analyzer' => 'standard'],
+                                ],
+                            ],
                             'kind' => ['type' => 'keyword'],
                             'source' => ['type' => 'keyword'],
                             'source_object_type' => ['type' => 'keyword'],

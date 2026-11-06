@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Config;
 
+use App\Config\AddressSourceConfig;
 use App\Config\ConsoleConfig;
 use App\Config\EnvironmentSnapshot;
 use App\Config\HttpServerConfig;
@@ -29,6 +30,9 @@ final class RuntimeConfigTest
             'APP_USER_AGENT' => 'geo-registry/test',
             'HTTP_TIMEOUT_SECONDS' => '3.5',
             'LOG_FORMAT' => 'console',
+            'DATAMOS_ADDRESS_REGISTRY_SOURCE' => '/data/datamos/registry.bson.gz',
+            'OSM_ADDRESS_ALIASES_SOURCE' => '/data/osm/aliases.jsonl',
+            'MOSCOW_REGION_CODE' => '77',
             'DATABASE_DSN' => 'host=postgres db=geo',
             'DATABASE_POOL_SIZE' => '7',
             'NOMINATIM_URL' => 'https://nominatim.example',
@@ -49,6 +53,7 @@ final class RuntimeConfigTest
         ]);
 
         $http = HttpServerConfig::fromEnvironment($environment);
+        $addressSources = AddressSourceConfig::fromEnvironment($environment);
         $logging = LoggingConfig::fromEnvironment($environment);
         $console = ConsoleConfig::fromEnvironment($environment);
         $postgres = PostgresConfig::fromEnvironment($environment);
@@ -58,6 +63,9 @@ final class RuntimeConfigTest
         Assert::same($console->name, 'geo-registry-test');
         Assert::same($console->version, 'test');
         Assert::same($console->userAgent, 'geo-registry/test');
+        Assert::same($addressSources->dataMosAddressRegistrySource, '/data/datamos/registry.bson.gz');
+        Assert::same($addressSources->osmAddressAliasesSource, '/data/osm/aliases.jsonl');
+        Assert::same($addressSources->moscowRegionCode, 77);
         Assert::same($http->listen, '0.0.0.0:9000');
         Assert::same($http->timeoutSeconds, 3.5);
         Assert::same($logging->service, 'geo-registry-test');
@@ -143,6 +151,14 @@ final class RuntimeConfigTest
     {
         NominatimConfig::fromEnvironment(new EnvironmentSnapshot([
             'NOMINATIM_URL' => 'file:///tmp/nominatim',
+        ]));
+    }
+
+    #[ExpectException(InvalidArgumentException::class)]
+    public function testAddressSourcesRejectAnInvalidMoscowRegionCode(): void
+    {
+        AddressSourceConfig::fromEnvironment(new EnvironmentSnapshot([
+            'MOSCOW_REGION_CODE' => '100',
         ]));
     }
 
