@@ -9,6 +9,7 @@ use InvalidArgumentException;
 final readonly class OpenSearchConfig
 {
     public function __construct(
+        public bool $enabled,
         public string $url,
         public string $index,
         public bool $searchEnabled,
@@ -22,6 +23,11 @@ final readonly class OpenSearchConfig
         public string $refreshInterval,
         public string $bulkRefreshInterval,
     ) {
+        if (!$this->enabled && ($this->searchEnabled || $this->coordinateUpdatesEnabled)) {
+            throw new InvalidArgumentException(
+                'OPENSEARCH_ENABLED must be enabled when an OpenSearch feature is enabled.',
+            );
+        }
         self::assertHttpUrl($this->url);
         if (
             strlen($this->index) > 235
@@ -53,6 +59,7 @@ final readonly class OpenSearchConfig
     public static function fromEnvironment(EnvironmentSnapshot $environment): self
     {
         return new self(
+            enabled: $environment->boolean('OPENSEARCH_ENABLED', true),
             url: $environment->string('OPENSEARCH_URL', 'http://127.0.0.1:9200'),
             index: $environment->string('OPENSEARCH_INDEX', 'places'),
             searchEnabled: $environment->boolean('OPENSEARCH_SEARCH_ENABLED', false),

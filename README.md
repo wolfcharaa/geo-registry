@@ -62,6 +62,10 @@ Readiness возвращает `unavailable`/`503` только при отка�
 Отказ только optional-компонентов возвращает `degraded`/`200`. Component payload
 содержит безопасные имена, policy и status без DSN и текста исключений:
 
+`NOMINATIM_ENABLED=0` и `OPENSEARCH_ENABLED=0` полностью исключают отключённую
+интеграцию из HTTP graph, readiness и transitional routes, поэтому приложение
+не выполняет сетевой probe к отсутствующему service.
+
 ```json
 {
   "status": "degraded",
@@ -75,6 +79,7 @@ Readiness возвращает `unavailable`/`503` только при отка�
 - `GET /search?q=example&limit=5` — поиск в `OPENSEARCH_INDEX`.
 
 Публичный `GET /api/addresses/search` по умолчанию читает PostgreSQL. Значение
+`OPENSEARCH_ENABLED=1` разрешает HTTP/worker integration, а
 `OPENSEARCH_SEARCH_ENABLED=1` подключает optional OpenSearch decorator: непустые
 валидные hits возвращаются с `search_backend=opensearch`, а empty/outage/
 malformed projection прозрачно использует PostgreSQL fallback. OpenSearch

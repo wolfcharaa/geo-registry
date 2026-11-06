@@ -142,18 +142,16 @@ partitioned `address_search` переключён, но остаются:
 2. запустить target Nominatim с согласованным dataset и проверить reverse flow;
 3. запустить target OpenSearch на `9201`, выполнить target-owned blue-green
    rebuild и только после parity включить search/coordinate feature flags;
-4. исправить readiness deadline: при недоступных optional integrations
-   `/health/ready` фактически завершается примерно за 18 секунд вместо 2;
-5. повторить representative legacy/target semantic parity после aliases и
+4. повторить representative legacy/target semantic parity после aliases и
    OpenSearch; текущий search top-10 пересекается только по одному object ID;
-6. решить судьбу legacy operational commands `gar:status`, `gar:activity`,
+5. решить судьбу legacy operational commands `gar:status`, `gar:activity`,
    `gar:releases`, `gar:integrity`, `opensearch:status`, bulk `gar:geocode` и
    orchestration `data:prepare`/`gar:bootstrap`;
-7. выполнить strict full Nominatim/Postman smoke и worker drain/restart/stale
+6. выполнить strict full Nominatim/Postman smoke и worker drain/restart/stale
    recovery evidence;
-8. отдельно подтвердить drain либо осознанное списание legacy RoadRunner/
+7. отдельно подтвердить drain либо осознанное списание legacy RoadRunner/
    BoltDB queues;
-9. получить operator approval перед traffic cutover и удалить transitional
+8. получить operator approval перед traffic cutover и удалить transitional
    `/geocode`/`/search` только после approval.
 
 Текущий Compose является development/data-migration topology, а не готовым
@@ -237,6 +235,9 @@ Docker memory фактически выполняются, но остаются
   является target projection;
 - target config сохраняет `OPENSEARCH_INDEX=places`, search и coordinate update
   flags выключены;
+- `NOMINATIM_ENABLED=0` и `OPENSEARCH_ENABLED=0` исключают отсутствующие
+  integrations из runtime graph и readiness; readiness с одним PostgreSQL
+  отвечает примерно за `1.3 ms` вместо прежних `18 s`;
 - PostgreSQL search `Москва Тверская 1` по региону 77 выполняется примерно за
   `0.19 s`; symmetric pruning benchmark дал около `9%` выигрыша;
 - новый единый `app/bin/app` использует

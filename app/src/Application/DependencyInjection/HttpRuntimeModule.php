@@ -71,6 +71,9 @@ final readonly class HttpRuntimeModule implements Module
         $nominatimConfig = NominatimConfig::fromEnvironment($this->environment);
         $openSearchConfig = OpenSearchConfig::fromEnvironment($this->environment);
         $registrySource = $this->messageBusRegistry ?? MessageBusRegistrySource::empty();
+        if (!$nominatimConfig->enabled) {
+            $registrySource = $registrySource->withoutService(ReverseGeocodeHandler::class);
+        }
         $codecs = $this->messageCodecs ?? new MessageCodecRegistry([]);
 
         $correlationContext = $dic->object(CorrelationContext::class);
@@ -98,25 +101,29 @@ final readonly class HttpRuntimeModule implements Module
                 ),
             )
             ->disposer(static fn(PostgresConnectionPool $pool) => $pool->close());
-        $nominatim = $dic
-            ->object(NominatimClient::class)
-            ->args([
-                'httpClient' => $httpClient,
-                'baseUrl' => $nominatimConfig->url,
-                'userAgent' => $httpConfig->userAgent,
-                'language' => $nominatimConfig->language,
-            ]);
+        $nominatim = $nominatimConfig->enabled
+            ? $dic
+                ->object(NominatimClient::class)
+                ->args([
+                    'httpClient' => $httpClient,
+                    'baseUrl' => $nominatimConfig->url,
+                    'userAgent' => $httpConfig->userAgent,
+                    'language' => $nominatimConfig->language,
+                ])
+            : null;
         $openSearchFactory = $dic
             ->object(OpenSearchClientFactory::class)
             ->arg('httpClient', $httpClient);
-        $openSearch = $dic
-            ->object(OpenSearchClient::class, [$openSearchFactory, 'create'])
-            ->args([
-                'baseUrl' => $openSearchConfig->url,
-                'userAgent' => $httpConfig->userAgent,
-                'username' => $openSearchConfig->username,
-                'password' => $openSearchConfig->password,
-            ]);
+        $openSearch = $openSearchConfig->enabled
+            ? $dic
+                ->object(OpenSearchClient::class, [$openSearchFactory, 'create'])
+                ->args([
+                    'baseUrl' => $openSearchConfig->url,
+                    'userAgent' => $httpConfig->userAgent,
+                    'username' => $openSearchConfig->username,
+                    'password' => $openSearchConfig->password,
+                ])
+            : null;
         $reverseGeocodeEnabled = ($registrySource->services[ReverseGeocodeHandler::class] ?? null)
             === ReverseGeocodeHandler::class;
         $reverseGeocodeLocator = $reverseGeocodeEnabled
@@ -142,12 +149,6 @@ final readonly class HttpRuntimeModule implements Module
         $postgresHealth = $dic
             ->object(PostgresHealthCheck::class)
             ->arg('postgres', $postgres);
-        $nominatimHealth = $dic
-            ->object(NominatimHealthCheck::class)
-            ->arg('client', $nominatim);
-        $openSearchHealth = $dic
-            ->object(OpenSearchHealthCheck::class)
-            ->arg('client', $openSearch);
         $postgresHealthDefinition = $dic
             ->object(HealthCheckDefinition::class)
             ->args([
@@ -156,30 +157,35 @@ final readonly class HttpRuntimeModule implements Module
                 'deadlineSeconds' => 2,
                 'check' => $postgresHealth,
             ]);
-        $nominatimHealthDefinition = $dic
-            ->object(HealthCheckDefinition::class)
-            ->args([
-                'name' => 'nominatim',
-                'policy' => HealthCheckPolicy::Optional,
-                'deadlineSeconds' => 2,
-                'check' => $nominatimHealth,
-            ]);
-        $openSearchHealthDefinition = $dic
-            ->object(HealthCheckDefinition::class)
-            ->args([
-                'name' => 'opensearch',
-                'policy' => HealthCheckPolicy::Optional,
-                'deadlineSeconds' => 2,
-                'check' => $openSearchHealth,
-            ]);
+        $healthChecks = [$postgresHealthDefinition];
+        if ($nominatim !== null) {
+            $healthChecks[] = $dic
+                ->object(HealthCheckDefinition::class)
+                ->args([
+                    'name' => 'nominatim',
+                    'policy' => HealthCheckPolicy::Optional,
+                    'deadlineSeconds' => 2,
+                    'check' => $dic
+                        ->object(NominatimHealthCheck::class)
+                        ->arg('client', $nominatim),
+                ]);
+        }
+        if ($openSearch !== null) {
+            $healthChecks[] = $dic
+                ->object(HealthCheckDefinition::class)
+                ->args([
+                    'name' => 'opensearch',
+                    'policy' => HealthCheckPolicy::Optional,
+                    'deadlineSeconds' => 2,
+                    'check' => $dic
+                        ->object(OpenSearchHealthCheck::class)
+                        ->arg('client', $openSearch),
+                ]);
+        }
         $health = $dic
             ->object(HealthRegistry::class)
             ->args([
-                'checks' => [
-                    $postgresHealthDefinition,
-                    $nominatimHealthDefinition,
-                    $openSearchHealthDefinition,
-                ],
+                'checks' => $healthChecks,
                 'startupState' => $startupState,
                 'logger' => $logger,
                 'correlationContext' => $correlationContext,

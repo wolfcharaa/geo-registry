@@ -45,6 +45,19 @@ final class MessageBusRegistrySourceTest
         Assert::same($first->sourceHash(), $second->sourceHash());
     }
 
+    public function testItRemovesAnOptionalServiceAndItsUnusedImplementation(): void
+    {
+        $source = new MessageBusRegistrySource(
+            [self::class, stdClass::class],
+            ['optional' => self::class, 'required' => stdClass::class],
+        );
+
+        $filtered = $source->withoutService('optional');
+
+        Assert::same($filtered->classes, [stdClass::class]);
+        Assert::same($filtered->services, ['required' => stdClass::class]);
+    }
+
     #[ExpectException(InvalidArgumentException::class)]
     public function testItRejectsDuplicateRegistryClasses(): void
     {

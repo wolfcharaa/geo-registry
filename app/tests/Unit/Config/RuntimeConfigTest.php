@@ -33,8 +33,10 @@ final class RuntimeConfigTest
             'DATABASE_POOL_SIZE' => '7',
             'NOMINATIM_URL' => 'https://nominatim.example',
             'NOMINATIM_LANGUAGE' => 'ru-RU',
+            'NOMINATIM_ENABLED' => 'true',
             'OPENSEARCH_URL' => 'https://search.example:9200',
             'OPENSEARCH_INDEX' => 'addresses',
+            'OPENSEARCH_ENABLED' => 'true',
             'OPENSEARCH_SEARCH_ENABLED' => 'true',
             'OPENSEARCH_COORDINATE_UPDATES_ENABLED' => 'true',
             'OPENSEARCH_TIMEOUT_SECONDS' => '90',
@@ -63,8 +65,10 @@ final class RuntimeConfigTest
         Assert::same($postgres->poolSize, 7);
         Assert::same($nominatim->url, 'https://nominatim.example');
         Assert::same($nominatim->language, 'ru-RU');
+        Assert::same($nominatim->enabled, true);
         Assert::same($openSearch->url, 'https://search.example:9200');
         Assert::same($openSearch->index, 'addresses');
+        Assert::same($openSearch->enabled, true);
         Assert::same($openSearch->searchEnabled, true);
         Assert::same($openSearch->coordinateUpdatesEnabled, true);
         Assert::same($openSearch->timeoutSeconds, 90.0);
@@ -88,6 +92,23 @@ final class RuntimeConfigTest
     {
         OpenSearchConfig::fromEnvironment(new EnvironmentSnapshot([
             'OPENSEARCH_SEARCH_ENABLED' => 'sometimes',
+        ]));
+    }
+
+    #[ExpectException(InvalidArgumentException::class)]
+    public function testOpenSearchFeatureRequiresTheIntegrationToBeEnabled(): void
+    {
+        OpenSearchConfig::fromEnvironment(new EnvironmentSnapshot([
+            'OPENSEARCH_ENABLED' => 'false',
+            'OPENSEARCH_SEARCH_ENABLED' => 'true',
+        ]));
+    }
+
+    #[ExpectException(InvalidArgumentException::class)]
+    public function testNominatimEnabledFlagMustBeBoolean(): void
+    {
+        NominatimConfig::fromEnvironment(new EnvironmentSnapshot([
+            'NOMINATIM_ENABLED' => 'sometimes',
         ]));
     }
 

@@ -77,7 +77,7 @@ final readonly class WorkerRuntimeModule implements Module
             )
             ->disposer(static fn(PostgresConnectionPool $pool) => $pool->close());
         $openSearch = null;
-        if ($openSearchConfig->coordinateUpdatesEnabled) {
+        if ($openSearchConfig->enabled && $openSearchConfig->coordinateUpdatesEnabled) {
             $httpClient = $dic->object(
                 HttpClient::class,
                 static fn(): HttpClient => AmpHttpClientFactory::create($openSearchConfig->timeoutSeconds),

@@ -28,8 +28,8 @@ final readonly class RouterFactory
     public function __construct(
         private LoggerInterface $logger,
         private HealthRegistry $health,
-        private NominatimClient $nominatim,
-        private OpenSearchClient $openSearch,
+        private ?NominatimClient $nominatim,
+        private ?OpenSearchClient $openSearch,
         private string $openSearchIndex,
         private CorrelationMiddleware $correlationMiddleware,
         private FindAddressByIdAction $findAddressById,
@@ -74,13 +74,17 @@ final readonly class RouterFactory
             ));
         }
 
-        $router->addRoute('GET', '/geocode', new ClosureRequestHandler(
-            fn(Request $request): Response => $this->geocode($request),
-        ));
+        if ($this->nominatim !== null) {
+            $router->addRoute('GET', '/geocode', new ClosureRequestHandler(
+                fn(Request $request): Response => $this->geocode($request),
+            ));
+        }
 
-        $router->addRoute('GET', '/search', new ClosureRequestHandler(
-            fn(Request $request): Response => $this->search($request),
-        ));
+        if ($this->openSearch !== null) {
+            $router->addRoute('GET', '/search', new ClosureRequestHandler(
+                fn(Request $request): Response => $this->search($request),
+            ));
+        }
 
         return $router;
     }
@@ -95,13 +99,18 @@ final readonly class RouterFactory
 
     private function geocode(Request $request): Response
     {
+        $nominatim = $this->nominatim;
+        if ($nominatim === null) {
+            return JsonResponse::create(['error' => 'Nominatim is disabled.'], HttpStatus::NOT_FOUND);
+        }
+
         $query = self::queryParameter($request, 'q');
         if ($query === null) {
             return JsonResponse::create(['error' => 'The q query parameter is required.'], HttpStatus::BAD_REQUEST);
         }
 
         try {
-            return JsonResponse::create($this->nominatim->search($query, self::limit($request)));
+            return JsonResponse::create($nominatim->search($query, self::limit($request)));
         } catch (Throwable $exception) {
             $this->logger->error('Nominatim search failed', [
                 'event' => 'integration.nominatim.search.failed',
@@ -115,13 +124,18 @@ final readonly class RouterFactory
 
     private function search(Request $request): Response
     {
+        $openSearch = $this->openSearch;
+        if ($openSearch === null) {
+            return JsonResponse::create(['error' => 'OpenSearch is disabled.'], HttpStatus::NOT_FOUND);
+        }
+
         $query = self::queryParameter($request, 'q');
         if ($query === null) {
             return JsonResponse::create(['error' => 'The q query parameter is required.'], HttpStatus::BAD_REQUEST);
         }
 
         try {
-            return JsonResponse::create($this->openSearch->search(
+            return JsonResponse::create($openSearch->search(
                 $this->openSearchIndex,
                 ['simple_query_string' => ['query' => $query]],
                 self::limit($request),

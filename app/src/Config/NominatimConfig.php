@@ -9,6 +9,7 @@ use InvalidArgumentException;
 final readonly class NominatimConfig
 {
     public function __construct(
+        public bool $enabled,
         public string $url,
         public string $language,
     ) {
@@ -21,6 +22,7 @@ final readonly class NominatimConfig
     public static function fromEnvironment(EnvironmentSnapshot $environment): self
     {
         return new self(
+            enabled: $environment->boolean('NOMINATIM_ENABLED', true),
             url: $environment->string('NOMINATIM_URL', 'http://127.0.0.1:8081'),
             language: $environment->string('NOMINATIM_LANGUAGE', 'ru'),
         );

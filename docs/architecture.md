@@ -387,12 +387,15 @@ OpenSearch индекс строится из canonical/read-model data и пе�
 versioned physical index + alias только после успешной загрузки и parity check.
 OpenSearch outage не меняет canonical state и при принятой optional policy даёт
 readiness `degraded`, а не liveness failure. Online decorator выключен по
-умолчанию и включается `OPENSEARCH_SEARCH_ENABLED=1`. C3 выполняет build одним
+умолчанию; `OPENSEARCH_ENABLED=0` исключает integration из runtime graph, а
+`OPENSEARCH_SEARCH_ENABLED=1` включает decorator только при доступной
+integration. C3 выполняет build одним
 AMPHP CLI process с bounded NDJSON concurrency; HTTP/per-item failure оставляет
 старый alias активным. Предыдущие и failed physical indexes удаляются только
 отдельной cleanup command с точным подтверждением и active-target guard.
 
 Nominatim используется через application-owned typed client/feature port.
+`NOMINATIM_ENABLED=0` исключает его client, health check и HTTP routes из graph.
 Community Docker image допустим в development; production image/digest и data
 update policy являются отдельным deployment решением.
 

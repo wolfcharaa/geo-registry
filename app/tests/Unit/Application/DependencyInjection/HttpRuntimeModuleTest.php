@@ -43,4 +43,21 @@ final class HttpRuntimeModuleTest
 
         Assert::same($runtimeClass, HttpRuntime::class);
     }
+
+    public function testItBuildsWithoutOptionalIntegrationGraphs(): void
+    {
+        $runtimeClass = Dic::run(
+            new HttpRuntimeModule(
+                new EnvironmentSnapshot([
+                    'NOMINATIM_ENABLED' => 'false',
+                    'OPENSEARCH_ENABLED' => 'false',
+                ]),
+                MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_http.php'),
+                MessageCodecRegistryLoader::fromFile(dirname(__DIR__, 4) . '/config/message_bus_codecs.php'),
+            ),
+            static fn(HttpRuntime $runtime): string => $runtime::class,
+        );
+
+        Assert::same($runtimeClass, HttpRuntime::class);
+    }
 }

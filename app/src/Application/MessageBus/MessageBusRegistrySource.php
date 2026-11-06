@@ -71,4 +71,26 @@ final readonly class MessageBusRegistrySource
             'services' => $this->services,
         ], JSON_THROW_ON_ERROR));
     }
+
+    public function withoutService(string $service): self
+    {
+        $implementation = $this->services[$service] ?? null;
+        $services = [];
+        foreach ($this->services as $id => $class) {
+            if ($id !== $service) {
+                $services[(string) $id] = $class;
+            }
+        }
+
+        $classes = $this->classes;
+        if ($implementation !== null && !in_array($implementation, $services, true)) {
+            $classes = array_values(array_filter(
+                $classes,
+                static fn(string $class): bool => $class !== $implementation,
+            ));
+        }
+
+        /** @var array<string, class-string<object>> $services */
+        return new self($classes, $services, $this->flows);
+    }
 }
