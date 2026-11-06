@@ -140,10 +140,9 @@ partitioned `address_search` переключён, но остаются:
 1. импортировать Data.Mos/OSM aliases либо явно принять отсутствие legacy alias
    parity; сейчас `address_aliases=0`;
 2. запустить target Nominatim с согласованным dataset и проверить reverse flow;
-3. запустить target OpenSearch на `9201`, выполнить target-owned blue-green
-   rebuild и только после parity включить search/coordinate feature flags;
-4. повторить representative legacy/target semantic parity после aliases и
-   OpenSearch; текущий search top-10 пересекается только по одному object ID;
+3. настроить OpenSearch relevance и повторить representative parity после
+   aliases; projection уже построена, но online decorator оставлен выключенным;
+4. повторить representative legacy/target semantic parity после aliases;
 5. решить судьбу legacy operational commands `gar:status`, `gar:activity`,
    `gar:releases`, `gar:integrity`, `opensearch:status`, bulk `gar:geocode` и
    orchestration `data:prepare`/`gar:bootstrap`;
@@ -228,18 +227,24 @@ Docker memory фактически выполняются, но остаются
 - `address_aliases` пуст (`0` строк); Data.Mos и OSM alias import не выполнены;
 - target HTTP/PostgreSQL работают как `geo-registry-amp-app-1` и
   `geo-registry-amp-postgres-1`; `GET /health/live` возвращает `200`;
-- target Nominatim и OpenSearch containers сейчас не запущены; target port
-  `9201` недоступен;
+- target Nominatim сейчас не запущен;
+- target OpenSearch `3.9.0` запущен на `9201`; alias `places` указывает на
+  `places-v20261106110423355` из `28 584 562` документов;
 - port `9200` принадлежит legacy OpenSearch: alias
   `geo_registry_addresses` указывает на индекс из `28 692 782` документов и не
   является target projection;
-- target config сохраняет `OPENSEARCH_INDEX=places`, search и coordinate update
-  flags выключены;
-- `NOMINATIM_ENABLED=0` и `OPENSEARCH_ENABLED=0` исключают отсутствующие
-  integrations из runtime graph и readiness; readiness с одним PostgreSQL
-  отвечает примерно за `1.3 ms` вместо прежних `18 s`;
+- target config сохраняет `OPENSEARCH_INDEX=places`; search и coordinate update
+  flags выключены до relevance gate;
+- `NOMINATIM_ENABLED=0` исключает отсутствующий Nominatim из runtime graph;
+  при одновременном отключении Nominatim/OpenSearch readiness с одним
+  PostgreSQL отвечал примерно за `1.3 ms` вместо прежних `18 s`; после запуска
+  OpenSearch текущий readiness с двумя компонентами занимает около `19 ms`;
 - PostgreSQL search `Москва Тверская 1` по региону 77 выполняется примерно за
   `0.19 s`; symmetric pruning benchmark дал около `9%` выигрыша;
+- полный OpenSearch rebuild занял `361.57 s`, primary store — `5.3 GiB`;
+  concurrency-16 benchmark дал p95 `78 ms` против PostgreSQL `587 ms`, но
+  top-10 overlap пяти запросов составил только `58%`; подробности в
+  [opensearch-benchmark.md](opensearch-benchmark.md);
 - новый единый `app/bin/app` использует
   `thesis/symfony-console-module 0.1.0`; default `server:run`, migrations, GAR,
   OpenSearch и worker commands видны в одном lazy command registry;
