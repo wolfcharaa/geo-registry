@@ -493,6 +493,9 @@ alias. Команда сохраняет имя `opensearch:reindex` из про
   того же batch идемпотентен по identity. Команда сама retry не выполняет.
 - `--batch-size` ограничивает один NDJSON payload диапазоном `1..10000`, а
   `--concurrency` — число in-flight `_bulk` requests диапазоном `1..32`.
+- `OPENSEARCH_REINDEX_MEMORY_LIMIT` применяется командой до чтения snapshot и
+  ограничивает совокупную память hydrated documents, NDJSON и in-flight bodies;
+  HTTP/worker memory limit не изменяется.
 - Target получает имя `<alias>-v<UTC timestamp>`, strict mapping и отдельные
   bulk refresh/replica settings. После загрузки восстанавливаются normal
   settings и выполняется refresh.

@@ -22,6 +22,7 @@ final class RebuildOpenSearchProjectionCommand extends Command
 {
     public function __construct(
         private readonly RebuildOpenSearchProjectionRunner $runner,
+        private readonly string $memoryLimit,
     ) {
         parent::__construct();
     }
@@ -62,6 +63,12 @@ HELP);
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        if (ini_set('memory_limit', $this->memoryLimit) === false) {
+            $output->writeln('<error>Unable to apply the configured OpenSearch reindex memory limit.</error>');
+
+            return self::FAILURE;
+        }
+
         try {
             $result = $this->runner->run(new RebuildOpenSearchProjection(
                 batchSize: self::integerOption($input, 'batch-size'),

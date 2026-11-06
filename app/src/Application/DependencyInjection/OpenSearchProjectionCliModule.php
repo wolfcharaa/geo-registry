@@ -89,7 +89,10 @@ final readonly class OpenSearchProjectionCliModule implements Module
         return [
             $dic
                 ->object(RebuildOpenSearchProjectionCommand::class)
-                ->arg('runner', $rebuildRunner),
+                ->args([
+                    'runner' => $rebuildRunner,
+                    'memoryLimit' => $this->openSearchConfig->reindexMemoryLimit,
+                ]),
             $dic
                 ->object(CleanupOpenSearchIndexCommand::class)
                 ->arg('runner', $cleanupRunner),

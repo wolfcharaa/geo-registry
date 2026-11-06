@@ -45,6 +45,7 @@ final class RuntimeConfigTest
             'OPENSEARCH_BULK_NUMBER_OF_REPLICAS' => '0',
             'OPENSEARCH_REFRESH_INTERVAL' => '2s',
             'OPENSEARCH_BULK_REFRESH_INTERVAL' => '-1',
+            'OPENSEARCH_REINDEX_MEMORY_LIMIT' => '1G',
         ]);
 
         $http = HttpServerConfig::fromEnvironment($environment);
@@ -77,6 +78,7 @@ final class RuntimeConfigTest
         Assert::same($openSearch->bulkNumberOfReplicas, 0);
         Assert::same($openSearch->refreshInterval, '2s');
         Assert::same($openSearch->bulkRefreshInterval, '-1');
+        Assert::same($openSearch->reindexMemoryLimit, '1G');
     }
 
     #[ExpectException(InvalidArgumentException::class)]
@@ -125,6 +127,14 @@ final class RuntimeConfigTest
     {
         OpenSearchConfig::fromEnvironment(new EnvironmentSnapshot([
             'OPENSEARCH_INDEX' => 'Unsafe Alias',
+        ]));
+    }
+
+    #[ExpectException(InvalidArgumentException::class)]
+    public function testOpenSearchRejectsAnInvalidReindexMemoryLimit(): void
+    {
+        OpenSearchConfig::fromEnvironment(new EnvironmentSnapshot([
+            'OPENSEARCH_REINDEX_MEMORY_LIMIT' => 'unlimited',
         ]));
     }
 

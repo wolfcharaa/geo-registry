@@ -22,6 +22,7 @@ final readonly class OpenSearchConfig
         public int $bulkNumberOfReplicas,
         public string $refreshInterval,
         public string $bulkRefreshInterval,
+        public string $reindexMemoryLimit,
     ) {
         if (!$this->enabled && ($this->searchEnabled || $this->coordinateUpdatesEnabled)) {
             throw new InvalidArgumentException(
@@ -54,6 +55,11 @@ final readonly class OpenSearchConfig
         }
         self::assertInterval($this->refreshInterval, 'OPENSEARCH_REFRESH_INTERVAL');
         self::assertInterval($this->bulkRefreshInterval, 'OPENSEARCH_BULK_REFRESH_INTERVAL');
+        if (preg_match('/^(?:-1|[1-9][0-9]*[KMG])$/Di', $this->reindexMemoryLimit) !== 1) {
+            throw new InvalidArgumentException(
+                'OPENSEARCH_REINDEX_MEMORY_LIMIT must be -1 or a positive PHP memory limit with K, M or G suffix.',
+            );
+        }
     }
 
     public static function fromEnvironment(EnvironmentSnapshot $environment): self
@@ -72,6 +78,7 @@ final readonly class OpenSearchConfig
             bulkNumberOfReplicas: self::integer($environment, 'OPENSEARCH_BULK_NUMBER_OF_REPLICAS', 0),
             refreshInterval: $environment->string('OPENSEARCH_REFRESH_INTERVAL', '1s'),
             bulkRefreshInterval: $environment->string('OPENSEARCH_BULK_REFRESH_INTERVAL', '-1'),
+            reindexMemoryLimit: $environment->string('OPENSEARCH_REINDEX_MEMORY_LIMIT', '512M'),
         );
     }
 

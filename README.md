@@ -85,7 +85,9 @@ Readiness возвращает `unavailable`/`503` только при отка�
 malformed projection прозрачно использует PostgreSQL fallback. OpenSearch
 projection строится командой `opensearch:reindex`: она создаёт versioned
 physical index, проверяет parity и атомарно переключает `OPENSEARCH_INDEX` как
-read alias. После первого успешного cutover online feature можно включить.
+read alias. `OPENSEARCH_REINDEX_MEMORY_LIMIT` задаёт отдельный PHP memory budget
+этой тяжёлой CLI-команды и не ослабляет лимит HTTP/worker process. После первого
+успешного cutover online feature можно включить.
 
 ## Почему собственный OpenSearch client
 
