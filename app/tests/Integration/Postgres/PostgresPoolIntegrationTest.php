@@ -32,6 +32,27 @@ final class PostgresPoolIntegrationTest
         }
     }
 
+    public function testItAppliesTheHttpStatementTimeoutToEveryPooledConnection(): void
+    {
+        $pool = PostgresPoolFactory::create(
+            self::environment(
+                'INTEGRATION_DATABASE_DSN',
+                'host=127.0.0.1 port=55432 user=integration password=integration-only db=integration',
+            ),
+            2,
+            125,
+        );
+
+        try {
+            $row = $pool->query('SHOW statement_timeout')->fetchRow();
+
+            Assert::notNull($row);
+            Assert::same($row['statement_timeout'] ?? null, '125ms');
+        } finally {
+            $pool->close();
+        }
+    }
+
     private static function environment(string $name, string $default): string
     {
         $value = getenv($name);

@@ -1281,8 +1281,9 @@ GAR import.
   cutover. Префикс ОКАТО как источник региона запрещён.
 - Региональный вызов применяет predicate до ranking. Nullable region остаётся
   только additive legacy HTTP fallback и также не использует `DISTINCT`.
-- Ranking объединяет Russian FTS, exact/trigram score с порогом `0.3`, level и
-  deterministic tie-breakers; alias match возвращает typed evidence.
+- Candidate set строится через Russian FTS и gated literal contains fallback;
+  exact/trigram score, level и deterministic tie-breakers ранжируют только
+  отобранные строки, alias match возвращает typed evidence.
 - Fast gate: Testo `43 tests / 197 assertions`, PHPStan max, Deptrac
   `0 violations / 0 uncovered`, registry `2 bindings`; Contract gate:
   `6 tests / 181 assertions`; Integration gate на PHP 8.4/PostgreSQL 17:

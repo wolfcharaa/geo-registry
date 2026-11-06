@@ -225,8 +225,10 @@ HTTP-клиент запрашивает адрес по GAR/FIAS UUID, `object_
 ### Полнотекстовый поиск адреса — `Capability/SearchAddress`
 
 HTTP-клиент ищет нормализованные адресные документы по русскому full-text и
-trigram ranking. Сценарий учитывает canonical address и aliases, возвращает
-evidence совпавшего alias и применяет детерминированный порядок результатов.
+literal contains fallback. Trigram similarity ранжирует уже отобранные
+документы, но не инициирует полный fuzzy scan. Сценарий учитывает canonical
+address и aliases, возвращает evidence совпавшего alias и применяет
+детерминированный порядок результатов.
 
 **Правила**
 
@@ -239,8 +241,13 @@ evidence совпавшего alias и применяет детерминиро
 - Строка без подтверждённого GAR `region_code` не попадает в региональную
   выдачу и должна быть восстановлена управляемым rebuild, а не эвристикой.
 - Отсутствие `region_code` сохраняет только legacy nationwide fallback.
-- Exact match, Russian FTS, trigram с порогом `0.3`, level и стабильные
-  tie-breakers определяют порядок.
+- Сначала формируется FTS candidate set; literal contains fallback запускается
+  только если FTS вернул меньше запрошенного `limit`. Символы `\`, `%` и `_`
+  во входе не интерпретируются как SQL wildcard.
+- Exact match, Russian FTS, trigram ranking, level и стабильные tie-breakers
+  определяют порядок только внутри candidate set.
+- HTTP PostgreSQL pool устанавливает `statement_timeout` из
+  `HTTP_TIMEOUT_SECONDS`; CLI/import/worker pool не получает этот лимит.
 - Storage failure и timeout возвращаются как `503/search_unavailable`; запись,
   автоматический retry и частичное состояние отсутствуют.
 

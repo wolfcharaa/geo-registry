@@ -53,6 +53,13 @@ final class PostgresSearchAddressReaderIntegrationTest
                 limit: 10,
                 regionCode: null,
             ), $cancellation);
+            $literalWildcard = $reader->search(new SearchAddressCriteria(
+                query: '%',
+                hierarchy: AddressHierarchy::Administrative,
+                profile: SearchProfile::Search,
+                limit: 10,
+                regionCode: 77,
+            ), $cancellation);
 
             Assert::true($region77 !== []);
             Assert::true(array_all(
@@ -66,7 +73,8 @@ final class PostgresSearchAddressReaderIntegrationTest
             Assert::same(array_map(
                 static fn(SearchAddressMatch $match): int => $match->document->objectId,
                 $nationwide,
-            ), [770005, 780005, 770004, 780004]);
+            ), [770005, 780005]);
+            Assert::same($literalWildcard, []);
         } finally {
             IntegrationDatabase::resetSchema($pool);
             $pool->close();
