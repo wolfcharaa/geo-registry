@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Application\Runtime;
 
-use Amp\Http\Server\DefaultErrorHandler;
 use Amp\Http\Server\SocketHttpServer;
 
 use function Amp\trapSignal;
 
 use App\Application\Health\StartupState;
 use App\Config\HttpServerConfig;
+use App\UserInterface\Http\JsonErrorHandler;
 use App\UserInterface\Http\RouterFactory;
 use Fedor\MessageBus\MessageBusInterface;
 use Psr\Log\LoggerInterface;
@@ -27,7 +27,7 @@ final readonly class HttpRuntime
 
     public function run(): void
     {
-        $errorHandler = new DefaultErrorHandler();
+        $errorHandler = new JsonErrorHandler();
         $server = SocketHttpServer::createForDirectAccess($this->logger);
         $router = $this->routerFactory->create($server, $errorHandler);
 

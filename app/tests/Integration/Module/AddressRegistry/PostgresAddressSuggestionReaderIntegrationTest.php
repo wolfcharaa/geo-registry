@@ -96,6 +96,40 @@ final class PostgresAddressSuggestionReaderIntegrationTest
         }
     }
 
+    public function testItIncludesGarRoadNetworkLevelEight(): void
+    {
+        $dsn = IntegrationDatabase::dsn();
+        $pool = PostgresPoolFactory::create($dsn, 1);
+
+        try {
+            IntegrationDatabase::resetSchema($pool);
+            IntegrationDatabase::runMigrationCommand($dsn, 'migrate:up', ['--force-yes' => true]);
+            AddressRegistryParityFixture::load($pool);
+            $pool->execute(<<<'SQL'
+UPDATE address_search
+SET level = 8
+WHERE object_id = 770004
+  AND hierarchy_type = 'mun'
+SQL);
+
+            $reader = new PostgresAddressSuggestionReader($pool, new PostgresAddressDocumentHydrator());
+            $district = $reader->resolve(770002, AddressHierarchy::Municipal, new NullCancellation());
+            Assert::notNull($district);
+
+            $streets = $reader->suggestThoroughfares(new SuggestionCriteria(
+                query: 'Общая',
+                hierarchy: AddressHierarchy::Municipal,
+                limit: 7,
+                context: $district,
+            ), new NullCancellation());
+
+            Assert::same(self::ids($streets), [770004]);
+        } finally {
+            IntegrationDatabase::resetSchema($pool);
+            $pool->close();
+        }
+    }
+
     /**
      * @param list<ProgressiveAddressSuggestion> $suggestions
      * @return list<int>

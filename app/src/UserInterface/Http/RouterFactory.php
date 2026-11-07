@@ -7,6 +7,9 @@ namespace App\UserInterface\Http;
 use Amp\Http\HttpStatus;
 use Amp\Http\Server\ErrorHandler;
 use Amp\Http\Server\HttpServer;
+
+use function Amp\Http\Server\Middleware\stackMiddleware;
+
 use Amp\Http\Server\Request;
 use Amp\Http\Server\RequestHandler\ClosureRequestHandler;
 use Amp\Http\Server\Response;
@@ -85,6 +88,13 @@ final readonly class RouterFactory
                 fn(Request $request): Response => $this->search($request),
             ));
         }
+
+        $router->setFallback(stackMiddleware(
+            new ClosureRequestHandler(
+                fn(Request $request): Response => $errorHandler->handleError(HttpStatus::NOT_FOUND, null, $request),
+            ),
+            $this->correlationMiddleware,
+        ));
 
         return $router;
     }

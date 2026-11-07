@@ -287,7 +287,7 @@
                         "header": [{"key": "Content-Type", "value": "application/json"}],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"suggest\": \"Тестоград\",\n  \"stage\": \"administrative_area\",\n  \"count\": 5,\n  \"hierarchy\": \"mun\"\n}",
+                            "raw": "{\n  \"suggest\": \"{{suggestCity}}\",\n  \"stage\": \"administrative_area\",\n  \"count\": 5,\n  \"hierarchy\": \"mun\"\n}",
                             "options": {"raw": {"language": "json"}}
                         },
                         "url": "{{baseUrl}}/api/addresses/suggest"
@@ -334,7 +334,7 @@
                         "header": [{"key": "Content-Type", "value": "application/json"}],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"suggest\": \"Центральный\",\n  \"stage\": \"administrative_area\",\n  \"context\": {\"parent_id\": {{suggestRegionId}}},\n  \"count\": 5,\n  \"hierarchy\": \"mun\"\n}",
+                            "raw": "{\n  \"suggest\": \"{{suggestDistrict}}\",\n  \"stage\": \"administrative_area\",\n  \"context\": {\"parent_id\": {{suggestRegionId}}},\n  \"count\": 5,\n  \"hierarchy\": \"mun\"\n}",
                             "options": {"raw": {"language": "json"}}
                         },
                         "url": "{{baseUrl}}/api/addresses/suggest"
@@ -381,7 +381,7 @@
                         "header": [{"key": "Content-Type", "value": "application/json"}],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"suggest\": \"Общая\",\n  \"stage\": \"thoroughfare\",\n  \"context\": {\"parent_id\": {{suggestDistrictId}}},\n  \"count\": 5,\n  \"hierarchy\": \"mun\"\n}",
+                            "raw": "{\n  \"suggest\": \"{{suggestThoroughfare}}\",\n  \"stage\": \"thoroughfare\",\n  \"context\": {\"parent_id\": {{suggestDistrictId}}},\n  \"count\": 5,\n  \"hierarchy\": \"mun\"\n}",
                             "options": {"raw": {"language": "json"}}
                         },
                         "url": "{{baseUrl}}/api/addresses/suggest"

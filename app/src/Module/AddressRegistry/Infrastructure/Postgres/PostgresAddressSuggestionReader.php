@@ -204,7 +204,7 @@ SQL;
         SuggestionCriteria $criteria,
         Cancellation $cancellation,
     ): array {
-        return $this->suggest($criteria, 'candidate.level = 7', $cancellation);
+        return $this->suggest($criteria, 'candidate.level BETWEEN 7 AND 8', $cancellation);
     }
 
     /** @return list<ProgressiveAddressSuggestion> */

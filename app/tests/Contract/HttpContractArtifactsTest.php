@@ -132,6 +132,9 @@ final class HttpContractArtifactsTest
 
         Assert::same($environmentValues['baseUrl'] ?? null, 'http://127.0.0.1:8080');
         Assert::same($environmentValues['addressId'] ?? null, '00000000-0000-4000-8000-000000770005');
+        Assert::same($environmentValues['suggestCity'] ?? null, 'Тестоград');
+        Assert::same($environmentValues['suggestDistrict'] ?? null, 'Центральный');
+        Assert::same($environmentValues['suggestThoroughfare'] ?? null, 'Общая');
         Assert::same($environmentValues['releaseStrict'] ?? null, 'false');
 
         $artifacts = implode("\n", [
@@ -162,6 +165,9 @@ final class HttpContractArtifactsTest
         Assert::same(substr_count($collection, "pm.variables.get('releaseStrict') === 'true'"), 9);
         Assert::true(str_contains($collection, "suggestion.data.search_backend === 'opensearch'"));
         Assert::true(str_contains($collection, "suggestion.data.fias_id === pm.variables.get('addressId')"));
+        Assert::true(str_contains($collection, '{{suggestCity}}'));
+        Assert::true(str_contains($collection, '{{suggestDistrict}}'));
+        Assert::true(str_contains($collection, '{{suggestThoroughfare}}'));
     }
 
     /** @return array<array-key, mixed> */

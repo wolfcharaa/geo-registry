@@ -44,8 +44,9 @@ HTTP smoke остаётся read-only. Target collection запускается 
 3. Nominatim PBF из той же географии, что и representative GAR address.
 4. Ignored файл `config/release.postman_environment.json`, созданный из
    `docs/api/postman/geo-registry.local.postman_environment.json` и содержащий
-   реальные согласованные значения `addressQuery`, parent IDs, `addressId` и
-   reverse coordinates. Secrets в Postman environment запрещены.
+   реальные согласованные значения `addressQuery`, `suggestCity`,
+   `suggestDistrict`, `suggestThoroughfare`, parent IDs, `addressId` и reverse
+   coordinates. Secrets в Postman environment запрещены.
 5. `OPENSEARCH_SEARCH_ENABLED=1`; для проверки enrichment projection отдельно
    включается `OPENSEARCH_COORDINATE_UPDATES_ENABLED=1`.
 
