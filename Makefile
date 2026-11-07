@@ -61,6 +61,38 @@ verify-release: guard-user ## Verify the frozen release and payload without chan
 		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" docker/release/change-release.sh
 .PHONY: verify-release
 
+backup-data-preflight: guard-user ## Check PostgreSQL/Nominatim source and backup capacity without writing a dump
+	BACKUP_DRY_RUN=1 BACKUP_COMPONENT="$(BACKUP_COMPONENT)" BACKUP_ROOT="$(BACKUP_ROOT)" \
+		BACKUP_PROVENANCE_NAME="$(BACKUP_PROVENANCE_NAME)" \
+		BACKUP_PROVENANCE_SHA256="$(BACKUP_PROVENANCE_SHA256)" \
+		docker/backup/create-postgres-backup.sh
+.PHONY: backup-data-preflight
+
+backup-data: guard-user ## Create a verified application PostgreSQL or Nominatim logical backup
+	BACKUP_COMPONENT="$(BACKUP_COMPONENT)" BACKUP_ROOT="$(BACKUP_ROOT)" \
+		BACKUP_PROVENANCE_NAME="$(BACKUP_PROVENANCE_NAME)" \
+		BACKUP_PROVENANCE_SHA256="$(BACKUP_PROVENANCE_SHA256)" \
+		docker/backup/create-postgres-backup.sh
+.PHONY: backup-data
+
+verify-data-backup: guard-user ## Verify backup bytes, checksum and pg_restore table of contents read-only
+	BACKUP_DIR="$(BACKUP_DIR)" VERIFY_CONTAINER="$(VERIFY_CONTAINER)" \
+		docker/backup/verify-postgres-backup.sh
+.PHONY: verify-data-backup
+
+restore-data-preflight: guard-user ## Validate a shadow restore target without creating a database
+	RESTORE_DRY_RUN=1 BACKUP_DIR="$(BACKUP_DIR)" RESTORE_CONTAINER="$(RESTORE_CONTAINER)" \
+		RESTORE_DATABASE="$(RESTORE_DATABASE)" RESTORE_DATABASE_OWNER="$(RESTORE_DATABASE_OWNER)" \
+		RESTORE_ADMIN_USER="$(RESTORE_ADMIN_USER)" docker/backup/restore-postgres-shadow.sh
+.PHONY: restore-data-preflight
+
+restore-data-shadow: guard-user ## Restore a backup only into an explicitly confirmed absent shadow database
+	BACKUP_DIR="$(BACKUP_DIR)" RESTORE_CONTAINER="$(RESTORE_CONTAINER)" \
+		RESTORE_DATABASE="$(RESTORE_DATABASE)" RESTORE_DATABASE_OWNER="$(RESTORE_DATABASE_OWNER)" \
+		RESTORE_ADMIN_USER="$(RESTORE_ADMIN_USER)" RESTORE_CONFIRM="$(RESTORE_CONFIRM)" \
+		docker/backup/restore-postgres-shadow.sh
+.PHONY: restore-data-shadow
+
 install: guard-user ## Install Composer dependencies
 	$(COMPOSE) run --rm --no-deps app composer install
 .PHONY: install

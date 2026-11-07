@@ -1712,7 +1712,13 @@ nationwide import; региональный 50/77 path завершился бе
   удаления test image. Switch пересоздаёт только HTTP и два worker services;
   rollback использует тот же механизм с предыдущим tag/payload.
 - [ ] Зафиксировать backup/restore для application PostgreSQL, target
-  Nominatim и rebuildable OpenSearch отдельно.
+  Nominatim и rebuildable OpenSearch отдельно. Fail-closed tooling и
+  [runbook](../deployment/data-backup-restore.md) готовы: logical dumps имеют
+  SHA-256/manifest, restore разрешён только в отсутствующую shadow-БД, а
+  OpenSearch восстанавливается rebuild-ом. Read-only preflight на data server
+  подтвердил source sizes и capacity; isolated PostgreSQL 17 rehearsal прошёл
+  полный dump/verify/shadow-restore с контрольной строкой. Checkbox остаётся
+  открытым до сохранения protected production dumps и полного data rehearsal.
 - [x] Обновить `release-scope.md`, `spiral-to-amphp.md`, server context и README
   после закрытия каждого фактического gate.
 - [ ] После rollback window удалить transitional `/geocode` и `/search`,

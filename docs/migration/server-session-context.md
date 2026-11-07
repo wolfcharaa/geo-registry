@@ -145,8 +145,8 @@ partitioned `address_search` переключён, но остаются:
 4. повторить representative legacy/target semantic parity после aliases;
 5. выполнить strict full Nominatim/Postman smoke и сохранить representative
    legacy/target comparison evidence;
-6. зафиксировать backup/restore отдельно для application PostgreSQL, Nominatim
-   и rebuildable OpenSearch до первого production switch;
+6. выполнить подготовленный backup/restore rehearsal отдельно для application
+   PostgreSQL, Nominatim и rebuildable OpenSearch до первого production switch;
 7. отдельно подтвердить drain либо осознанное списание legacy RoadRunner/
    BoltDB queues;
 8. получить operator approval перед traffic cutover и удалить transitional
@@ -227,7 +227,8 @@ Docker memory фактически выполняются, но остаются
 - `address_aliases` пуст (`0` строк); Data.Mos и OSM alias import не выполнены;
 - target HTTP/PostgreSQL работают как `geo-registry-amp-app-1` и
   `geo-registry-amp-postgres-1`; `GET /health/live` возвращает `200`;
-- target Nominatim сейчас не запущен;
+- historical checkpoint: target Nominatim тогда не был запущен; актуальное
+  состояние приведено ниже;
 - target OpenSearch `3.9.0` запущен на `9201`; alias `places` указывает на
   `places-v20261106110423355` из `28 584 562` документов;
 - port `9200` принадлежит legacy OpenSearch: alias
@@ -273,9 +274,23 @@ Docker memory фактически выполняются, но остаются
   `verify-release` успешно прошёл как с уже загруженным digest, так и после
   удаления test image и восстановления через checksum + `docker load`;
 - production release/tag не создавался, traffic и data services не менялись.
+- application PostgreSQL (`17.11`) занимает `100027537075` bytes, Nominatim
+  PostgreSQL (`16.15`) — `5168200727` bytes; оба services сейчас healthy;
+- read-only backup preflight для обоих PostgreSQL lifecycle прошёл при
+  `310011285504` bytes free на `/srv`. Dump не создавался: protected
+  `BACKUP_LOCATION`, retention и off-host copy всё ещё требуют operator
+  approval;
+- добавлены fail-closed logical backup/checksum/manifest и restore только в
+  отсутствующую shadow-БД; OpenSearch зафиксирован как rebuildable projection,
+  а не source-of-truth volume. Полный порядок описан в
+  [data-backup-restore.md](../deployment/data-backup-restore.md).
+- isolated PostgreSQL 17 rehearsal подтвердил custom dump, checksum/TOC,
+  read-only restore preflight, exact confirmation и восстановление контрольной
+  строки в новой shadow-БД. Временные БД, dump и integration container удалены;
+  production data не менялись.
 
-Следующий delivery gate — отдельный проверяемый backup/restore runbook для
-application PostgreSQL, Nominatim и rebuildable OpenSearch. После него остаются
+Следующий delivery gate — выбрать protected `BACKUP_LOCATION` и выполнить
+полный backup/restore rehearsal подготовленного runbook. После него остаются
 full Nominatim/Postman parity, legacy queue approval и traffic cutover.
 
 ## Первый Шаг Новой Сессии

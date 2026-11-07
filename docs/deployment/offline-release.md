@@ -97,8 +97,9 @@ cp /srv/releases/geo-registry/v1.0.0/source-manifest.txt \
   docker/data/release/v1.0.0/
 ```
 
-Перед изменением runtime создать ignored `config/prod.env`, проверить
-PostgreSQL backup/schema compatibility и выполнить read-only gate:
+Перед изменением runtime создать ignored `config/prod.env`, выполнить
+[data backup/restore gate](data-backup-restore.md), проверить schema
+compatibility и выполнить read-only release gate:
 
 ```shell
 make verify-release
