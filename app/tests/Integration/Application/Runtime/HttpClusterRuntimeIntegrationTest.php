@@ -33,6 +33,8 @@ final class HttpClusterRuntimeIntegrationTest
             $root,
             [
                 'APP_HTTP_WORKERS' => '2',
+                'APP_HTTP_WORKER_HEARTBEAT_INTERVAL_SECONDS' => '0.05',
+                'APP_HTTP_WORKER_HEARTBEAT_TIMEOUT_SECONDS' => '0.3',
                 'APP_LISTEN' => '127.0.0.1:' . $port,
                 'DATABASE_DSN' => 'host=127.0.0.1 dbname=geo_registry_cluster_test',
                 'DATABASE_POOL_SIZE' => '1',
@@ -59,6 +61,10 @@ final class HttpClusterRuntimeIntegrationTest
 
         Assert::same($exitCode, 0, $errors);
         Assert::same(substr_count($logs, '"message":"HTTP server started"'), 2, $logs);
+        Assert::same(substr_count($logs, '"message":"HTTP worker is online"'), 2, $logs);
+        Assert::true(str_contains($logs, '"event":"http.cluster.capacity.ready"'), $logs);
+        Assert::false(str_contains($logs, '"event":"http.cluster.capacity.degraded"'), $logs);
+        Assert::false(str_contains($logs, '"event":"http.worker.heartbeat.failed"'), $logs);
         Assert::same(substr_count($logs, 'terminated cleanly'), 2, $logs);
         Assert::true(str_contains($logs, '"event":"http.cluster.stopped"'), $logs);
         Assert::same($loadExitCode, 0, $loadErrors);
@@ -127,6 +133,8 @@ final class HttpClusterRuntimeIntegrationTest
                 'APP_HTTP_WORKER_RESTART_WINDOW_SECONDS' => '10',
                 'APP_HTTP_WORKER_RESTART_BACKOFF_INITIAL_SECONDS' => '5',
                 'APP_HTTP_WORKER_RESTART_BACKOFF_MAX_SECONDS' => '5',
+                'APP_HTTP_WORKER_HEARTBEAT_INTERVAL_SECONDS' => '0.05',
+                'APP_HTTP_WORKER_HEARTBEAT_TIMEOUT_SECONDS' => '0.15',
                 'APP_LISTEN' => '127.0.0.1:' . $port,
                 'DATABASE_DSN' => 'host=127.0.0.1 dbname=geo_registry_cluster_test',
                 'DATABASE_POOL_SIZE' => '1',
@@ -141,7 +149,7 @@ final class HttpClusterRuntimeIntegrationTest
 
         try {
             $this->awaitLiveness($port);
-            delay(0.1);
+            delay(0.2);
             $shutdownStartedAt = microtime(true);
             $process->signal(SIGTERM);
             $exitCode = $process->join(new TimeoutCancellation(3));
@@ -155,6 +163,7 @@ final class HttpClusterRuntimeIntegrationTest
 
         Assert::same($exitCode, 0, $errors);
         Assert::true(str_contains($logs, '"event":"http.cluster.worker.restart.delayed"'), $logs);
+        Assert::true(str_contains($logs, '"event":"http.cluster.capacity.degraded"'), $logs);
         Assert::true($shutdownDuration < 2, sprintf('Shutdown took %.3f seconds.', $shutdownDuration));
         Assert::true(str_contains($logs, '"event":"http.cluster.stopped"'), $logs);
     }

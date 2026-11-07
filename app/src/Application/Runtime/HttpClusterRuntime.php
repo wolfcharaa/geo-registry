@@ -7,6 +7,9 @@ namespace App\Application\Runtime;
 use Amp\Cluster\Cluster;
 use Amp\Cluster\ClusterWatcher;
 use Amp\DeferredCancellation;
+
+use function Amp\now;
+
 use Amp\Parallel\Ipc\LocalIpcHub;
 use Amp\TimeoutCancellation;
 use App\Config\HttpServerConfig;
@@ -33,6 +36,10 @@ final readonly class HttpClusterRuntime
 
         $hub = new LocalIpcHub();
         $workerStartCancellation = new DeferredCancellation();
+        $workerPool = new HttpWorkerPoolState(
+            expectedWorkers: $this->config->workers,
+            heartbeatTimeoutSeconds: $this->config->workerHeartbeatTimeoutSeconds,
+        );
         $restartBackoff = new ProcessRestartBackoff(
             initialStartCount: $this->config->workers,
             restartBurst: $this->config->workerRestartBurst,
@@ -61,19 +68,45 @@ final readonly class HttpClusterRuntime
             'restart_window_seconds' => $this->config->workerRestartWindowSeconds,
             'restart_backoff_initial_seconds' => $this->config->workerRestartBackoffInitialSeconds,
             'restart_backoff_maximum_seconds' => $this->config->workerRestartBackoffMaximumSeconds,
+            'worker_heartbeat_interval_seconds' => $this->config->workerHeartbeatIntervalSeconds,
+            'worker_heartbeat_timeout_seconds' => $this->config->workerHeartbeatTimeoutSeconds,
         ]);
 
+        $capacityMonitorWatcher = null;
         try {
             $watcher->start($this->config->workers);
+            $capacityMonitorWatcher = EventLoop::repeat(
+                $this->config->workerHeartbeatIntervalSeconds,
+                function (string $watcherId) use ($workerPool, $workerStartCancellation): void {
+                    if ($workerStartCancellation->isCancelled()) {
+                        EventLoop::cancel($watcherId);
+
+                        return;
+                    }
+
+                    $this->logWorkerPoolObservation($workerPool->inspect(now(), self::isProcessAlive(...)));
+                },
+            );
+            EventLoop::unreference($capacityMonitorWatcher);
             foreach ($watcher->getMessageIterator() as $message) {
+                $data = $message->getData();
+                if ($data instanceof HttpWorkerSignal && !$workerStartCancellation->isCancelled()) {
+                    $this->handleWorkerSignal($workerPool, $data);
+
+                    continue;
+                }
+
                 $this->logger->debug('Received HTTP worker message', [
                     'event' => 'http.cluster.message.received',
                     'worker_id' => $message->getWorker()->getId(),
-                    'message_type' => get_debug_type($message->getData()),
+                    'message_type' => get_debug_type($data),
                 ]);
             }
         } finally {
             $workerStartCancellation->cancel();
+            if ($capacityMonitorWatcher !== null) {
+                EventLoop::cancel($capacityMonitorWatcher);
+            }
             foreach ($signalWatchers as $watcherId) {
                 EventLoop::cancel($watcherId);
             }
@@ -83,6 +116,64 @@ final readonly class HttpClusterRuntime
                 'pid' => getmypid(),
             ]);
         }
+    }
+
+    private function handleWorkerSignal(HttpWorkerPoolState $workerPool, HttpWorkerSignal $signal): void
+    {
+        $now = now();
+        $workerPool->observe($signal, $now);
+
+        if ($signal->type === HttpWorkerSignalType::Online) {
+            $this->logger->info('HTTP worker is online', [
+                'event' => 'http.cluster.worker.online',
+                'worker_id' => $signal->workerId,
+                'pid' => $signal->pid,
+                'active_workers' => $workerPool->activeWorkers(),
+                'expected_workers' => $this->config->workers,
+            ]);
+        } elseif ($signal->type === HttpWorkerSignalType::Offline) {
+            $this->logger->info('HTTP worker is offline', [
+                'event' => 'http.cluster.worker.offline',
+                'worker_id' => $signal->workerId,
+                'pid' => $signal->pid,
+                'active_workers' => $workerPool->activeWorkers(),
+                'expected_workers' => $this->config->workers,
+            ]);
+
+            return;
+        }
+
+        $this->logWorkerPoolObservation($workerPool->inspect($now, self::isProcessAlive(...)));
+    }
+
+    private function logWorkerPoolObservation(HttpWorkerPoolObservation $observation): void
+    {
+        $context = [
+            'active_workers' => $observation->activeWorkers,
+            'expected_workers' => $observation->expectedWorkers,
+            'removed_worker_ids' => $observation->removedWorkerIds,
+        ];
+
+        match ($observation->transition) {
+            HttpWorkerPoolTransition::Ready => $this->logger->info(
+                'HTTP worker pool reached the configured capacity',
+                ['event' => 'http.cluster.capacity.ready', ...$context],
+            ),
+            HttpWorkerPoolTransition::Degraded => $this->logger->warning(
+                'HTTP worker pool is below the configured capacity',
+                ['event' => 'http.cluster.capacity.degraded', ...$context],
+            ),
+            HttpWorkerPoolTransition::Restored => $this->logger->info(
+                'HTTP worker pool capacity was restored',
+                ['event' => 'http.cluster.capacity.restored', ...$context],
+            ),
+            null => null,
+        };
+    }
+
+    private static function isProcessAlive(int $pid): bool
+    {
+        return posix_kill($pid, 0);
     }
 
     /**

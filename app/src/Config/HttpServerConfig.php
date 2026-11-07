@@ -22,6 +22,8 @@ final readonly class HttpServerConfig
         public float $workerRestartWindowSeconds,
         public float $workerRestartBackoffInitialSeconds,
         public float $workerRestartBackoffMaximumSeconds,
+        public float $workerHeartbeatIntervalSeconds,
+        public float $workerHeartbeatTimeoutSeconds,
         public int $connectionLimit,
         public int $connectionsPerIpLimit,
         public int $concurrencyLimit,
@@ -68,6 +70,18 @@ final readonly class HttpServerConfig
                 'APP_HTTP_WORKER_RESTART_BACKOFF_MAX_SECONDS must be at least the initial delay and at most 300.',
             );
         }
+        if ($this->workerHeartbeatIntervalSeconds <= 0 || $this->workerHeartbeatIntervalSeconds > 300) {
+            throw new InvalidArgumentException(
+                'APP_HTTP_WORKER_HEARTBEAT_INTERVAL_SECONDS must be greater than zero and at most 300.',
+            );
+        }
+        if ($this->workerHeartbeatTimeoutSeconds < ($this->workerHeartbeatIntervalSeconds * 2)
+            || $this->workerHeartbeatTimeoutSeconds > 900
+        ) {
+            throw new InvalidArgumentException(
+                'APP_HTTP_WORKER_HEARTBEAT_TIMEOUT_SECONDS must be at least two intervals and at most 900.',
+            );
+        }
         if ($this->connectionLimit < 1) {
             throw new InvalidArgumentException('APP_HTTP_CONNECTION_LIMIT must be greater than zero.');
         }
@@ -101,6 +115,14 @@ final readonly class HttpServerConfig
             workerRestartBackoffMaximumSeconds: $environment->positiveFloat(
                 'APP_HTTP_WORKER_RESTART_BACKOFF_MAX_SECONDS',
                 30,
+            ),
+            workerHeartbeatIntervalSeconds: $environment->positiveFloat(
+                'APP_HTTP_WORKER_HEARTBEAT_INTERVAL_SECONDS',
+                5,
+            ),
+            workerHeartbeatTimeoutSeconds: $environment->positiveFloat(
+                'APP_HTTP_WORKER_HEARTBEAT_TIMEOUT_SECONDS',
+                15,
             ),
             connectionLimit: $environment->positiveInteger('APP_HTTP_CONNECTION_LIMIT', 512),
             connectionsPerIpLimit: $environment->nonNegativeInteger('APP_HTTP_CONNECTIONS_PER_IP_LIMIT', 64),

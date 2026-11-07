@@ -47,6 +47,8 @@ Production image содержит закреплённые `ev 1.2.3`, `pq 2.2.3
 | `APP_HTTP_WORKER_RESTART_WINDOW_SECONDS` | `30` | `30` | Скользящее окно restart budget; `(0..3600]` |
 | `APP_HTTP_WORKER_RESTART_BACKOFF_INITIAL_SECONDS` | `0.5` | `0.5` | Первая задержка после исчерпания burst; `(0..300]` |
 | `APP_HTTP_WORKER_RESTART_BACKOFF_MAX_SECONDS` | `30` | `30` | Верхняя граница задержки, не меньше initial; `(0..300]` |
+| `APP_HTTP_WORKER_HEARTBEAT_INTERVAL_SECONDS` | `5` | `5` | Интервал IPC heartbeat и проверки ёмкости; `(0..300]` |
+| `APP_HTTP_WORKER_HEARTBEAT_TIMEOUT_SECONDS` | `15` | `15` | Максимальный возраст heartbeat, не меньше двух интервалов; `[2×interval..900]` |
 | `APP_HTTP_CONNECTION_LIMIT` | `512` | `1024` | Одновременные connections на worker |
 | `APP_HTTP_CONNECTIONS_PER_IP_LIMIT` | `64` | `0` | Лимит на client IP; `0` отключает его за reverse proxy |
 | `APP_HTTP_CONCURRENCY_LIMIT` | `256` | `512` | Одновременные requests на worker; `0` отключает limiter |
@@ -77,6 +79,31 @@ Restart budget общий для supervisor process. Например, при pr
 in-memory историю, а внешний Compose restart policy остаётся вторым уровнем
 защиты, если завершится сам supervisor. Ожидание backoff отменяется сигналом
 остановки и не увеличивает graceful shutdown timeout.
+
+## Worker Pool Capacity
+
+Каждый cluster worker после запуска отправляет supervisor-у typed IPC-сигнал
+`online`, затем heartbeat с заданным интервалом и `offline` после остановки
+HTTP server. Supervisor также проверяет существование PID и исключает worker,
+если heartbeat устарел либо process исчез. Heartbeat не записывается в log на
+каждом интервале и поэтому не создаёт постоянный log traffic.
+
+До первого достижения `APP_HTTP_WORKERS` неполный pool считается стартующим, а
+не degraded. После этого supervisor пишет только переходы состояния:
+
+- `http.cluster.capacity.ready` — первичный pool достиг заданной ёмкости;
+- `http.cluster.capacity.degraded` — после контрольного интервала активных
+  worker-ов стало меньше ожидаемого;
+- `http.cluster.capacity.restored` — ёмкость восстановлена;
+- `http.cluster.worker.online` и `http.cluster.worker.offline` — lifecycle
+  конкретного `worker_id`/PID.
+
+Быстрый штатный recycle обычно успевает заменить process до следующей проверки
+и не создаёт ложного `degraded`. Повторяющийся `degraded/restored` указывает на
+слишком агрессивные recycle limits, crash-loop или event-loop stall. Эти события
+дают проверяемый pool status через централизованные logs без входа в container и
+ручного `ps`. В single-process mode heartbeat не запускается: container health
+остаётся источником состояния единственного process.
 
 ## PostgreSQL Connection Budget
 

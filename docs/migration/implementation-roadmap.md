@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
 - Статус: `Active; production-like runtime hardening`
-- Версия документа: `0.68.0`
+- Версия документа: `0.69.0`
 - Обновлено: `2026-11-07`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -1910,6 +1910,16 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.69.0 — 2026-11-07
+
+- cluster workers публикуют supervisor-у typed IPC lifecycle/heartbeat без
+  периодического log spam;
+- supervisor сверяет heartbeat age и PID, фиксирует только переходы pool
+  capacity `ready/degraded/restored` и не тревожит до первичного полного старта;
+- heartbeat interval/timeout имеют bounded dev/prod environment contract;
+- multi-process integration доказывает initial capacity, degraded во время
+  длинного restart backoff и быстрый cooperative shutdown.
 
 ### 0.68.0 — 2026-11-07
 

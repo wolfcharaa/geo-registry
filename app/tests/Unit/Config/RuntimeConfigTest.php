@@ -36,6 +36,8 @@ final class RuntimeConfigTest
             'APP_HTTP_WORKER_RESTART_WINDOW_SECONDS' => '45',
             'APP_HTTP_WORKER_RESTART_BACKOFF_INITIAL_SECONDS' => '0.75',
             'APP_HTTP_WORKER_RESTART_BACKOFF_MAX_SECONDS' => '20',
+            'APP_HTTP_WORKER_HEARTBEAT_INTERVAL_SECONDS' => '4',
+            'APP_HTTP_WORKER_HEARTBEAT_TIMEOUT_SECONDS' => '12',
             'APP_HTTP_CONNECTION_LIMIT' => '700',
             'APP_HTTP_CONNECTIONS_PER_IP_LIMIT' => '0',
             'APP_HTTP_CONCURRENCY_LIMIT' => '350',
@@ -92,6 +94,8 @@ final class RuntimeConfigTest
         Assert::same($http->workerRestartWindowSeconds, 45.0);
         Assert::same($http->workerRestartBackoffInitialSeconds, 0.75);
         Assert::same($http->workerRestartBackoffMaximumSeconds, 20.0);
+        Assert::same($http->workerHeartbeatIntervalSeconds, 4.0);
+        Assert::same($http->workerHeartbeatTimeoutSeconds, 12.0);
         Assert::same($http->connectionLimit, 700);
         Assert::same($http->connectionsPerIpLimit, 0);
         Assert::same($http->concurrencyLimit, 350);
@@ -229,6 +233,15 @@ final class RuntimeConfigTest
         HttpServerConfig::fromEnvironment(new EnvironmentSnapshot([
             'APP_HTTP_WORKER_RESTART_BACKOFF_INITIAL_SECONDS' => '2',
             'APP_HTTP_WORKER_RESTART_BACKOFF_MAX_SECONDS' => '1',
+        ]));
+    }
+
+    #[ExpectException(InvalidArgumentException::class)]
+    public function testHttpWorkerHeartbeatTimeoutMustCoverTwoIntervals(): void
+    {
+        HttpServerConfig::fromEnvironment(new EnvironmentSnapshot([
+            'APP_HTTP_WORKER_HEARTBEAT_INTERVAL_SECONDS' => '5',
+            'APP_HTTP_WORKER_HEARTBEAT_TIMEOUT_SECONDS' => '9',
         ]));
     }
 
