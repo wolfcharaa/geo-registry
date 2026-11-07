@@ -1637,8 +1637,10 @@ Data.Mos/OSM enrichment. Legacy остаётся запущенным на `8899
   например `Можайское шоссе` из OSM и `Шоссе Можайское` из GAR. Перестановка
   ограничена белым списком типов; другой route или номер дома по-прежнему
   отбрасывается.
-- [ ] Перенести bulk `gar:geocode` как bounded, resumable CLI/worker operation
-  либо явно исключить массовое обогащение из release scope.
+- [x] Явно исключить bulk `gar:geocode` из первого release scope. On-demand
+  reverse-geocode уже публикует idempotent coordinate events; массовый forward
+  geocode возвращается в scope только по отдельному product requirement с
+  Nominatim budget, persisted checkpoint и собственным data-quality gate.
 
 Target Nominatim `5.3.3` прошёл database check и health; replication отключён
 явно (`REPLICATION_URL` пуст, `UPDATE_MODE=none`). На Арбате, 1 legacy и target

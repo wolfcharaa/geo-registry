@@ -84,11 +84,16 @@ restore, старые queues и operator traffic.
 
 ## Намеренно Deferred
 
-В первый release не входят Data.Mos import/enrichment и импорт OSM aliases. Они
-остаются отдельным E1 optional scope и требуют нового подтверждения до начала
-implementation. Это не относится к Nominatim: его OSM dataset является внешней
-reverse-geocode integration, а не переносом legacy OSM aliases в canonical GAR
-model.
+Data.Mos import/enrichment и импорт OSM aliases реализованы как optional
+data-preparation features и использованы при сборке проверенной projection.
+Их raw sources и повторный запуск не требуются application runtime и не входят
+в обязательную cutover sequence; отключение features не меняет core contracts.
+
+Bulk forward-geocode `gar:geocode` первого release также не входит в scope.
+Текущий контракт обогащает отсутствующие координаты on demand после
+reverse-geocode через idempotent `runtime_async` event. Массовый проход по
+projection требует отдельного product requirement, Nominatim capacity/rate
+budget, persisted checkpoint и самостоятельного data-quality approval.
 
 Также не входят multi-process/fork orchestration старого RoadRunner, outbox и
 новые raw source-specific поля core contracts. Старые RoadRunner/BoltDB queues

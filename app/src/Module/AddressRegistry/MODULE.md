@@ -513,6 +513,10 @@ GAR match. Если у document отсутствует хотя бы одна к
 
 - Runtime worker читает `postgres/runtime`; OpenSearch updater выключен по
   умолчанию и требует существующего read alias/physical target.
+- Legacy bulk forward-geocode `gar:geocode` намеренно не входит в первый release
+  scope. Его нельзя считать скрытой обязанностью reverse-geocode flow: массовый
+  запуск требует отдельного Nominatim capacity budget, durable checkpoint и
+  data-quality gate.
 - Drain/restart/cutover и legacy BoltDB gate описаны в
   [worker-cutover.md](../../../../docs/migration/worker-cutover.md).
 

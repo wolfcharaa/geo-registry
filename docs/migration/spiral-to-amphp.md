@@ -83,15 +83,17 @@ feature composition и документация модуля.
 ## Лицензионный Gate
 
 Исходный `phpfiasgeocoder` объявлен как `proprietary`, а целевой `geo-registry`
-как `MIT`. До копирования исходных файлов необходимо явно подтвердить одно из
-решений:
+как `MIT`. До копирования исходных файлов требовалось явно подтвердить одно из
+решений; gate закрыт следующим вариантом:
 
-- [ ] право перенести исходный код и опубликовать результат под MIT подтверждено;
-- [ ] целевая лицензия будет изменена;
-- [ ] перенос выполняется как независимая реализация поведения без копирования
-  proprietary source.
+- [x] право перенести согласованный исходный код и опубликовать результат под
+  MIT подтверждено владельцем; provenance и границы разрешения зафиксированы в
+  implementation roadmap.
 
-Этот gate блокирует массовое копирование, но не блокирует проектирование,
+Альтернативы со сменой целевой лицензии или полностью clean-room реализацией не
+выбраны.
+
+До подтверждения gate блокировал массовое копирование, но не проектирование,
 контрактные тесты и независимую реализацию.
 
 ## Целевая Архитектура
@@ -381,7 +383,7 @@ heartbeat, recovery/control plane и worker CLI вынесены в отдель
 
 | Сценарий | Ownership | Runtime | Исходный контракт | Статус |
 | --- | --- | --- | --- | --- |
-| Health live/ready | Application | HTTP | `/health/live`, `/health/ready` | Foundation |
+| Health live/ready/startup | Application | HTTP | `/health/live`, `/health/ready`, `/health/startup` | Done |
 | FindAddressById | Core Capability | HTTP sync | `gar.address.find_by_id` | Done |
 | SearchAddress | Core Capability | HTTP sync | `gar.address.search` | Done |
 | SuggestAddress | Core Capability | HTTP sync | `gar.address.suggest` | Done |
@@ -390,14 +392,14 @@ heartbeat, recovery/control plane и worker CLI вынесены в отдель
 | SuggestThoroughfare | Core Capability | nested sync | `gar.address.suggest_thoroughfare` | Done |
 | ImportGarXml | Core Capability | CLI/worker | `gar.import` | Done |
 | BuildAddressSearch | Core Capability | CLI/worker | `gar.address_search.build` | Done |
-| BootstrapGar | Core Capability | CLI/worker | `gar.bootstrap` | Not started |
+| BootstrapGar | Core Capability | CLI/worker | `gar.bootstrap` replaced by explicit import/rebuild commands | Done |
 | ReverseGeocode | Feature | HTTP sync | `gar.address.reverse_geocode` | Done |
 | AddressCoordinatesResolved | Feature | HTTP producer/worker | `gar.address_coordinates.resolved` | Done |
 | OpenSearch search decorator | Feature | HTTP sync | `SearchAddressPort` decoration | Done |
 | OpenSearch reindex | Feature | CLI | derived index rebuild | Done |
-| Nominatim coordinate enrichment | Feature | CLI/worker | `gar:geocode` | Not started |
-| Data.Mos import/enrichment | Feature | CLI | source-specific enrichment | Deferred |
-| OSM alias import | Feature | CLI | source-specific enrichment | Deferred |
+| Nominatim bulk coordinate enrichment | Feature | CLI/worker | `gar:geocode` | Deferred |
+| Data.Mos import/enrichment | Feature | CLI | source-specific enrichment | Done |
+| OSM alias import | Feature | CLI | source-specific enrichment | Done |
 
 ## Фазы Миграции
 
@@ -437,7 +439,7 @@ console работают через новую composition без бизнес-�
 - [x] реализовать `FindAddressById` целиком:
   `HTTP -> Message -> Handler -> Port -> Amp PostgreSQL Adapter -> Result`;
 - [x] перенести focused tests и Postman request;
-- [ ] сравнить Spiral и AMPHP response на одном dataset.
+- [x] сравнить Spiral и AMPHP response на одном dataset.
 
 Готовность: первый business endpoint достиг contract parity без Spiral types и
 blocking I/O в HTTP path.
@@ -495,10 +497,10 @@ blocking I/O в HTTP path.
 
 ### Phase 7 — Дополнительные Enrichment Features
 
-- [ ] перенести Data.Mos import/enrichment при подтверждённой необходимости;
-- [ ] перенести OSM aliases import;
-- [ ] проверить rebuild/reindex implications;
-- [ ] добавить feature-local documentation и tests.
+- [x] перенести Data.Mos import/enrichment как optional feature;
+- [x] перенести OSM aliases import как optional feature;
+- [x] проверить rebuild/reindex implications;
+- [x] добавить feature-local documentation и tests.
 
 Готовность: дополнительные источники не расширяют core contracts своими raw
 fields и могут быть отключены независимо.
@@ -594,7 +596,7 @@ tests, module knowledge и Postman обновляются вместе.
 | Решение | Предлагаемый вариант | Статус |
 | --- | --- | --- |
 | Основной модуль | `AddressRegistry` | Accepted |
-| Лицензия | подтвердить право на MIT-перенос | Blocking |
+| Лицензия | право на согласованный MIT-перенос подтверждено владельцем | Accepted |
 | DI container | `thesis/dic ^0.5.3`, три runtime roots | Accepted |
 | MessageBus | новые `message-bus-async` и `message-bus-async-worker` 0.1.x | Accepted |
 | Async storage | PostgreSQL queue, at-least-once | Accepted |
@@ -605,7 +607,7 @@ tests, module knowledge и Postman обновляются вместе.
 | Cache | добавить после переноса корректного uncached flow | Proposed |
 | OpenSearch bulk | async CLI, bounded streaming, blue-green alias switch | Accepted baseline |
 | Data cutover | dumps/restore против full re-import | Open |
-| Data.Mos/OSM | перенос после core parity | Deferred |
+| Data.Mos/OSM | optional features после core parity | Implemented |
 
 ## Definition Of Done
 
