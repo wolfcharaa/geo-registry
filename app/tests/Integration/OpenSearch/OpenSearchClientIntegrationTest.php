@@ -40,7 +40,8 @@ final class OpenSearchClientIntegrationTest
 
         try {
             $client->indexDocument($index, '770005-adm', self::document(77, 770005, 'Альфа', 10));
-            $client->indexDocument($index, '770006-adm', self::document(77, 770006, 'Альфа', 11, ', кв. 1'));
+            $client->indexDocument($index, '770006-adm', self::document(77, 770006, 'Альфа', 11, '10', ', кв. 1'));
+            $client->indexDocument($index, '770007-adm', self::document(77, 770007, 'Альфа', 10, '100'));
             $client->indexDocument($index, '780005-adm', self::document(78, 780005, 'Бета', 10));
             $client->refreshIndex($index);
 
@@ -59,7 +60,7 @@ final class OpenSearchClientIntegrationTest
                 regionCode: 77,
             ), new NullCancellation());
 
-            Assert::same(count($matches), 2);
+            Assert::same(count($matches), 3);
             $match = $matches[0] ?? null;
             Assert::notNull($match);
             Assert::same($match->document->objectId, 770005);
@@ -87,13 +88,13 @@ final class OpenSearchClientIntegrationTest
         int $objectId,
         string $region,
         int $level,
+        string $house = '10',
         string $suffix = '',
-    ): array
-    {
+    ): array {
         return [
             'object_id' => $objectId,
             'object_guid' => sprintf('00000000-0000-4000-8000-%012d', $objectId),
-            'address' => "Регион {$region}, г. Тестоград, ул. Общая, д. 10{$suffix}",
+            'address' => "Регион {$region}, г. Тестоград, ул. Общая, д. {$house}{$suffix}",
             'hierarchy_type' => 'adm',
             'region_code' => $regionCode,
             'level' => $level,
@@ -102,8 +103,12 @@ final class OpenSearchClientIntegrationTest
             'geo_lon' => 37.610001,
             'source' => 'gar',
             'alias_count' => 1,
+            'address_street_key' => ['общая'],
+            'address_house_key' => [$house],
+            'address_building_key' => [],
+            'address_structure_key' => [],
             'aliases' => [[
-                'value' => 'Тестоград, Общая улица, дом 10',
+                'value' => "Тестоград, Общая улица, дом {$house}",
                 'kind' => 'alternative_address',
                 'source' => 'osm',
                 'source_object_type' => 'way',

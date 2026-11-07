@@ -83,10 +83,16 @@ final class OpenSearchSearchAddressDecoratorTest
         $body = self::jsonObject(buffer($http->request->getBody()->getContent()));
         $query = self::object($body['query'] ?? null);
         $functionScore = self::object($query['function_score'] ?? null);
-        Assert::same($functionScore['functions'] ?? null, [[
-            'filter' => ['term' => ['level' => 10]],
-            'weight' => 1000,
-        ]]);
+        Assert::same($functionScore['functions'] ?? null, [
+            [
+                'filter' => ['term' => ['level' => 10]],
+                'weight' => 1000,
+            ],
+            [
+                'filter' => ['term' => ['address_house_key' => '10']],
+                'weight' => 3000,
+            ],
+        ]);
         $nestedQuery = self::object($functionScore['query'] ?? null);
         $bool = self::object($nestedQuery['bool'] ?? null);
         $filters = self::list($bool['filter'] ?? null);

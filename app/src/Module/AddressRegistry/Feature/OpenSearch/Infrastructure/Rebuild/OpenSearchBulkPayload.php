@@ -6,6 +6,7 @@ namespace App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\Rebuild;
 
 use App\Module\AddressRegistry\Capability\AddressAlias;
 use App\Module\AddressRegistry\Feature\OpenSearch\Capability\RebuildProjection\OpenSearchProjectionDocument;
+use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\OpenSearchAddressComponentParser;
 
 final readonly class OpenSearchBulkPayload
 {
@@ -18,13 +19,14 @@ final readonly class OpenSearchBulkPayload
     public static function fromDocuments(array $documents): self
     {
         $ndjson = '';
+        $components = new OpenSearchAddressComponentParser();
         foreach ($documents as $document) {
             $ndjson .= json_encode(
                 ['index' => ['_id' => $document->id()]],
                 JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
             ) . "\n";
             $ndjson .= json_encode(
-                self::source($document),
+                self::source($document, $components),
                 JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
             ) . "\n";
         }
@@ -33,9 +35,15 @@ final readonly class OpenSearchBulkPayload
     }
 
     /** @return array<string, mixed> */
-    private static function source(OpenSearchProjectionDocument $projection): array
-    {
+    private static function source(
+        OpenSearchProjectionDocument $projection,
+        OpenSearchAddressComponentParser $components,
+    ): array {
         $document = $projection->document;
+        $componentSets = $components->componentSets([
+            $document->address,
+            ...array_map(static fn(AddressAlias $alias): string => $alias->value, $projection->aliases),
+        ]);
 
         return [
             'object_id' => $document->objectId,
@@ -59,6 +67,10 @@ final readonly class OpenSearchBulkPayload
             'cadastral_numbers' => $document->cadastralNumbers,
             'land_cadastral_numbers' => $document->landCadastralNumbers,
             'alias_count' => $document->aliasCount,
+            'address_street_key' => $componentSets['street_key'],
+            'address_house_key' => $componentSets['house_key'],
+            'address_building_key' => $componentSets['building_key'],
+            'address_structure_key' => $componentSets['structure_key'],
             'aliases' => array_map(self::alias(...), $projection->aliases),
         ];
     }

@@ -49,6 +49,10 @@ final class OpenSearchAddressIndexDefinition
                     'cadastral_numbers' => ['type' => 'keyword'],
                     'land_cadastral_numbers' => ['type' => 'keyword'],
                     'alias_count' => ['type' => 'integer'],
+                    'address_street_key' => ['type' => 'keyword'],
+                    'address_house_key' => ['type' => 'keyword'],
+                    'address_building_key' => ['type' => 'keyword'],
+                    'address_structure_key' => ['type' => 'keyword'],
                     'aliases' => [
                         'properties' => [
                             'value' => [

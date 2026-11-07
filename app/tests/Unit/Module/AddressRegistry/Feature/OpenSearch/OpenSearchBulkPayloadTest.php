@@ -61,6 +61,10 @@ final class OpenSearchBulkPayloadTest
         ));
         Assert::same($source['region_code'] ?? null, 77);
         Assert::same($source['alias_count'] ?? null, 1);
+        Assert::same($source['address_street_key'] ?? null, ['тестовая']);
+        Assert::same($source['address_house_key'] ?? null, ['1']);
+        Assert::same($source['address_building_key'] ?? null, []);
+        Assert::same($source['address_structure_key'] ?? null, []);
         $aliases = self::list($source['aliases'] ?? null);
         $alias = self::object($aliases[0] ?? null);
         Assert::same($alias['source_object_id'] ?? null, 55);

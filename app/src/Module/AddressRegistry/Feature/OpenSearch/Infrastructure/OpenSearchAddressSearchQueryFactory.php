@@ -10,6 +10,7 @@ final class OpenSearchAddressSearchQueryFactory
 {
     public function __construct(
         private readonly OpenSearchAddressQueryIntent $intent = new OpenSearchAddressQueryIntent(),
+        private readonly OpenSearchAddressComponentParser $components = new OpenSearchAddressComponentParser(),
     ) {}
 
     /** @return array<string, mixed> */
@@ -118,19 +119,58 @@ final class OpenSearchAddressSearchQueryFactory
             ],
         ];
 
-        if (!$this->intent->targetsHouse($criteria->query)) {
+        $functions = [];
+        if ($this->intent->targetsHouse($criteria->query)) {
+            $functions[] = [
+                'filter' => ['term' => ['level' => 10]],
+                'weight' => 1000,
+            ];
+        }
+
+        $houseKey = $this->intent->houseKey($criteria->query);
+        if ($houseKey !== null) {
+            $functions[] = [
+                'filter' => ['term' => ['address_house_key' => $houseKey]],
+                'weight' => 3000,
+            ];
+        }
+
+        $components = $this->components->components($criteria->query);
+        $streetKey = $components['street_key'];
+        $structuredHouseKey = $components['house_key'];
+        if ($streetKey !== null && $structuredHouseKey !== null) {
+            $baseMust = [
+                ['term' => ['address_street_key' => $streetKey]],
+                ['term' => ['address_house_key' => $structuredHouseKey]],
+            ];
+            $functions[] = [
+                'filter' => ['bool' => ['must' => $baseMust]],
+                'weight' => 12000,
+            ];
+
+            $exactMust = $baseMust;
+            if ($components['building_key'] !== null) {
+                $exactMust[] = ['term' => ['address_building_key' => $components['building_key']]];
+            }
+            if ($components['structure_key'] !== null) {
+                $exactMust[] = ['term' => ['address_structure_key' => $components['structure_key']]];
+            }
+            if (count($exactMust) > count($baseMust)) {
+                $functions[] = [
+                    'filter' => ['bool' => ['must' => $exactMust]],
+                    'weight' => 18000,
+                ];
+            }
+        }
+
+        if ($functions === []) {
             return $query;
         }
 
         return [
             'function_score' => [
                 'query' => $query,
-                'functions' => [
-                    [
-                        'filter' => ['term' => ['level' => 10]],
-                        'weight' => 1000,
-                    ],
-                ],
+                'functions' => $functions,
                 'score_mode' => 'sum',
                 'boost_mode' => 'sum',
             ],

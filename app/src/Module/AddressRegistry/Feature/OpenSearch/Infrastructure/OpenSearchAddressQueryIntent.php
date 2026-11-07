@@ -11,9 +11,24 @@ use function trim;
 
 final class OpenSearchAddressQueryIntent
 {
+    public function __construct(
+        private readonly OpenSearchAddressComponentParser $components = new OpenSearchAddressComponentParser(),
+    ) {}
+
     public function targetsHouse(string $query): bool
     {
         return $this->houseNumber($query) !== null && !$this->containsUnitMarker($query);
+    }
+
+    public function houseKey(string $query): ?string
+    {
+        if (!$this->targetsHouse($query)) {
+            return null;
+        }
+
+        $houseNumber = $this->houseNumber($query);
+
+        return $houseNumber !== null ? $this->components->markerValueKey($houseNumber) : null;
     }
 
     private function houseNumber(string $query): ?string

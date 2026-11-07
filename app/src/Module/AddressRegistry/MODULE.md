@@ -535,6 +535,10 @@ PostgreSQL остаётся fallback и источником истины.
 - Запрос с явным либо завершающим номером дома без маркера квартиры/помещения
   получает совместимый с legacy boost для GAR level `10`, чтобы вложенные
   level `11` units не вытесняли базовый дом.
+- Projection хранит нормализованные keyword sets улицы, дома, корпуса и
+  строения из canonical address и aliases. Exact house key и полная
+  street/house/building/structure комбинация получают отдельные boosts; новые
+  поля начинают участвовать только после blue-green rebuild индекса.
 - Strict index mapping содержит только поля core document, regional key и typed
   aliases. Raw OpenSearch hit/response не покидает feature infrastructure.
 - Непустые hits получают `search_backend=opensearch`. Empty result, HTTP
