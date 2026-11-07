@@ -29,20 +29,24 @@ multi-architecture digest-ами.
 
 ```dotenv
 DOCKER_IMAGE_PREFIX=registry.example/namespace/geo-registry
+```
+
+Префикс хранится в ignored `config/prod.env`. Tracked
+`docker/compose/prod/release.env` содержит только frozen identity релиза:
+
+```dotenv
 APP_IMAGE_TAG=v0.1.0-linux-amd64
 APP_IMAGE_DIGEST=sha256:<64-hex-characters>
 RELEASE_VERSION=v0.1.0
 COMPOSE_PROJECT_NAME=geo-registry
 ```
 
-Эти значения хранятся в ignored
-`docker/compose/prod/release.env`, созданном из
-`docker/compose/prod/release.env.example`. Один release-файл указывает на один
-точный tag и его OCI manifest digest. Compose запускает image только по digest и
-использует `pull_policy: never`: отсутствующий локальный image является ошибкой,
-а не причиной неявно скачать другой build.
-Checksum manifest и offline archive для exact image остаются следующим этапом
-delivery work.
+Один tracked release-файл указывает на один точный tag и его OCI manifest
+digest. Compose запускает image только по digest и использует
+`pull_policy: never`: отсутствующий локальный image является ошибкой, а не
+причиной неявно скачать другой build.
+Checksum manifest и offline archive создаются отдельным release workflow,
+описанным в [offline-release.md](offline-release.md).
 
 Сборка требует clean revisions всех трёх repositories:
 
@@ -63,13 +67,13 @@ Runtime endpoints, credentials, feature flags и resource overrides находя
 
 ```shell
 cp config/prod.env.example config/prod.env
-cp docker/compose/prod/release.env.example docker/compose/prod/release.env
 ```
 
 Placeholder credentials и endpoints нужно заменить до запуска. Runtime env
-намеренно не может содержать `DOCKER_IMAGE_PREFIX`, `APP_IMAGE_TAG`,
-`APP_IMAGE_DIGEST` или `RELEASE_VERSION`: secrets/configuration не выбирают
-revision приложения.
+намеренно не может содержать `APP_IMAGE_TAG`, `APP_IMAGE_DIGEST` или
+`RELEASE_VERSION`: secrets/configuration не выбирают revision приложения.
+`DOCKER_IMAGE_PREFIX` является только полным deployment namespace и сам по себе
+не выбирает release.
 
 Если Nominatim или OpenSearch отсутствуют на конкретном deployment, нужно явно
 задать `NOMINATIM_ENABLED=0` или `OPENSEARCH_ENABLED=0`. Тогда HTTP graph и

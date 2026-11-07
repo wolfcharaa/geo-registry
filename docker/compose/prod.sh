@@ -63,11 +63,11 @@ release_env_file=$(resolve_path "${RELEASE_ENV_FILE:-docker/compose/prod/release
 [ -f "${app_env_file}" ] || fail "application environment file not found: ${app_env_file}"
 [ -f "${release_env_file}" ] || fail "release environment file not found: ${release_env_file}"
 
-if grep -Eq '^(DOCKER_IMAGE_PREFIX|APP_IMAGE_TAG|APP_IMAGE_DIGEST|RELEASE_VERSION)=' "${app_env_file}"; then
+if grep -Eq '^(APP_IMAGE_TAG|APP_IMAGE_DIGEST|RELEASE_VERSION)=' "${app_env_file}"; then
     fail "application environment must not select the release image or version"
 fi
 
-image_prefix=$(environment_value DOCKER_IMAGE_PREFIX "${release_env_file}" || true)
+image_prefix=$(environment_value DOCKER_IMAGE_PREFIX "${app_env_file}" || true)
 image_tag=$(environment_value APP_IMAGE_TAG "${release_env_file}" || true)
 image_digest=$(environment_value APP_IMAGE_DIGEST "${release_env_file}" || true)
 release_version=$(environment_value RELEASE_VERSION "${release_env_file}" || true)

@@ -184,6 +184,10 @@ make smoke-release POSTMAN_ENVIRONMENT=config/release.postman_environment.json #
 make server-source-bundle # собрать проверяемый source workspace для data server
 make server-preflight GAR_SOURCE=/data/gar SERVER_STORAGE_PATH=/data # read-only server gate
 make build-production DOCKER_IMAGE_PREFIX=registry.example/namespace/geo-registry RELEASE_VERSION=v0.1.0 # self-contained image
+make freeze-release RELEASE_VERSION=v0.1.0 APP_IMAGE_DIGEST=sha256:... # tracked release identity
+make release-offline   # image payload + manifest + Git bundle + flat transport tar
+make verify-release    # checksum/runtime/config gate без изменения containers
+make change-release    # exact image switch только для HTTP/workers
 make prod-config       # проверить production HTTP/worker topology
 make prod-up           # запустить exact prebuilt application image без pull/build
 make prod-ps            # показать production processes
@@ -216,6 +220,8 @@ worker image, не владеет lifecycle PostgreSQL/OpenSearch/Nominatim и �
 полный image prefix только из deployment namespace. Его image/runtime contract,
 resource limits и безопасный wrapper описаны в
 [production-compose.md](docs/deployment/production-compose.md).
+Offline payload, manifest, установка и симметричный rollback описаны в
+[offline-release.md](docs/deployment/offline-release.md).
 
 Команды `migrate:*` входят только в `CliRuntime` и используют `DATABASE_DSN`.
 Они работают через blocking PDO и не включаются в HTTP/worker DIC graphs. База

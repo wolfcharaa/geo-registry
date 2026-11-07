@@ -27,6 +27,7 @@ require_clean_repository() {
 locked_reference() {
     package_name=$1
 
+    # shellcheck disable=SC2016
     XDEBUG_MODE=off php -r '
         $lock = json_decode(file_get_contents($argv[1]), true, flags: JSON_THROW_ON_ERROR);
         foreach (array_merge($lock["packages"] ?? [], $lock["packages-dev"] ?? []) as $package) {

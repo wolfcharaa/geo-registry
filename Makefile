@@ -36,6 +36,31 @@ build-production: guard-user ## Build the self-contained production image from t
 		DOCKER_PLATFORM="$(DOCKER_PLATFORM)" docker/scripts/build-production-image.sh
 .PHONY: build-production
 
+freeze-release: guard-user ## Freeze the tracked production release identity for an already built image
+	RELEASE_VERSION="$(RELEASE_VERSION)" APP_IMAGE_DIGEST="$(APP_IMAGE_DIGEST)" \
+		DOCKER_PLATFORM="$(DOCKER_PLATFORM)" docker/release/freeze-release.sh
+.PHONY: freeze-release
+
+release-payload: guard-user ## Save the frozen application image and write its checksum manifest
+	DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
+		docker/release/build-offline-payload.sh
+.PHONY: release-payload
+
+release-offline: release-payload ## Assemble the flat tagged offline transport archive
+	DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
+		OFFLINE_ARCHIVE_PATH="$(OFFLINE_ARCHIVE_PATH)" docker/release/build-offline-archive.sh
+.PHONY: release-offline
+
+change-release: guard-user ## Verify/load the frozen image and recreate application processes only
+	DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
+		docker/release/change-release.sh
+.PHONY: change-release
+
+verify-release: guard-user ## Verify the frozen release and payload without changing containers
+	RELEASE_DRY_RUN=1 DOCKER_PLATFORM="$(DOCKER_PLATFORM)" \
+		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" docker/release/change-release.sh
+.PHONY: verify-release
+
 install: guard-user ## Install Composer dependencies
 	$(COMPOSE) run --rm --no-deps app composer install
 .PHONY: install
@@ -127,7 +152,7 @@ doctor: ## Validate the resolved Compose configuration
 	$(COMPOSE) config --quiet
 	$(INTEGRATION_COMPOSE) config --quiet
 	COMPOSE_ENV_FILE=config/prod.env.example \
-		RELEASE_ENV_FILE=docker/compose/prod/release.env.example \
+		RELEASE_ENV_FILE=docker/compose/prod/release.env \
 		$(PRODUCTION_COMPOSE) config --quiet
 .PHONY: doctor
 
