@@ -44,28 +44,6 @@
             "App\\Tests\\": "tests/"
         }
     },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../../library/MessageBusAsync",
-            "options": {
-                "symlink": true,
-                "versions": {
-                    "romanfedorskij/message-bus-async": "0.1.0"
-                }
-            }
-        },
-        {
-            "type": "path",
-            "url": "../../library/MessageBusAsyncWorker",
-            "options": {
-                "symlink": true,
-                "versions": {
-                    "romanfedorskij/message-bus-async-worker": "0.1.0"
-                }
-            }
-        }
-    ],
     "config": {
         "sort-packages": true
     },

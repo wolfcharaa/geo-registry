@@ -13,8 +13,9 @@ geocoding.
 
 Выберите свою задачу:
 
-1. [Запустить приложение](docs/guides/getting-started.md) — получить три
-   совместимых repository, настроить окружение и проверить пустой runtime.
+1. [Запустить приложение](docs/guides/getting-started.md) — получить
+   приложение, установить зафиксированные Composer packages, настроить
+   окружение и проверить пустой runtime.
 2. [Скачать и загрузить данные](docs/guides/data-lifecycle.md) — получить
    официальный GAR XML, выделить регионы 50/77, импортировать canonical tables
    и построить `address_search`.
@@ -27,20 +28,18 @@ geocoding.
 
 ## Быстрый Запуск
 
-Приложение `v0.1.x` использует две соседние библиотеки из Composer path
-repositories. Workspace должна выглядеть так:
+Приложение `v0.1.x` получает обе MessageBus-библиотеки из Packagist. Достаточно
+клонировать один repository:
 
-```text
-workspace/
-├── geo-registry/
-└── library/
-    ├── MessageBusAsync/
-    └── MessageBusAsyncWorker/
+```shell
+git clone --branch v0.1.0 \
+  https://github.com/wolfcharaa/geo-registry.git
+cd geo-registry
 ```
 
-Клонирование exact release и все требования описаны в
-[руководстве первого запуска](docs/guides/getting-started.md). После получения
-workspace:
+`app/composer.lock` фиксирует опубликованные `v0.1.0`; `make install` загружает
+их как обычные Composer dist packages. Все требования описаны в
+[руководстве первого запуска](docs/guides/getting-started.md):
 
 ```shell
 make config

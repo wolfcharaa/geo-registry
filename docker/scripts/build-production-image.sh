@@ -3,7 +3,6 @@ set -eu
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
-workspace_root=$(CDPATH='' cd -- "${project_root}/.." && pwd)
 
 fail() {
     echo "Production image build error: $*" >&2
@@ -32,10 +31,22 @@ locked_reference() {
         $lock = json_decode(file_get_contents($argv[1]), true, flags: JSON_THROW_ON_ERROR);
         foreach (array_merge($lock["packages"] ?? [], $lock["packages-dev"] ?? []) as $package) {
             if (($package["name"] ?? null) === $argv[2]) {
-                echo $package["dist"]["reference"] ?? $package["source"]["reference"] ?? "";
+                if (($package["dist"]["type"] ?? null) !== "zip") {
+                    fwrite(STDERR, "Locked package must use a Packagist zip distribution: {$argv[2]}\n");
+                    exit(1);
+                }
+
+                $reference = $package["dist"]["reference"] ?? $package["source"]["reference"] ?? null;
+                if (!is_string($reference) || $reference === "") {
+                    fwrite(STDERR, "Locked package has no release reference: {$argv[2]}\n");
+                    exit(1);
+                }
+
+                echo $reference;
                 exit(0);
             }
         }
+        fwrite(STDERR, "Locked package is missing: {$argv[2]}\n");
         exit(1);
     ' "${project_root}/app/composer.lock" "${package_name}"
 }
@@ -63,18 +74,9 @@ case "${platform}" in
     *) fail "DOCKER_PLATFORM must be linux/amd64 or linux/arm64" ;;
 esac
 
-core_root="${workspace_root}/library/MessageBusAsync"
-worker_root="${workspace_root}/library/MessageBusAsyncWorker"
 require_clean_repository "${project_root}" geo-registry
-require_clean_repository "${core_root}" message-bus-async
-require_clean_repository "${worker_root}" message-bus-async-worker
-
-core_revision=$(git -C "${core_root}" rev-parse HEAD)
-worker_revision=$(git -C "${worker_root}" rev-parse HEAD)
-[ "$(locked_reference romanfedorskij/message-bus-async)" = "${core_revision}" ] \
-    || fail "Composer lock does not match message-bus-async HEAD"
-[ "$(locked_reference romanfedorskij/message-bus-async-worker)" = "${worker_revision}" ] \
-    || fail "Composer lock does not match message-bus-async-worker HEAD"
+core_revision=$(locked_reference romanfedorskij/message-bus-async)
+worker_revision=$(locked_reference romanfedorskij/message-bus-async-worker)
 
 platform_slug=$(printf '%s' "${platform}" | tr / -)
 image_tag="${release_version}-${platform_slug}"
@@ -90,7 +92,7 @@ docker buildx build \
     --build-arg "MESSAGE_BUS_CORE_REF=${core_revision}" \
     --build-arg "MESSAGE_BUS_WORKER_REF=${worker_revision}" \
     --tag "${image}" \
-    "${workspace_root}"
+    "${project_root}"
 
 image_reference=$(docker image inspect --format '{{index .RepoDigests 0}}' "${image}")
 case "${image_reference}" in

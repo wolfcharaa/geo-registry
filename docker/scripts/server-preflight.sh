@@ -3,9 +3,6 @@ set -eu
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
-workspace_root=$(CDPATH='' cd -- "${project_root}/.." && pwd)
-core_root="${workspace_root}/library/MessageBusAsync"
-worker_root="${workspace_root}/library/MessageBusAsyncWorker"
 lock_file="${project_root}/app/composer.lock"
 
 fail() {
@@ -61,7 +58,7 @@ environment_value() {
     ' "${env_file}"
 }
 
-locked_reference() {
+locked_identity() {
     package_name=$1
 
     # shellcheck disable=SC2016
@@ -69,10 +66,23 @@ locked_reference() {
         $lock = json_decode(file_get_contents($argv[1]), true, flags: JSON_THROW_ON_ERROR);
         foreach (array_merge($lock["packages"] ?? [], $lock["packages-dev"] ?? []) as $package) {
             if (($package["name"] ?? null) === $argv[2]) {
-                echo $package["dist"]["reference"] ?? $package["source"]["reference"] ?? "";
+                if (($package["dist"]["type"] ?? null) !== "zip") {
+                    fwrite(STDERR, "Locked package must use a Packagist zip distribution: {$argv[2]}\n");
+                    exit(1);
+                }
+
+                $version = $package["version"] ?? null;
+                $reference = $package["dist"]["reference"] ?? $package["source"]["reference"] ?? null;
+                if (!is_string($version) || $version === "" || !is_string($reference) || $reference === "") {
+                    fwrite(STDERR, "Locked package has incomplete release metadata: {$argv[2]}\n");
+                    exit(1);
+                }
+
+                echo $version, "@", $reference;
                 exit(0);
             }
         }
+        fwrite(STDERR, "Locked package is missing: {$argv[2]}\n");
         exit(1);
     ' "${lock_file}" "${package_name}"
 }
@@ -181,17 +191,8 @@ if grep -Eq 'monaco-latest\.osm\.pbf|europe/monaco-updates' "${env_file}"; then
 fi
 
 require_clean_repository "${project_root}" "geo-registry"
-require_clean_repository "${core_root}" "message-bus-async"
-require_clean_repository "${worker_root}" "message-bus-async-worker"
-
-core_commit=$(git -C "${core_root}" rev-parse HEAD)
-worker_commit=$(git -C "${worker_root}" rev-parse HEAD)
-core_locked_reference=$(locked_reference "romanfedorskij/message-bus-async")
-worker_locked_reference=$(locked_reference "romanfedorskij/message-bus-async-worker")
-[ "${core_locked_reference}" = "${core_commit}" ] \
-    || fail "Composer lock does not match message-bus-async HEAD"
-[ "${worker_locked_reference}" = "${worker_commit}" ] \
-    || fail "Composer lock does not match message-bus-async-worker HEAD"
+core_identity=$(locked_identity "romanfedorskij/message-bus-async")
+worker_identity=$(locked_identity "romanfedorskij/message-bus-async-worker")
 
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is unavailable"
 docker_info=$(docker info --format '{{.OSType}} {{.MemTotal}}' 2>/dev/null) \
@@ -231,8 +232,8 @@ POSTGRES_CAPACITY_CHECK=1 \
 
 echo "Server preflight passed without changing runtime state."
 echo "Application: $(git -C "${project_root}" rev-parse HEAD)"
-echo "MessageBus core: ${core_commit}"
-echo "MessageBus worker: ${worker_commit}"
+echo "MessageBus core package: ${core_identity}"
+echo "MessageBus worker package: ${worker_identity}"
 echo "Docker platform: ${docker_os}"
 echo "Docker memory bytes: ${docker_memory_bytes}"
 echo "Storage path: ${storage_path}"

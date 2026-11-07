@@ -2,6 +2,12 @@
 
 Все значимые изменения проекта документируются в этом файле.
 
+## [Unreleased]
+
+- MessageBus dependencies переведены с соседних Composer path repositories на
+  опубликованные Packagist releases `v0.1.0`; development, production build и
+  source handoff больше не требуют отдельных library checkout.
+
 ## [0.1.0] - 2026-11-07
 
 Первый публичный source release.
@@ -19,3 +25,4 @@
   Postman parity и offline application release workflow.
 
 [0.1.0]: https://github.com/wolfcharaa/geo-registry/releases/tag/v0.1.0
+[Unreleased]: https://github.com/wolfcharaa/geo-registry/compare/v0.1.0...HEAD

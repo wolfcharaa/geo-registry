@@ -25,17 +25,12 @@ FROM php-runtime AS vendor
 
 COPY --from=composer /usr/bin/composer /usr/local/bin/composer
 
-RUN apk add --no-cache git unzip
+RUN apk add --no-cache unzip
 
 WORKDIR /app
 
-COPY geo-registry/app/composer.json geo-registry/app/composer.lock ./
-COPY geo-registry/app/src ./src
-COPY library/MessageBusAsync/composer.json /library/MessageBusAsync/composer.json
-COPY library/MessageBusAsync/src /library/MessageBusAsync/src
-COPY library/MessageBusAsyncWorker/composer.json /library/MessageBusAsyncWorker/composer.json
-COPY library/MessageBusAsyncWorker/bin /library/MessageBusAsyncWorker/bin
-COPY library/MessageBusAsyncWorker/src /library/MessageBusAsyncWorker/src
+COPY app/composer.json app/composer.lock ./
+COPY app/src ./src
 
 RUN composer install \
     --classmap-authoritative \
@@ -66,11 +61,10 @@ RUN addgroup -g 10001 app \
 WORKDIR /app
 
 COPY --chown=app:app --from=vendor /app/vendor ./vendor
-COPY --chown=app:app --from=vendor /library /library
-COPY --chown=app:app geo-registry/app/bin ./bin
-COPY --chown=app:app geo-registry/app/config ./config
-COPY --chown=app:app geo-registry/app/src ./src
-COPY --chown=app:app geo-registry/app/composer.json geo-registry/app/composer.lock ./
+COPY --chown=app:app app/bin ./bin
+COPY --chown=app:app app/config ./config
+COPY --chown=app:app app/src ./src
+COPY --chown=app:app app/composer.json app/composer.lock ./
 
 USER app
 

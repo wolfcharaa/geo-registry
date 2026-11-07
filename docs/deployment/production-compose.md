@@ -7,21 +7,23 @@ PostgreSQL workers. Application PostgreSQL, OpenSearch и Nominatim живут
 
 ## Image Contract
 
-Production image собирается из согласованной трёхрепозиторной workspace:
+Production image собирается из одного application repository. Build stage
+выполняет `composer install --prefer-dist` по `app/composer.lock` и получает
+зафиксированные MessageBus packages из Packagist:
 
 ```text
-workspace/
-├── geo-registry/
-└── library/
-    ├── MessageBusAsync/
-    └── MessageBusAsyncWorker/
+geo-registry/
+├── app/composer.json
+├── app/composer.lock
+└── docker/php/production.Dockerfile
 ```
 
-`docker/php/production.Dockerfile` встраивает минимальные runtime sources обеих
-path-библиотек в `/library`, поэтому Composer symlinks разрешаются внутри самого
-image. Итоговый image не зависит от исходной workspace, host bind mounts или
-Composer network во время запуска. PHP и Composer build images закреплены
-multi-architecture digest-ами.
+`docker/php/production.Dockerfile` встраивает готовый `vendor` в image.
+Итоговый runtime не зависит от исходного checkout, host bind mounts или
+Composer network во время запуска. Для самой сборки нужен доступ к Packagist и
+GitHub dist archives. PHP и Composer build images закреплены
+multi-architecture digest-ами, а OCI labels сохраняют source references обеих
+библиотек из lock.
 
 Префикс image задаётся только целиком через `DOCKER_IMAGE_PREFIX`. Он уже должен
 содержать registry host и полный namespace проекта; Compose не добавляет к нему
@@ -48,7 +50,8 @@ digest. Compose запускает image только по digest и испол�
 Checksum manifest и offline archive создаются отдельным release workflow,
 описанным в [offline-release.md](offline-release.md).
 
-Сборка требует clean revisions всех трёх repositories:
+Сборка требует clean application repository и отклоняет оставшиеся Composer
+path packages:
 
 ```shell
 make build-production \

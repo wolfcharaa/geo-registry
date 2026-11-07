@@ -19,15 +19,16 @@ DEPLOY.md
 
 `source-linux-amd64.tar` содержит self-contained application image с HTTP и
 worker runtime. `source-manifest.txt` связывает release commit, исходный commit
-image, commits двух MessageBus packages, platform, image tag/digest/id и
-SHA-256 Docker archive. Git bundle содержит application release branch и
-annotated tag. Исходники библиотек уже встроены в image; для сборки нового image
-по-прежнему нужна трёхрепозиторная workspace.
+image, source references двух locked MessageBus packages, platform, image
+tag/digest/id и SHA-256 Docker archive. Git bundle содержит application release
+branch и annotated tag. Библиотеки уже находятся в `vendor` внутри image; для
+сборки нового image нужен application repository и доступ к Composer dist
+archives, но не соседние library checkout.
 
 ## Подготовка Релиза
 
 Release version использует формат `vMAJOR.MINOR.PATCH`. Начинать нужно с clean
-application и library repositories:
+application repository и актуального `app/composer.lock`:
 
 ```shell
 make build-production \

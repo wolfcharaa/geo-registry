@@ -2,7 +2,7 @@
 
 - Назначение: `handoff в новую Codex-сессию после переноса repositories`
 - Состояние на момент записи: `regions 50/77 imported; partitioned search live; release parity incomplete`
-- Обновлено: `2026-11-06`
+- Обновлено: `2026-11-07`
 - Основной roadmap: [implementation-roadmap.md](implementation-roadmap.md)
 - Server runbook: [server-handoff.md](server-handoff.md)
 
@@ -31,21 +31,15 @@ GAR/Nominatim import, rebuild или cutover до успешного server pref
 
 ## Ожидаемая Source Identity
 
-Repositories должны иметь соседнюю структуру:
+Текущая workspace содержит один application repository. MessageBus packages
+устанавливаются из Packagist, а их authoritative identity находится в
+`app/composer.lock`:
 
-```text
-workspace/
-├── geo-registry/
-└── library/
-    ├── MessageBusAsync/
-    └── MessageBusAsyncWorker/
-```
-
-| Repository | Branch | Commit |
+| Artifact | Release | Source reference |
 | --- | --- | --- |
-| `geo-registry` | `docs/async-migration-roadmap` | `23e7f129a82bb7a0a2da64e712ac334b16226c69` |
-| `MessageBusAsync` | `feature/async-core-registry` | `9d25f26cabe5f69c08aff331eea2ef985ff37bc3` |
-| `MessageBusAsyncWorker` | `main` | `306ff70a634772bd51b0b9feb53cb79e20492d19` |
+| `geo-registry` | current application branch/tag | `git rev-parse HEAD` |
+| `romanfedorskij/message-bus-async` | `v0.1.0` | `0ea19e855fb0d1e476498e323c8dc4205652d8c3` |
+| `romanfedorskij/message-bus-async-worker` | `v0.1.0` | `c9369b4230333537b3193d15e3855982a25dafeb` |
 
 Source archive, из которого проверялось восстановление workspace:
 
@@ -54,11 +48,11 @@ geo-registry-server-source-78f92321924f.tar
 sha256=dac2b59f34cbf6eaebf128f20b5577a092f7088efe105039cb0e6e0de06abdaf
 ```
 
-Архив является transport artifact и в Git не хранится. Если context-файл
-передан отдельным более поздним commit, `geo-registry` может быть чистым
-потомком указанного baseline; новая сессия должна явно показать такой commit и
-его diff, а не считать это ошибкой автоматически. Revisions библиотек обязаны
-совпадать с references в `app/composer.lock`.
+Этот архив является историческим transport artifact формата v1 и в Git не
+хранится. Новый `make server-source-bundle` создаёт application-only формат v2
+с package versions/references в manifest. Если context-файл передан отдельным
+более поздним commit, новая сессия должна показать фактический application
+commit и diff, а не считать расхождение ошибкой автоматически.
 
 ## На Чём Остановились
 
@@ -75,7 +69,7 @@ sha256=dac2b59f34cbf6eaebf128f20b5577a092f7088efe105039cb0e6e0de06abdaf
 - PostgreSQL durable workers и idempotent coordinate enrichment;
 - fast, contract и real PostgreSQL/OpenSearch integration gates;
 - strict Postman release runner, release scope и worker cutover runbooks;
-- source-only server archive и read-only `make server-preflight`.
+- application-only source archive v2 и read-only `make server-preflight`.
 
 Последние подтверждённые gates на data server:
 
@@ -88,9 +82,10 @@ composer audit         no known security advisories
 make doctor            Compose configuration valid
 ```
 
-Bundle был независимо распакован; все три repositories восстановились на
-ожидаемые commits. На новом сервере эти результаты являются baseline, а не
-заменой повторных release gates.
+Исторический bundle v1 был независимо распакован; все три repositories тогда
+восстановились на ожидаемые commits. После публикации packages этот layout
+заменён application-only source bundle v2. На новом сервере старые результаты
+являются baseline, а не заменой повторных release gates.
 
 Переход на data server выбран потому, что полный GAR занимает примерно `53 GB`
 в исходном архиве и около `454 GB` после распаковки; локальной машине не хватало
@@ -267,8 +262,9 @@ Docker memory фактически выполняются, но остаются
   `worker-instance-id`; повторный controlled restart HTTP и двух idle workers
   сохранил backlog `0`, корректно пометил старые instances `stopped`, поднял
   новые `running/idle` и вернул live/ready/startup и Docker health в `ok`;
-- production application image собирается self-contained из трёх repositories,
-  имеет pinned PHP/Composer bases, non-root runtime и immutable OCI digest;
+- production application image собирается self-contained из application
+  repository и locked Packagist dist packages, имеет pinned PHP/Composer
+  bases, non-root runtime и immutable OCI digest;
 - production Compose содержит только `app`, `worker-address`, `worker-runtime`,
   использует полный `DOCKER_IMAGE_PREFIX` из deployment namespace и не владеет
   PostgreSQL/OpenSearch/Nominatim;
@@ -329,13 +325,7 @@ git status --short
 git branch --show-current
 git rev-parse HEAD
 
-git -C ../library/MessageBusAsync status --short
-git -C ../library/MessageBusAsync branch --show-current
-git -C ../library/MessageBusAsync rev-parse HEAD
-
-git -C ../library/MessageBusAsyncWorker status --short
-git -C ../library/MessageBusAsyncWorker branch --show-current
-git -C ../library/MessageBusAsyncWorker rev-parse HEAD
+jq '.packages[] | select(.name | startswith("romanfedorskij/message-bus-async")) | {name, version, source, dist}' app/composer.lock
 
 uname -a
 docker version
@@ -344,9 +334,8 @@ docker info --format '{{.OSType}} {{.Architecture}} {{.MemTotal}} {{.DockerRootD
 df -h <SERVER_STORAGE_PATH>
 ```
 
-Если workspace имеет другой layout, сначала зафиксировать реальные пути и
-проверить, что Composer path repositories разрешаются в эти же два checkout.
-Не создавать symlink или копию library source молча.
+Lock должен содержать `dist.type=zip`; `path` distribution или library symlink
+означают, что workspace не соответствует текущему release contract.
 
 После заполнения server parameters создать ignored `config/.env` из example,
 заменить development credentials и Monaco dataset, затем запустить read-only
@@ -405,7 +394,7 @@ timestamps, exit code и собственный parity result. Не объявл
 
 Перед следующим переносом сессии обновить только проверенные факты:
 
-- новые commits и branches всех трёх repositories;
+- новый application commit/branch и locked versions/references packages;
 - выполненные команды и точные результаты;
 - заполненные non-secret server parameters;
 - созданные data manifests/evidence locations;

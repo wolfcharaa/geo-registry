@@ -1,11 +1,8 @@
 #!/bin/sh
 set -eu
 
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-project_root=$(CDPATH= cd -- "${script_dir}/../.." && pwd)
-workspace_root=$(CDPATH= cd -- "${project_root}/.." && pwd)
-core_root="${workspace_root}/library/MessageBusAsync"
-worker_root="${workspace_root}/library/MessageBusAsyncWorker"
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
 lock_file="${project_root}/app/composer.lock"
 guide_file="${project_root}/docs/migration/server-handoff.md"
 
@@ -30,9 +27,10 @@ require_repository() {
         || fail "${label} repository must be on a named branch"
 }
 
-locked_reference() {
+locked_identity() {
     package_name=$1
 
+    # shellcheck disable=SC2016
     XDEBUG_MODE=off php -r '
         $lock = json_decode(file_get_contents($argv[1]), true, flags: JSON_THROW_ON_ERROR);
         foreach (array_merge($lock["packages"] ?? [], $lock["packages-dev"] ?? []) as $package) {
@@ -40,13 +38,23 @@ locked_reference() {
                 continue;
             }
 
+            if (($package["dist"]["type"] ?? null) !== "zip") {
+                fwrite(STDERR, "Locked package must use a Packagist zip distribution: {$argv[2]}\n");
+                exit(1);
+            }
+
+            $version = $package["version"] ?? null;
             $reference = $package["dist"]["reference"] ?? $package["source"]["reference"] ?? null;
+            if (!is_string($version) || $version === "") {
+                fwrite(STDERR, "Locked package has no version: {$argv[2]}\n");
+                exit(1);
+            }
             if (!is_string($reference) || $reference === "") {
                 fwrite(STDERR, "Locked package has no revision: {$argv[2]}\n");
                 exit(1);
             }
 
-            echo $reference;
+            echo $version, "|", $reference;
             exit(0);
         }
 
@@ -72,23 +80,15 @@ done
 [ -f "${guide_file}" ] || fail "Server handoff guide is unavailable: ${guide_file}"
 
 require_repository "${project_root}" "geo-registry"
-require_repository "${core_root}" "message-bus-async"
-require_repository "${worker_root}" "message-bus-async-worker"
 
 application_branch=$(git -C "${project_root}" symbolic-ref --quiet --short HEAD)
 application_commit=$(git -C "${project_root}" rev-parse HEAD)
-core_branch=$(git -C "${core_root}" symbolic-ref --quiet --short HEAD)
-core_commit=$(git -C "${core_root}" rev-parse HEAD)
-worker_branch=$(git -C "${worker_root}" symbolic-ref --quiet --short HEAD)
-worker_commit=$(git -C "${worker_root}" rev-parse HEAD)
-
-core_locked_reference=$(locked_reference "romanfedorskij/message-bus-async")
-worker_locked_reference=$(locked_reference "romanfedorskij/message-bus-async-worker")
-
-[ "${core_locked_reference}" = "${core_commit}" ] \
-    || fail "Composer locks message-bus-async at ${core_locked_reference}, current HEAD is ${core_commit}"
-[ "${worker_locked_reference}" = "${worker_commit}" ] \
-    || fail "Composer locks message-bus-async-worker at ${worker_locked_reference}, current HEAD is ${worker_commit}"
+core_identity=$(locked_identity "romanfedorskij/message-bus-async")
+worker_identity=$(locked_identity "romanfedorskij/message-bus-async-worker")
+core_version=${core_identity%%|*}
+core_reference=${core_identity#*|}
+worker_version=${worker_identity%%|*}
+worker_reference=${worker_identity#*|}
 
 output_path=${SERVER_SOURCE_OUTPUT:-/tmp/geo-registry-server-source-$(git -C "${project_root}" rev-parse --short=12 HEAD).tar}
 case "${output_path}" in
@@ -112,48 +112,43 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 git -C "${project_root}" bundle create "${staging_dir}/geo-registry.bundle" "${application_branch}"
-git -C "${core_root}" bundle create "${staging_dir}/message-bus-async.bundle" "${core_branch}"
-git -C "${worker_root}" bundle create "${staging_dir}/message-bus-async-worker.bundle" "${worker_branch}"
 
 git init --bare --quiet "${staging_dir}/verifier.git"
 git -C "${staging_dir}/verifier.git" bundle verify "${staging_dir}/geo-registry.bundle" >/dev/null
-git -C "${staging_dir}/verifier.git" bundle verify "${staging_dir}/message-bus-async.bundle" >/dev/null
-git -C "${staging_dir}/verifier.git" bundle verify "${staging_dir}/message-bus-async-worker.bundle" >/dev/null
 rm -rf -- "${staging_dir}/verifier.git"
 
 cp "${guide_file}" "${staging_dir}/SERVER.md"
 
 created_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 cat >"${staging_dir}/source-manifest.txt" <<EOF
-format=geo-registry-server-source-v1
+format=geo-registry-server-source-v2
 created_at=${created_at}
 application.branch=${application_branch}
 application.commit=${application_commit}
 application.bundle.sha256=$(sha256_file "${staging_dir}/geo-registry.bundle")
-message_bus_async.branch=${core_branch}
-message_bus_async.commit=${core_commit}
-message_bus_async.bundle.sha256=$(sha256_file "${staging_dir}/message-bus-async.bundle")
-message_bus_async_worker.branch=${worker_branch}
-message_bus_async_worker.commit=${worker_commit}
-message_bus_async_worker.bundle.sha256=$(sha256_file "${staging_dir}/message-bus-async-worker.bundle")
+message_bus_async.package=romanfedorskij/message-bus-async
+message_bus_async.version=${core_version}
+message_bus_async.reference=${core_reference}
+message_bus_async.distribution=packagist
+message_bus_async_worker.package=romanfedorskij/message-bus-async-worker
+message_bus_async_worker.version=${worker_version}
+message_bus_async_worker.reference=${worker_reference}
+message_bus_async_worker.distribution=packagist
 server_guide.sha256=$(sha256_file "${staging_dir}/SERVER.md")
 runtime_data_included=false
 secrets_included=false
 docker_images_included=false
+composer_vendor_included=false
 EOF
 
 tar -C "${staging_dir}" -cf "${output_path}" \
     source-manifest.txt \
     SERVER.md \
-    geo-registry.bundle \
-    message-bus-async.bundle \
-    message-bus-async-worker.bundle
+    geo-registry.bundle
 
 expected_members='source-manifest.txt
 SERVER.md
-geo-registry.bundle
-message-bus-async.bundle
-message-bus-async-worker.bundle'
+geo-registry.bundle'
 actual_members=$(tar -tf "${output_path}")
 [ "${actual_members}" = "${expected_members}" ] || fail "archive member verification failed"
 

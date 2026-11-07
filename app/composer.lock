@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "68dc9e5540213b51f6c2bcf6bb466aef",
+    "content-hash": "d4d479d2b5c121949259ceed11497bc9",
     "packages": [
         {
             "name": "amphp/amp",
@@ -2314,11 +2314,17 @@
         },
         {
             "name": "romanfedorskij/message-bus-async",
-            "version": "0.1.0",
-            "dist": {
-                "type": "path",
-                "url": "../../library/MessageBusAsync",
+            "version": "v0.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/wolfcharaa/message-bus-async.git",
                 "reference": "0ea19e855fb0d1e476498e323c8dc4205652d8c3"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/wolfcharaa/message-bus-async/zipball/0ea19e855fb0d1e476498e323c8dc4205652d8c3",
+                "reference": "0ea19e855fb0d1e476498e323c8dc4205652d8c3",
+                "shasum": ""
             },
             "require": {
                 "amphp/amp": "^3.1",
@@ -2344,22 +2350,7 @@
                     "Fedor\\MessageBus\\": "src/"
                 }
             },
-            "autoload-dev": {
-                "psr-4": {
-                    "Fedor\\MessageBus\\Tests\\": "tests/"
-                }
-            },
-            "scripts": {
-                "analyse": [
-                    "phpstan analyse --level=max src tests integration-tests"
-                ],
-                "test": [
-                    "phpunit --do-not-cache-result"
-                ],
-                "test:integration": [
-                    "phpunit --configuration phpunit.integration.xml.dist --do-not-cache-result"
-                ]
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -2382,18 +2373,22 @@
                 "issues": "https://github.com/wolfcharaa/message-bus-async/issues",
                 "source": "https://github.com/wolfcharaa/message-bus-async"
             },
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
+            "time": "2026-11-07T11:28:21+00:00",
+            "published-time": "2026-11-07T13:19:09+00:00"
         },
         {
             "name": "romanfedorskij/message-bus-async-worker",
-            "version": "0.1.0",
-            "dist": {
-                "type": "path",
-                "url": "../../library/MessageBusAsyncWorker",
+            "version": "v0.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/wolfcharaa/message-bus-async-worker.git",
                 "reference": "c9369b4230333537b3193d15e3855982a25dafeb"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/wolfcharaa/message-bus-async-worker/zipball/c9369b4230333537b3193d15e3855982a25dafeb",
+                "reference": "c9369b4230333537b3193d15e3855982a25dafeb",
+                "shasum": ""
             },
             "require": {
                 "amphp/amp": "^3.1",
@@ -2420,22 +2415,7 @@
                     "Fedor\\MessageBus\\Worker\\": "src/"
                 }
             },
-            "autoload-dev": {
-                "psr-4": {
-                    "Fedor\\MessageBus\\Worker\\Tests\\": "tests/"
-                }
-            },
-            "scripts": {
-                "analyse": [
-                    "phpstan analyse --level=max src tests integration-tests"
-                ],
-                "test": [
-                    "phpunit --do-not-cache-result"
-                ],
-                "test:integration": [
-                    "phpunit --configuration phpunit.integration.xml.dist --do-not-cache-result"
-                ]
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -2458,10 +2438,8 @@
                 "issues": "https://github.com/wolfcharaa/message-bus-async-worker/issues",
                 "source": "https://github.com/wolfcharaa/message-bus-async-worker"
             },
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
+            "time": "2026-11-07T11:28:21+00:00",
+            "published-time": "2026-11-07T13:18:56+00:00"
         },
         {
             "name": "symfony/console",

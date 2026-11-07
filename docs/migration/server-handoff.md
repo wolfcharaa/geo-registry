@@ -1,63 +1,61 @@
-# Перенос Source Workspace На Data Server
+# Перенос Source Repository На Data Server
 
 - Статус: `Source handoff ready; full-data execution pending`
 - Область: `R1 release parity preparation`
-- Обновлено: `2026-11-04`
+- Обновлено: `2026-11-07`
 - Связанный runbook: [release-parity.md](release-parity.md)
 
 ## Граница Этого Этапа
 
-Текущий deployment использует Composer path repositories и bind mounts трёх
-соседних Git repositories. Поэтому переносится согласованный source workspace:
+Приложение устанавливает `romanfedorskij/message-bus-async` и
+`romanfedorskij/message-bus-async-worker` из Packagist по
+`app/composer.lock`. Соседние Git checkout библиотек, Composer path
+repositories и bind mounts `/library` больше не входят в source workspace.
 
-```text
-workspace/
-├── geo-registry/
-└── library/
-    ├── MessageBusAsync/
-    └── MessageBusAsyncWorker/
-```
+`make server-source-bundle` создаёт source transport v2 из:
 
-`make server-source-bundle` создаёт transport archive из трёх self-contained
-Git bundles, этого документа и manifest с branch, полными commit IDs и SHA-256.
-Перед сборкой команда требует чистое состояние всех repositories и проверяет,
-что revisions библиотек совпадают с `app/composer.lock`.
+- application Git bundle;
+- этого server guide;
+- manifest с application branch/commit, SHA-256 и locked version/reference
+  обеих MessageBus packages.
 
-В архив намеренно не входят:
+Composer `vendor` в архив не входит. Для source build на сервере нужен доступ к
+Packagist и GitHub dist archives. Если сервер изолирован от сети, используйте
+[offline application release](../deployment/offline-release.md), где готовый
+`vendor` уже находится внутри Docker image.
+
+В source archive намеренно не входят:
 
 - GAR XML/ZIP, Nominatim PBF и любые production/import data;
 - `config/.env`, credentials, Postman environment и secrets;
 - Composer `vendor`, Docker images, named volumes, dumps и indexes;
 - локальные runtime artifacts и старые BoltDB queues.
 
-Это перенос исходного workspace, а не production image release и не offline
-release bundle. Отдельный application-only production workflow уже описывает
-self-contained HTTP/worker image, resource/health policy, точный namespace
-prefix, offline archive, checksum manifest и симметричный code rollback.
-Backup/restore PostgreSQL/Nominatim/OpenSearch и data compatibility остаются
-отдельным delivery slice; source handoff их не заменяет.
+Source handoff не заменяет production image release, data backup или rollback.
 
 ## Сборка На Текущей Машине
+
+Команда требует clean application branch и проверяет, что обе MessageBus
+dependencies в lock имеют обычную release distribution, а не `path`:
 
 ```shell
 make server-source-bundle
 ```
 
-По умолчанию архив создаётся в `/tmp` и не попадает в Git. Для явного пути:
+По умолчанию архив создаётся в `/tmp`. Для явного пути:
 
 ```shell
 make server-source-bundle \
   SERVER_SOURCE_OUTPUT=/absolute/path/geo-registry-server-source.tar
 ```
 
-Перед передачей сохранить напечатанный SHA-256 отдельно от архива. Не добавлять
-в transport archive данные или `.env`: они имеют собственные provenance,
-checksum, retention и access rules.
+Сохраните напечатанный SHA-256 отдельно от архива. Не добавляйте в transport
+данные или `.env`: у них собственные provenance, checksum и access rules.
 
-## Восстановление Workspace На Сервере
+## Восстановление Source На Сервере
 
-Распаковывать архив следует в новый пустой staging directory. Сначала сверить
-внешний checksum, затем manifest и bundles:
+Распакуйте архив в новый пустой staging directory. Сначала сверьте внешний
+checksum, затем application bundle:
 
 ```shell
 mkdir geo-registry-source
@@ -66,37 +64,27 @@ cd geo-registry-source
 
 git init --bare --quiet bundle-verifier.git
 git -C bundle-verifier.git bundle verify "$(pwd)/geo-registry.bundle"
-git -C bundle-verifier.git bundle verify "$(pwd)/message-bus-async.bundle"
-git -C bundle-verifier.git bundle verify "$(pwd)/message-bus-async-worker.bundle"
 ```
 
-Проверка в пустом bare repository подтверждает, что bundles содержат полную
-историю без скрытых prerequisites. Временный `bundle-verifier.git` не входит в
-workspace и после проверки может быть удалён.
-
-Создать точную соседнюю структуру и checkout веток из `source-manifest.txt`:
+Создайте application checkout из branch, указанной в
+`source-manifest.txt`, и проверьте полный commit:
 
 ```shell
-mkdir -p workspace/library
-git clone --branch main \
-  geo-registry.bundle workspace/geo-registry
-git clone --branch main \
-  message-bus-async.bundle workspace/library/MessageBusAsync
-git clone --branch main \
-  message-bus-async-worker.bundle workspace/library/MessageBusAsyncWorker
+git clone --branch main geo-registry.bundle geo-registry
+cd geo-registry
+git rev-parse HEAD
 ```
 
-Для public release используются `main` и annotated tags. Manifest остаётся
-authoritative для каждого конкретного source archive: если в нём указана другая
-ветка, в `--branch` подставляется её значение. После clone все три `HEAD` должны
-совпасть с полными commit IDs manifest; dirty checkout продолжать нельзя.
+Для public release вместо branch checkout используйте соответствующий
+annotated tag. Dirty checkout продолжать нельзя. Package versions и source
+references берутся из tracked `app/composer.lock`, а не из произвольной
+локальной копии библиотек.
 
 ## Read-Only Preflight
 
-Создать ignored `workspace/geo-registry/config/.env` из example и заменить
-development credentials, Monaco PBF/update URLs и остальные значения на
-утверждённую server configuration. Секреты не должны попадать в shell history,
-manifest или Git.
+Создайте ignored `config/.env` из example и замените development credentials,
+Monaco PBF/update URLs и остальные значения на утверждённую server
+configuration. Секреты не должны попадать в shell history, manifest или Git.
 
 Для зафиксированного локального Nominatim PBF используется read-only каталог:
 
@@ -110,7 +98,7 @@ NOMINATIM_PBF_PATH=/data/nominatim/approved-snapshot.osm.pbf
 должен указывать на файл внутри `/data/nominatim`, а соответствующий host
 directory — существовать и быть читаемым до preflight.
 
-Для data server в ignored `config/.env` обязательно выбрать production-профиль
+Для data server в ignored `config/.env` обязательно выберите production-профиль
 application PostgreSQL:
 
 ```dotenv
@@ -120,10 +108,9 @@ POSTGRES_TUNING_PROFILE=prod
 Профиль, его границы ресурсов и допустимые operator overrides описаны в
 [postgresql-tuning.md](../postgresql-tuning.md).
 
-До build/start/import выполнить только read-only preflight:
+До build/start/import выполните только read-only preflight:
 
 ```shell
-cd workspace/geo-registry
 make server-preflight \
   GAR_SOURCE=/absolute/path/to/gar/xml-or-directory \
   SERVER_STORAGE_PATH=/absolute/path/to/data-filesystem \
@@ -131,30 +118,35 @@ make server-preflight \
   SERVER_MIN_MEMORY_GB=<approved-docker-memory-budget>
 ```
 
-Оба budget задаются оператором явно: preflight не угадывает требования по
-размеру архива. Free-space budget должен одновременно учитывать распакованный
-GAR, application PostgreSQL, внутреннюю PostgreSQL Nominatim, OpenSearch,
-временные rebuild artifacts, backups и согласованный запас. Файловая система
-`SERVER_STORAGE_PATH` должна быть той, на которой фактически будут размещены
-эти данные; перенос Docker data root/volumes остаётся server configuration.
+Оба budget задаются оператором явно. Free-space budget должен учитывать
+распакованный GAR, application PostgreSQL, PostgreSQL Nominatim, OpenSearch,
+временные rebuild artifacts, backups и согласованный запас.
 
 Preflight не запускает containers и не меняет данные. Он проверяет:
 
-- non-root execution, наличие Docker/Compose и Linux container daemon;
-- чистые repositories и совпадение library HEAD с Composer lock;
+- non-root execution, Docker/Compose и Linux container daemon;
+- clean application repository;
+- locked versions/references MessageBus packages и отсутствие path
+  distribution;
 - абсолютный читаемый GAR source и доступный data filesystem;
-- отсутствие development-only credentials и Monaco dataset в `.env`;
-- production-профиль PostgreSQL, его внутренний memory/WAL budget и capacity
-  host;
-- утверждённые minimum free space и Docker memory не ниже границ профиля;
-- корректность разрешённой Compose configuration.
+- отсутствие development credentials и Monaco dataset в `.env`;
+- production-профиль PostgreSQL и capacity host;
+- утверждённые minimum free space и Docker memory;
+- разрешённую Compose configuration без library bind mounts.
 
 ## После Успешного Preflight
 
-На data server выполняется существующий [release parity runbook](release-parity.md):
+Для connected source build установите exact dependencies из lock:
 
-1. build/install и fast/contract/integration gates на одной revision;
-2. применение migrations и запуск full Nominatim import;
+```shell
+make build
+make install
+```
+
+Затем выполняется существующий [release parity runbook](release-parity.md):
+
+1. fast/contract/integration gates на одной application revision;
+2. migrations и full Nominatim import;
 3. canonical GAR import с checkpoints;
 4. региональный `address_search` rebuild и parity;
 5. OpenSearch blue-green rebuild и alias switch;
@@ -165,7 +157,7 @@ Preflight не запускает containers и не меняет данные. 
 
 ## Rollback Boundary
 
-До начала import rollback равен удалению нового server workspace и не затрагивает
-рабочий legacy runtime. После начала migrations/import применяются backup и
-rollback правила `release-parity.md` и `worker-cutover.md`; source archive не
-является backup базы, индексов, Nominatim или legacy queues.
+До начала import rollback равен удалению нового server checkout и не
+затрагивает рабочий legacy runtime. После начала migrations/import применяются
+backup и rollback правила `release-parity.md` и `worker-cutover.md`; source
+archive не является backup базы, индексов, Nominatim или legacy queues.

@@ -14,32 +14,35 @@ runtime продолжите по [руководству данных](data-lif
 PHP и Composer на host не нужны. Не запускайте development-команды через
 `sudo`.
 
-## 1. Получить Совместимую Workspace
+## 1. Получить Приложение
 
-Geo Registry `v0.1.0` подключает библиотеки через Composer path repositories,
-поэтому три release должны лежать в соседней структуре:
+Geo Registry `v0.1.0` подключает опубликованные библиотеки через Packagist.
+Соседние library checkout больше не требуются:
 
 ```shell
-mkdir -p geo-registry-workspace/library
-cd geo-registry-workspace
-
 git clone --branch v0.1.0 \
-  https://github.com/wolfcharaa/geo-registry.git geo-registry
-git clone --branch v0.1.0 \
-  https://github.com/wolfcharaa/message-bus-async.git library/MessageBusAsync
-git clone --branch v0.1.0 \
-  https://github.com/wolfcharaa/message-bus-async-worker.git library/MessageBusAsyncWorker
-
+  https://github.com/wolfcharaa/geo-registry.git
 cd geo-registry
 ```
 
-Не смешивайте произвольные branches: `app/composer.lock` фиксирует commits
-обеих библиотек, а production build проверяет соседние checkout.
+`app/composer.lock` фиксирует `v0.1.0` и source references обеих библиотек.
+`make install` использует эти exact dist packages, поэтому отдельный checkout
+библиотек не участвует ни в development runtime, ни в production build.
 
-В другом приложении библиотеки можно подключить как обычные VCS packages.
-Команды Composer и минимальные примеры находятся в README
-[core](https://github.com/wolfcharaa/message-bus-async) и
-[worker](https://github.com/wolfcharaa/message-bus-async-worker).
+В другом Composer-приложении та же release line устанавливается напрямую из
+Packagist:
+
+```shell
+composer require \
+  'romanfedorskij/message-bus-async:^0.1' \
+  'romanfedorskij/message-bus-async-worker:^0.1'
+```
+
+Metadata и доступные версии: [core package][packagist-core] и
+[worker package][packagist-worker].
+
+[packagist-core]: https://packagist.org/packages/romanfedorskij/message-bus-async
+[packagist-worker]: https://packagist.org/packages/romanfedorskij/message-bus-async-worker
 
 ## 2. Настроить Окружение
 

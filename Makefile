@@ -31,7 +31,7 @@ build: ## Build the PHP development image
 	$(COMPOSE) build app
 .PHONY: build
 
-build-production: guard-user ## Build the self-contained production image from the three-repository workspace
+build-production: guard-user ## Build the self-contained production image from locked Composer packages
 	DOCKER_IMAGE_PREFIX="$(DOCKER_IMAGE_PREFIX)" RELEASE_VERSION="$(RELEASE_VERSION)" \
 		DOCKER_PLATFORM="$(DOCKER_PLATFORM)" docker/scripts/build-production-image.sh
 .PHONY: build-production
@@ -220,7 +220,7 @@ test-integration: guard-user ## Run real PostgreSQL and OpenSearch integration t
 	docker/scripts/run-integration-tests.sh
 .PHONY: test-integration
 
-server-source-bundle: guard-user ## Package the clean three-repository source workspace for transfer
+server-source-bundle: guard-user ## Package the clean application source and locked package identity for transfer
 	SERVER_SOURCE_OUTPUT="$(SERVER_SOURCE_OUTPUT)" docker/scripts/create-server-source-bundle.sh
 .PHONY: server-source-bundle
 

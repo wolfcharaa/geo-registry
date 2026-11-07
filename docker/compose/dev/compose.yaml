@@ -45,8 +45,6 @@ services:
       - ../../../app:/app
       - ../../../docs:/docs:ro
       - "${ADDRESS_SOURCE_DATA_PATH:-../../../docker/data}:/data:ro"
-      - ../../../../library/MessageBusAsync:/library/MessageBusAsync:ro
-      - ../../../../library/MessageBusAsyncWorker:/library/MessageBusAsyncWorker:ro
     depends_on:
       - nominatim
       - opensearch
@@ -83,8 +81,6 @@ services:
       LOG_FORMAT: "${LOG_FORMAT:-console}"
     volumes:
       - ../../../app:/app
-      - ../../../../library/MessageBusAsync:/library/MessageBusAsync:ro
-      - ../../../../library/MessageBusAsyncWorker:/library/MessageBusAsyncWorker:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -124,8 +120,6 @@ services:
       OPENSEARCH_TIMEOUT_SECONDS: "${OPENSEARCH_TIMEOUT_SECONDS:-60}"
     volumes:
       - ../../../app:/app
-      - ../../../../library/MessageBusAsync:/library/MessageBusAsync:ro
-      - ../../../../library/MessageBusAsyncWorker:/library/MessageBusAsyncWorker:ro
     depends_on:
       postgres:
         condition: service_healthy
