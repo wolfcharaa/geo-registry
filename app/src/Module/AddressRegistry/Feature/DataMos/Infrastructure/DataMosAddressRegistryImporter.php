@@ -47,8 +47,6 @@ use function trim;
 
 final class DataMosAddressRegistryImporter
 {
-    public const APICRAFTER_SOURCE = 'https://api.crftr.net/open/rawapi/v3/datamos/addressreestr';
-
     public function __construct(
         private readonly PDO $db,
         private readonly BsonDocumentStream $bsonDocuments,
@@ -64,13 +62,14 @@ final class DataMosAddressRegistryImporter
         ?int $limit = null,
         bool $truncate = false,
         bool $dryRun = false,
+        bool $requireManifest = false,
         ?callable $progress = null,
     ): DataMosAddressRegistryImportResult {
         $source = trim($source);
         if ($source === '') {
             throw new RuntimeException('Data.Mos source is required.');
         }
-        $this->validateSource($source);
+        $this->validateSource($source, $requireManifest);
 
         $batchSize = max(1, $batchSize);
         $pageSize = max(1, $pageSize);
@@ -149,7 +148,12 @@ final class DataMosAddressRegistryImporter
             return;
         }
 
-        if (str_ends_with($lowerSource, '.jsonl') || str_ends_with($lowerSource, '.ndjson')) {
+        if (
+            str_ends_with($lowerSource, '.jsonl')
+            || str_ends_with($lowerSource, '.ndjson')
+            || str_ends_with($lowerSource, '.jsonl.gz')
+            || str_ends_with($lowerSource, '.ndjson.gz')
+        ) {
             yield from $this->jsonLines($source);
 
             return;
@@ -164,9 +168,13 @@ final class DataMosAddressRegistryImporter
         yield from $this->jsonFile($source);
     }
 
-    private function validateSource(string $source): void
+    private function validateSource(string $source, bool $requireManifest): void
     {
         if (str_starts_with($source, 'http://') || str_starts_with($source, 'https://')) {
+            if ($requireManifest) {
+                throw new RuntimeException('Data.Mos --require-manifest accepts only a local snapshot file.');
+            }
+
             return;
         }
 
@@ -178,6 +186,48 @@ final class DataMosAddressRegistryImporter
             throw new RuntimeException(
                 'Data.Mos zip package must be extracted first. Import data.bson.gz from the package.',
             );
+        }
+
+        $manifestPath = $source . '.manifest.json';
+        if (!is_file($manifestPath)) {
+            if ($requireManifest) {
+                throw new RuntimeException("Data.Mos snapshot manifest not found: {$manifestPath}");
+            }
+
+            return;
+        }
+
+        $this->verifySnapshotManifest($source, $manifestPath);
+    }
+
+    private function verifySnapshotManifest(string $source, string $manifestPath): void
+    {
+        $contents = file_get_contents($manifestPath);
+        if ($contents === false) {
+            throw new RuntimeException("Unable to read Data.Mos snapshot manifest: {$manifestPath}");
+        }
+        try {
+            $manifest = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException $error) {
+            throw new RuntimeException('Data.Mos snapshot manifest is not valid JSON.', previous: $error);
+        }
+        if (!is_array($manifest) || array_is_list($manifest)) {
+            throw new RuntimeException('Data.Mos snapshot manifest must be a JSON object.');
+        }
+        if (($manifest['format'] ?? null) !== 'geo-registry-datamos-snapshot-v1') {
+            throw new RuntimeException('Data.Mos snapshot manifest format is not supported.');
+        }
+        if (($manifest['file'] ?? null) !== basename($source)) {
+            throw new RuntimeException('Data.Mos snapshot filename does not match its manifest.');
+        }
+
+        $bytes = filesize($source);
+        $sha256 = hash_file('sha256', $source);
+        if (!is_int($bytes) || !is_string($sha256)) {
+            throw new RuntimeException('Unable to calculate Data.Mos snapshot checksum.');
+        }
+        if (($manifest['bytes'] ?? null) !== $bytes || ($manifest['sha256'] ?? null) !== $sha256) {
+            throw new RuntimeException('Data.Mos snapshot bytes or SHA-256 do not match the manifest.');
         }
     }
 
@@ -223,7 +273,8 @@ final class DataMosAddressRegistryImporter
      */
     private function jsonLines(string $path): iterable
     {
-        $handle = fopen($path, 'rb');
+        $streamPath = str_ends_with(strtolower($path), '.gz') ? 'compress.zlib://' . $path : $path;
+        $handle = fopen($streamPath, 'rb');
         if ($handle === false) {
             throw new RuntimeException(sprintf('Unable to open Data.Mos JSONL file: %s', $path));
         }

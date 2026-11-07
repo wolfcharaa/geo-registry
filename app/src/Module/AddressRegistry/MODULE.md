@@ -199,6 +199,12 @@ scanned/written rows, итоговый physical row count, elapsed milliseconds 
 
 ## Операционный Статус GAR
 
+`bin/app gar:import <release-directory> --regions=50,77` импортирует общие XML
+из корня release и региональные XML только из каталогов `50/` и `77/`.
+Отсутствие любого запрошенного региона является ошибкой до запуска workers;
+для single-file source опция запрещена, потому что регион нельзя доказать по
+структуре release.
+
 `bin/app gar:status` читает последний import manifest, file checkpoints,
 последнюю shadow rebuild operation и региональные checkpoints. По умолчанию
 используются регионы `50,77`; другой ограниченный набор задаётся через

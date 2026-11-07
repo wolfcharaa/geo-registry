@@ -31,6 +31,7 @@ final class RuntimeConfigTest
             'HTTP_TIMEOUT_SECONDS' => '3.5',
             'LOG_FORMAT' => 'console',
             'DATAMOS_ADDRESS_REGISTRY_SOURCE' => '/data/datamos/registry.bson.gz',
+            'DATAMOS_API_KEY' => 'test-key',
             'OSM_ADDRESS_ALIASES_SOURCE' => '/data/osm/aliases.jsonl',
             'MOSCOW_REGION_CODE' => '77',
             'DATABASE_DSN' => 'host=postgres db=geo',
@@ -64,6 +65,7 @@ final class RuntimeConfigTest
         Assert::same($console->version, 'test');
         Assert::same($console->userAgent, 'geo-registry/test');
         Assert::same($addressSources->dataMosAddressRegistrySource, '/data/datamos/registry.bson.gz');
+        Assert::same($addressSources->dataMosApiKey, 'test-key');
         Assert::same($addressSources->osmAddressAliasesSource, '/data/osm/aliases.jsonl');
         Assert::same($addressSources->moscowRegionCode, 77);
         Assert::same($http->listen, '0.0.0.0:9000');

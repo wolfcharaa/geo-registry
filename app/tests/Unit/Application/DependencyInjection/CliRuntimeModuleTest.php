@@ -50,6 +50,7 @@ final class CliRuntimeModuleTest
         Assert::true(str_contains($console, 'gar:activity'));
         Assert::true(str_contains($console, 'gar:releases'));
         Assert::true(str_contains($console, 'gar:address-search:rebuild'));
+        Assert::true(str_contains($console, 'datamos:address-registry:download'));
         Assert::true(str_contains($console, 'datamos:address-registry:import'));
         Assert::true(str_contains($console, 'datamos:address-registry:enrich'));
         Assert::true(str_contains($console, 'osm:address-aliases:import'));

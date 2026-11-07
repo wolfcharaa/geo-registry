@@ -10,6 +10,7 @@ final readonly class AddressSourceConfig
 {
     public function __construct(
         public string $dataMosAddressRegistrySource,
+        public ?string $dataMosApiKey,
         public string $osmAddressAliasesSource,
         public int $moscowRegionCode,
     ) {
@@ -29,8 +30,9 @@ final readonly class AddressSourceConfig
         return new self(
             dataMosAddressRegistrySource: $environment->string(
                 'DATAMOS_ADDRESS_REGISTRY_SOURCE',
-                '/data/datamos/addressreestr.bson.gz',
+                '/data/datamos/addressreestr.jsonl.gz',
             ),
+            dataMosApiKey: $environment->optionalString('DATAMOS_API_KEY'),
             osmAddressAliasesSource: $environment->string(
                 'OSM_ADDRESS_ALIASES_SOURCE',
                 '/data/geodata/moscow-address-aliases.jsonl',

@@ -27,4 +27,18 @@ final class ImportGarTest
 
         new ImportGar('/data/gar', workers: 17);
     }
+
+    public function testItAcceptsAnExplicitRegionSelection(): void
+    {
+        $command = new ImportGar('/data/gar', regions: [50, 77]);
+
+        Assert::same($command->regions, [50, 77]);
+    }
+
+    public function testItRejectsDuplicateRegions(): void
+    {
+        Expect::exception(InvalidArgumentException::class);
+
+        new ImportGar('/data/gar', regions: [77, 77]);
+    }
 }

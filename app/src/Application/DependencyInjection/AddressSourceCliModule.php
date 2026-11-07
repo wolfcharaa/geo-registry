@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace App\Application\DependencyInjection;
 
+use Amp\Http\Client\HttpClient;
 use App\Config\AddressSourceConfig;
+use App\Config\ConsoleConfig;
 use App\Config\PostgresConfig;
+use App\Infrastructure\Http\AmpHttpClientFactory;
 use App\Infrastructure\Postgres\PdoConnectionFactory;
 use App\Module\AddressRegistry\Feature\DataMos\Infrastructure\BsonDocumentStream;
 use App\Module\AddressRegistry\Feature\DataMos\Infrastructure\DataMosAddressRegistryEnricher;
 use App\Module\AddressRegistry\Feature\DataMos\Infrastructure\DataMosAddressRegistryImporter;
+use App\Module\AddressRegistry\Feature\DataMos\Infrastructure\DataMosSnapshotDownloader;
+use App\Module\AddressRegistry\Feature\DataMos\UserInterface\Cli\DownloadDataMosAddressRegistryCommand;
 use App\Module\AddressRegistry\Feature\DataMos\UserInterface\Cli\EnrichAddressSearchFromDataMosCommand;
 use App\Module\AddressRegistry\Feature\DataMos\UserInterface\Cli\ImportDataMosAddressRegistryCommand;
 use App\Module\AddressRegistry\Feature\Osm\Infrastructure\OsmAddressAliasImporter;
@@ -27,6 +32,7 @@ final readonly class AddressSourceCliModule implements Module
     public function __construct(
         private PostgresConfig $postgresConfig,
         private AddressSourceConfig $addressSourceConfig,
+        private ConsoleConfig $consoleConfig,
     ) {}
 
     /** @return list<Ref<Command>> */
@@ -50,6 +56,16 @@ final readonly class AddressSourceCliModule implements Module
                 'db' => $connection,
                 'bsonDocuments' => $dic->object(BsonDocumentStream::class),
             ]);
+        $httpClient = $dic->object(
+            HttpClient::class,
+            static fn(): HttpClient => AmpHttpClientFactory::create(120),
+        );
+        $snapshotDownloader = $dic
+            ->object(DataMosSnapshotDownloader::class)
+            ->args([
+                'httpClient' => $httpClient,
+                'userAgent' => $this->consoleConfig->userAgent,
+            ]);
         $osmImporter = $dic
             ->object(OsmAddressAliasImporter::class)
             ->args([
@@ -58,6 +74,13 @@ final readonly class AddressSourceCliModule implements Module
             ]);
 
         return [
+            $dic
+                ->object(DownloadDataMosAddressRegistryCommand::class)
+                ->args([
+                    'downloader' => $snapshotDownloader,
+                    'defaultDestination' => $dic->value($this->addressSourceConfig->dataMosAddressRegistrySource),
+                    'defaultApiKey' => $dic->value($this->addressSourceConfig->dataMosApiKey),
+                ]),
             $dic
                 ->object(ImportDataMosAddressRegistryCommand::class)
                 ->args([

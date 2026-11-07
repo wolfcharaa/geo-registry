@@ -19,8 +19,11 @@ final class GarXmlCatalog
         $this->descriptors = self::descriptors();
     }
 
-    /** @return list<GarXmlSourceFile> */
-    public function files(string $sourcePath): array
+    /**
+     * @param list<int> $regions
+     * @return list<GarXmlSourceFile>
+     */
+    public function files(string $sourcePath, array $regions = []): array
     {
         $source = realpath($sourcePath);
         if ($source === false) {
@@ -28,6 +31,9 @@ final class GarXmlCatalog
         }
 
         if (is_file($source)) {
+            if ($regions !== []) {
+                throw new GarImportFailed('GAR --regions filtering requires a release directory, not a single XML file.');
+            }
             $descriptor = $this->descriptorFor(basename($source));
             if ($descriptor === null) {
                 throw new GarImportFailed('The specified XML file is not supported by the GAR catalog.');
@@ -40,6 +46,7 @@ final class GarXmlCatalog
         }
 
         $files = [];
+        $matchedRegions = [];
         $iterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($source, RecursiveDirectoryIterator::SKIP_DOTS),
         );
@@ -56,11 +63,31 @@ final class GarXmlCatalog
                 throw new GarImportFailed("Unable to resolve GAR XML file: {$item->getPathname()}");
             }
             $relativePath = str_replace('\\', '/', substr($path, strlen($source) + 1));
+            if (!$this->matchesRegions($relativePath, $regions)) {
+                continue;
+            }
+            $region = $this->regionForPath($relativePath);
+            if ($region !== null && in_array($region, $regions, true)) {
+                $matchedRegions[$region] = true;
+            }
             $files[] = $this->sourceFile($path, $relativePath, $descriptor);
         }
 
+        if ($regions !== []) {
+            $missingRegions = array_values(array_filter(
+                $regions,
+                static fn(int $region): bool => !isset($matchedRegions[$region]),
+            ));
+            if ($missingRegions !== []) {
+                throw new GarImportFailed(
+                    'GAR import source has no supported XML files for regions ' . implode(',', $missingRegions) . '.',
+                );
+            }
+        }
+
         if ($files === []) {
-            throw new GarImportFailed('GAR import source does not contain supported XML files.');
+            $suffix = $regions === [] ? '' : ' for regions ' . implode(',', $regions);
+            throw new GarImportFailed("GAR import source does not contain supported XML files{$suffix}.");
         }
 
         usort(
@@ -75,6 +102,37 @@ final class GarXmlCatalog
         );
 
         return $files;
+    }
+
+    /** @param list<int> $regions */
+    private function matchesRegions(string $relativePath, array $regions): bool
+    {
+        if ($regions === []) {
+            return true;
+        }
+
+        $region = $this->regionForPath($relativePath);
+        if ($region === null) {
+            return true;
+        }
+
+        return in_array($region, $regions, true);
+    }
+
+    private function regionForPath(string $relativePath): ?int
+    {
+        $directories = explode('/', dirname($relativePath));
+        foreach ($directories as $directory) {
+            if (preg_match('/^[0-9]{1,2}$/D', $directory) !== 1) {
+                continue;
+            }
+            $region = (int) $directory;
+            if ($region >= 1 && $region <= 99) {
+                return $region;
+            }
+        }
+
+        return null;
     }
 
     public function canonicalSourcePath(string $sourcePath): string

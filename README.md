@@ -58,7 +58,7 @@ make smoke
 
 ```text
 официальный GAR XML
-  -> региональный source 50/77
+  -> --regions=50,77 без копирования всероссийской распаковки
   -> canonical GAR tables
   -> partitioned address_search
   -> Data.Mos / OSM aliases (опционально)
@@ -69,15 +69,16 @@ make smoke
 
 ```shell
 bin/app gar:releases --json
-bin/app gar:import /data/gar --batch-size=50000 --workers=4
+bin/app gar:import /data/gar --regions=50,77 --batch-size=50000 --workers=4
 bin/app gar:address-search:rebuild --batch-size=50000
 bin/app gar:integrity --regions=50,77 --deep --only-failed
 bin/app gar:status --regions=50,77 --exact
+bin/app datamos:address-registry:download --dry-run
 ```
 
-Не запускайте `gar:import` на корне всероссийской распаковки, если нужен только
-московский набор: у команды нет `--regions`. Подготовка каталога, скачивание,
-распаковка, Data.Mos, Nominatim и OpenSearch описаны в
+`gar:import --regions=50,77` оставляет общие root-справочники release и читает
+региональные XML только из каталогов `50/` и `77/`. Скачивание, распаковка,
+официальный Data.Mos snapshot, Nominatim и OpenSearch описаны в
 [жизненном цикле данных](docs/guides/data-lifecycle.md).
 
 ## HTTP API

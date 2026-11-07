@@ -46,6 +46,12 @@ final class ImportGarCommand extends Command
                 '2',
             )
             ->addOption(
+                'regions',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Import shared dictionaries and only these regional directories (comma-separated codes 1..99).',
+            )
+            ->addOption(
                 'restart',
                 null,
                 InputOption::VALUE_NONE,
@@ -59,10 +65,12 @@ final class ImportGarCommand extends Command
             $source = $input->getArgument('source');
             $batchSize = $input->getOption('batch-size');
             $workers = $input->getOption('workers');
+            $regions = $input->getOption('regions');
             if (
                 !is_string($source)
                 || !is_string($batchSize)
                 || !is_string($workers)
+                || ($regions !== null && !is_string($regions))
                 || preg_match('/^[0-9]+$/D', $batchSize) !== 1
                 || preg_match('/^[0-9]+$/D', $workers) !== 1
             ) {
@@ -70,11 +78,13 @@ final class ImportGarCommand extends Command
             }
 
             $workerCount = (int) $workers;
+            $selectedRegions = $regions === null ? [] : self::regions($regions);
             $result = $this->runner->run(new ImportGar(
                 sourcePath: $source,
                 batchSize: (int) $batchSize,
                 workers: $workerCount,
                 restart: $input->getOption('restart') === true,
+                regions: $selectedRegions,
             ));
         } catch (InvalidArgumentException|GarImportFailed $error) {
             $output->writeln('<error>' . $error->getMessage() . '</error>');
@@ -84,7 +94,7 @@ final class ImportGarCommand extends Command
 
         $status = $result->alreadyCompleted ? 'already-completed' : 'completed';
         $output->writeln(sprintf(
-            'status=%s operation=%d files=%d/%d rows=%d merged=%d workers=%d resumed=%s',
+            'status=%s operation=%d files=%d/%d rows=%d merged=%d workers=%d regions=%s resumed=%s',
             $status,
             $result->operationId,
             $result->filesCompleted,
@@ -92,9 +102,30 @@ final class ImportGarCommand extends Command
             $result->rowsProcessed,
             $result->rowsMerged,
             $workerCount,
+            $selectedRegions === [] ? 'all' : implode(',', $selectedRegions),
             $result->resumed ? 'yes' : 'no',
         ));
 
         return self::SUCCESS;
+    }
+
+    /** @return non-empty-list<int> */
+    private static function regions(string $value): array
+    {
+        $regions = [];
+        foreach (explode(',', $value) as $part) {
+            $part = trim($part);
+            if (preg_match('/^[0-9]{1,2}$/D', $part) !== 1 || (int) $part < 1 || (int) $part > 99) {
+                throw new InvalidArgumentException('Option --regions accepts unique codes from 1 to 99.');
+            }
+            $region = (int) $part;
+            if (isset($regions[$region])) {
+                throw new InvalidArgumentException('Option --regions accepts unique codes from 1 to 99.');
+            }
+            $regions[$region] = $region;
+        }
+        ksort($regions);
+
+        return array_values($regions);
     }
 }

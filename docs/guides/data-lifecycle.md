@@ -4,8 +4,9 @@
 GAR и partitioned `address_search` для регионов `50` и `77`. Data.Mos,
 OSM aliases, Nominatim и OpenSearch подключаются после базовой проверки GAR.
 
-Git release не содержит datasets. Исходные архивы, распаковки и backups храните
-вне repository.
+Обычный Git/offline release не содержит datasets. Full-data offline release
+может по явному флагу включить application PostgreSQL dump; исходные архивы,
+распаковки и рабочие backups всё равно хранятся вне repository.
 
 ## Какие Данные Нужны
 
@@ -75,45 +76,19 @@ unzip -q gar-full.zip -d full
 Полная распаковка значительно больше ZIP. Проверяйте свободное место до
 `unzip`; не распаковывайте архив внутри Git workspace.
 
-## 4. Оставить Только Регионы 50 И 77
+## 4. Выбрать Регионы 50 И 77 Без Копирования
 
-`gar:import` рекурсивно читает все поддерживаемые XML и не имеет опции
-`--regions`. Поэтому подготовьте отдельный source tree:
+Оставьте полную распаковку неизменной. `gar:import --regions=50,77` до чтения
+XML строит catalog из:
 
-```text
-regions-50-77/
-├── AS_*_TYPES_*.XML и другие общие справочники release
-├── version.txt
-├── 50/
-│   └── региональные AS_*.XML
-└── 77/
-    └── региональные AS_*.XML
-```
+- поддерживаемых общих XML в корне release;
+- поддерживаемых XML внутри числовых каталогов `50/` и `77/`;
+- без XML из остальных числовых региональных каталогов.
 
-Пример для распаковки, где файлы лежат непосредственно в `full/`:
-
-```shell
-mkdir -p /srv/geo-registry-data/gar/regions-50-77
-cp -a /srv/geo-registry-data/gar/full/50 \
-  /srv/geo-registry-data/gar/regions-50-77/50
-cp -a /srv/geo-registry-data/gar/full/77 \
-  /srv/geo-registry-data/gar/regions-50-77/77
-
-find /srv/geo-registry-data/gar/full -maxdepth 1 -type f \
-  \( -name 'AS_*.XML' -o -name 'version.txt' \) \
-  -exec cp -a -- {} /srv/geo-registry-data/gar/regions-50-77/ \;
-```
-
-Проверьте, что на верхнем уровне нет других региональных каталогов:
-
-```shell
-find /srv/geo-registry-data/gar/regions-50-77 \
-  -mindepth 1 -maxdepth 1 -type d -printf '%f\n'
-du -sh /srv/geo-registry-data/gar/regions-50-77
-```
-
-Ожидаются только `50` и `77`. Общие root XML нужны для справочников типов и
-операций; не копируйте только два региональных каталога.
+Команда fail-closed отклоняет отсутствующий запрошенный регион. Для одного
+XML-файла `--regions` запрещён: региональный scope доказывается структурой
+полного release directory. Предварительно копировать десятки гигабайт в
+отдельный source tree больше не нужно.
 
 ## 5. Импортировать Canonical GAR
 
@@ -124,8 +99,9 @@ Importer использует streaming XMLReader, нормализует XML at
 
 ```shell
 docker/compose/dev.sh run --rm --no-deps \
-  --volume /srv/geo-registry-data/gar/regions-50-77:/data/gar:ro \
+  --volume /srv/geo-registry-data/gar/full:/data/gar:ro \
   app bin/app gar:import /data/gar \
+  --regions=50,77 \
   --batch-size=50000 \
   --workers=4
 ```
@@ -165,23 +141,50 @@ Rebuild строит shadow table, создаёт indexes, проверяет pa
 
 ## 7. Добавить Data.Mos
 
-Официальный источник —
+Официальный источник — набор `60562`
 [«Адресный реестр объектов недвижимости города Москвы»](https://data.mos.ru/opendata/60562).
-Importer принимает BSON.GZ, BSON, JSON, JSONL или совместимый paginated HTTP
-source, но не разбирает XML. Получите snapshot на официальной странице и, если
-портал отдаёт другой формат, преобразуйте его вне приложения с сохранением
-version/date/checksum. В repository готового converter или официального mirror
-нет; старый сторонний BSON snapshot нельзя выдавать за актуальную выгрузку.
-Готовый input сохраните вне Git, например в
-`<ADDRESS_SOURCE_DATA_PATH>/datamos/addressreestr.bson.gz`.
+Приложение само читает официальный `apidata.mos.ru`, фиксирует version/release,
+постранично сохраняет JSONL.GZ и создаёт companion manifest с UTC-датой,
+числом строк, размером и SHA-256. Сторонний mirror и внешний XML/BSON converter
+для поддержанного пути не нужны.
 
-Сначала проверьте parser на ограниченном наборе без записи:
+Получите API key в личном кабинете Data.Mos (контракт endpoints описан в
+[официальной API-документации](https://apidata.mos.ru/Docs)) и передайте его
+только через environment; команда не печатает и не записывает ключ:
+
+```shell
+export DATAMOS_API_KEY='<personal-api-key>'
+make datamos-download DATAMOS_DOWNLOAD_FLAGS=--dry-run
+make datamos-download
+unset DATAMOS_API_KEY
+```
+
+Для внешнего каталога добавьте `DATA_HOST_PATH=/srv/geo-registry-data`; внутри
+него команда сама создаст `datamos/`.
+
+Результат находится вне Git:
+
+```text
+docker/data/datamos/
+├── addressreestr.jsonl.gz
+└── addressreestr.jsonl.gz.manifest.json
+```
+
+Для другого host path запустите ту же runtime-команду с writable mount. Полный
+контракт и параметры доступны во встроенной справке; default dataset ID уже
+равен `60562`:
+
+```shell
+bin/app datamos:address-registry:download --help
+```
+
+Сначала проверьте parser и manifest на ограниченном наборе без записи:
 
 ```shell
 docker/compose/dev.sh run --rm --no-deps app \
   bin/app datamos:address-registry:import \
-  /data/datamos/addressreestr.bson.gz \
-  --limit=1000 --dry-run
+  /data/datamos/addressreestr.jsonl.gz \
+  --require-manifest --limit=1000 --dry-run
 ```
 
 Затем загрузите staging и обогатите только регион `77`:
@@ -189,8 +192,8 @@ docker/compose/dev.sh run --rm --no-deps app \
 ```shell
 docker/compose/dev.sh run --rm --no-deps app \
   bin/app datamos:address-registry:import \
-  /data/datamos/addressreestr.bson.gz \
-  --batch-size=5000 --truncate --enrich
+  /data/datamos/addressreestr.jsonl.gz \
+  --require-manifest --batch-size=5000 --truncate --enrich
 ```
 
 Enrichment сопоставляет `N_FIAS` с GAR UUID, добавляет metadata/coordinates и
@@ -252,7 +255,19 @@ make smoke-release \
   POSTMAN_ENVIRONMENT=config/release.postman_environment.json
 ```
 
-Готовый переносимый набор состоит из независимых backups application
-PostgreSQL и Nominatim. OpenSearch экспортировать как canonical data не нужно —
-он перестраивается. Полные команды preflight, backup, verification и shadow
-restore находятся в [runbook backup/restore](../deployment/data-backup-restore.md).
+Готовый переносимый набор можно собрать вместе с application PostgreSQL:
+
+```shell
+make release-offline \
+  RELEASE_INCLUDE_APPLICATION_DATA=1 \
+  RELEASE_DATA_CONTAINER=<application-postgres-container> \
+  RELEASE_DATA_RESERVE_GB=10
+```
+
+Команда создаёт и проверяет custom `pg_dump`, связывает его с release commit и
+включает как `application-postgres-backup.tar`. Можно передать уже созданный
+`RELEASE_DATA_BACKUP_DIR`. Nominatim по-прежнему переносится отдельным backup,
+а OpenSearch экспортировать как canonical data не нужно — после `pg_restore`
+он перестраивается. Полные команды находятся в
+[offline release](../deployment/offline-release.md) и
+[runbook backup/restore](../deployment/data-backup-restore.md).

@@ -7,6 +7,13 @@
 - MessageBus dependencies переведены с соседних Composer path repositories на
   опубликованные Packagist releases `v0.1.0`; development, production build и
   source handoff больше не требуют отдельных library checkout.
+- `gar:import` получил fail-closed `--regions`, сохраняющий общие справочники и
+  отбрасывающий XML остальных регионов до запуска COPY workers.
+- Добавлена встроенная выгрузка официального Data.Mos dataset `60562` в
+  JSONL.GZ с version/release/checksum manifest и обязательной проверкой
+  manifest при импорте.
+- Offline release получил opt-in application PostgreSQL dump, проверяемое
+  извлечение на новом сервере и явный restore/rebuild OpenSearch runbook.
 
 ## [0.1.0] - 2026-11-07
 

@@ -1,13 +1,14 @@
 # Offline Release И Rollback
 
-Offline release переносит только application runtime. PostgreSQL приложения,
-Nominatim и OpenSearch имеют отдельный lifecycle и никогда не сохраняются в
-image archive приложения. Их volumes, dumps и indexes не входят в transport
-tar.
+Offline release всегда переносит immutable application runtime. По умолчанию
+он code-only; явный `RELEASE_INCLUDE_APPLICATION_DATA=1` дополнительно включает
+проверенный logical dump application PostgreSQL. Dump не встраивается в image.
+Nominatim и OpenSearch сохраняют отдельный lifecycle: Nominatim переносится
+своим backup, OpenSearch полностью перестраивается из PostgreSQL.
 
 ## Артефакты
 
-Готовый flat archive содержит ровно пять файлов в корне:
+Code-only flat archive содержит пять файлов в корне:
 
 ```text
 release-geo-registry-vX.Y.Z.bundle
@@ -17,6 +18,12 @@ RELEASE.md
 DEPLOY.md
 ```
 
+Full-data вариант содержит шестой файл:
+
+```text
+application-postgres-backup.tar
+```
+
 `source-linux-amd64.tar` содержит self-contained application image с HTTP и
 worker runtime. `source-manifest.txt` связывает release commit, исходный commit
 image, source references двух locked MessageBus packages, platform, image
@@ -24,6 +31,12 @@ tag/digest/id и SHA-256 Docker archive. Git bundle содержит application
 branch и annotated tag. Библиотеки уже находятся в `vendor` внутри image; для
 сборки нового image нужен application repository и доступ к Composer dist
 archives, но не соседние library checkout.
+
+`application-postgres-backup.tar` содержит ровно custom-format
+`application-postgres.dump` и его `manifest.txt`. Внешний `source-manifest.txt`
+дополнительно фиксирует SHA-256 data archive, dump SHA-256, время backup и
+release commit. Архив содержит production data без пароля: передавайте и
+храните его как защищённый backup, а не как публичный release asset.
 
 ## Подготовка Релиза
 
@@ -67,6 +80,32 @@ make release-offline DOCKER_PLATFORM=linux/amd64
 `docker/data/release/<tag>/`. Напечатанный SHA-256 внешнего tar нужно хранить и
 передавать отдельно от самого файла.
 
+Чтобы сразу снять transaction-consistent dump из запущенного application
+PostgreSQL и включить его в тот же transport archive, сначала остановите новые
+jobs/import/rebuild согласно backup runbook, затем выполните:
+
+```shell
+make release-offline \
+  DOCKER_PLATFORM=linux/amd64 \
+  RELEASE_INCLUDE_APPLICATION_DATA=1 \
+  RELEASE_DATA_CONTAINER=<application-postgres-container> \
+  RELEASE_DATA_RESERVE_GB=10
+```
+
+Если verified backup уже создан, исключите повторный `pg_dump`:
+
+```shell
+make release-offline \
+  DOCKER_PLATFORM=linux/amd64 \
+  RELEASE_INCLUDE_APPLICATION_DATA=1 \
+  RELEASE_DATA_BACKUP_DIR=/srv/backups/geo-registry/application-postgres-<UTC> \
+  RELEASE_DATA_CONTAINER=<compatible-postgres-container>
+```
+
+Оба пути проверяют SHA-256, `pg_restore --list`, PostgreSQL major и точное
+совпадение `application_revision` с release commit. Без явного флага data
+archive не создаётся и не включается.
+
 Проверка состава:
 
 ```shell
@@ -98,6 +137,28 @@ cp /srv/releases/geo-registry/v1.0.0/source-manifest.txt \
   docker/data/release/v1.0.0/
 ```
 
+Если `source-manifest.txt` содержит `data_bundle=application-postgres`, сначала
+проверьте data archive без публикации backup-каталога:
+
+```shell
+make extract-release-data \
+  RELEASE_EXTRACT_DIR=/srv/releases/geo-registry/v1.0.0 \
+  BACKUP_ROOT=/srv/backups/geo-registry \
+  RELEASE_DATA_DRY_RUN=1
+```
+
+Затем атомарно извлеките проверенный backup:
+
+```shell
+make extract-release-data \
+  RELEASE_EXTRACT_DIR=/srv/releases/geo-registry/v1.0.0 \
+  BACKUP_ROOT=/srv/backups/geo-registry
+```
+
+Результат — `/srv/backups/geo-registry/application-postgres-v1.0.0`, совместимый
+с обычными `verify-data-backup` и `restore-data-shadow`. Restore не выполняется
+автоматически и не может затронуть действующую БД.
+
 Перед изменением runtime создать ignored `config/prod.env`, выполнить
 [data backup/restore gate](data-backup-restore.md), проверить schema
 compatibility и выполнить read-only release gate:
@@ -118,6 +179,14 @@ make change-release
 `app`, `worker-address`, `worker-runtime` с `--no-build --pull never`. Data
 services и их volumes не затрагиваются. Migrations/import/rebuild не запускаются
 неявно и должны быть выполнены в согласованном release window до switch.
+
+Для нового контура порядок данных такой:
+
+1. `make restore-data-preflight` для отсутствующей shadow-БД;
+2. `make restore-data-shadow` с точным `RESTORE_CONFIRM`;
+3. `gar:integrity --regions=50,77 --deep --only-failed` на восстановленной БД;
+4. `opensearch:reindex`, затем `opensearch:status` и search smoke;
+5. только после этих gates — переключение DSN/application runtime.
 
 ## Rollback
 

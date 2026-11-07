@@ -48,9 +48,10 @@ backup уже подготовленного target PostgreSQL, но не legacy
 legacy shell-команды дословно; используйте `bin/app <command> --help` и
 [актуальный data guide](../guides/data-lifecycle.md).
 
-В target `gar:import` не имеет `--regions`, `--truncate` или `--insert-only`.
-Региональный scope определяется составом подготовленного XML-каталога, а
-повторный запуск использует manifest/checkpoints. Target rebuild не принимает
+В target `gar:import` имеет fail-closed `--regions=50,77`, но не имеет
+`--truncate` или `--insert-only`. Фильтр сохраняет общие root-справочники,
+выбирает только числовые региональные каталоги и включается в
+manifest/checkpoints. Target rebuild не принимает
 legacy `--workers/--truncate`: он строит shadow table и переключает её только
 после parity.
 

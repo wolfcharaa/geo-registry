@@ -7,7 +7,7 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
 # shellcheck disable=SC1091
 . "${script_dir}/release-lib.sh"
 
-for command_name in awk cp git grep ln mkdir mktemp mv tar tr; do
+for command_name in awk cp docker git grep ln mkdir mktemp mv tar tr; do
     release_require_command "${command_name}"
 done
 
@@ -55,6 +55,62 @@ expected_archive_sha256=$(release_manifest_value archive_sha256 "${manifest_path
 [ "$(release_sha256 "${archive_path}")" = "${expected_archive_sha256}" ] \
     || release_fail "image archive checksum does not match before transport packaging"
 
+include_application_data=${RELEASE_INCLUDE_APPLICATION_DATA:-0}
+case "${include_application_data}" in
+    0|1) ;;
+    *) release_fail "RELEASE_INCLUDE_APPLICATION_DATA must be 0 or 1" ;;
+esac
+
+data_archive_name=application-postgres-backup.tar
+data_archive_path="${artifact_dir}/${data_archive_name}"
+data_archive_sha256=
+data_dump_sha256=
+data_created_at=
+if [ "${include_application_data}" = 1 ]; then
+    data_backup_directory=${RELEASE_DATA_BACKUP_DIR:-}
+    if [ -z "${data_backup_directory}" ]; then
+        data_backup_output=$(
+            BACKUP_COMPONENT=application-postgres \
+            BACKUP_ROOT="${artifact_dir}" \
+            BACKUP_CONTAINER="${RELEASE_DATA_CONTAINER:-}" \
+            BACKUP_RESERVE_GB="${RELEASE_DATA_RESERVE_GB:-10}" \
+            BACKUP_APPLICATION_REVISION="${release_commit}" \
+                "${project_root}/docker/backup/create-postgres-backup.sh"
+        )
+        printf '%s\n' "${data_backup_output}"
+        data_backup_directory=$(printf '%s\n' "${data_backup_output}" | awk -F': ' '$1 == "Backup created" {print substr($0, index($0, ": ") + 2)}')
+        [ -n "${data_backup_directory}" ] \
+            || release_fail "application PostgreSQL backup path was not reported"
+    else
+        data_backup_directory=$(release_resolve_path "${data_backup_directory}")
+    fi
+
+    BACKUP_DIR="${data_backup_directory}" VERIFY_CONTAINER="${RELEASE_DATA_CONTAINER:-}" \
+        "${project_root}/docker/backup/verify-postgres-backup.sh"
+    data_manifest_path="${data_backup_directory}/manifest.txt"
+    [ "$(release_manifest_value component "${data_manifest_path}" || true)" = application-postgres ] \
+        || release_fail "release data backup must contain application-postgres"
+    [ "$(release_manifest_value application_revision "${data_manifest_path}" || true)" = "${release_commit}" ] \
+        || release_fail "release data backup revision does not match the release commit"
+    data_dump_sha256=$(release_manifest_value dump_sha256 "${data_manifest_path}" || true)
+    data_created_at=$(release_manifest_value created_at "${data_manifest_path}" || true)
+
+    data_archive_temporary=$(mktemp "${artifact_dir}/.${data_archive_name}.tmp.XXXXXX")
+    cleanup_data_archive() {
+        rm -f "${data_archive_temporary}"
+    }
+    trap cleanup_data_archive EXIT INT TERM
+    tar -cf "${data_archive_temporary}" -C "${data_backup_directory}" \
+        application-postgres.dump manifest.txt
+    data_members=$(tar -tf "${data_archive_temporary}")
+    expected_data_members=$(printf '%s\n' application-postgres.dump manifest.txt)
+    [ "${data_members}" = "${expected_data_members}" ] \
+        || release_fail "application PostgreSQL backup archive contains unexpected members"
+    data_archive_sha256=$(release_sha256 "${data_archive_temporary}")
+    mv "${data_archive_temporary}" "${data_archive_path}"
+    trap - EXIT INT TERM
+fi
+
 bundle_name="release-geo-registry-${release_version}.bundle"
 bundle_path="${artifact_dir}/${bundle_name}"
 outer_path=$(release_resolve_path "${OFFLINE_ARCHIVE_PATH:-release-geo-registry-${release_version}-offline.tar}")
@@ -84,10 +140,20 @@ verifier_dir=
 mv "${bundle_temporary}" "${bundle_path}"
 bundle_sha256=$(release_sha256 "${bundle_path}")
 
-awk '!/^git_bundle(_sha256)?=/' "${manifest_path}" > "${manifest_temporary}"
+awk -F= '$1 !~ /^(git_bundle|git_bundle_sha256|data_bundle|data_archive|data_archive_sha256|data_created_at|data_dump_sha256)$/' \
+    "${manifest_path}" > "${manifest_temporary}"
 {
     printf 'git_bundle=%s\n' "${bundle_name}"
     printf 'git_bundle_sha256=%s\n' "${bundle_sha256}"
+    if [ "${include_application_data}" = 1 ]; then
+        printf '%s\n' 'data_bundle=application-postgres'
+        printf 'data_archive=%s\n' "${data_archive_name}"
+        printf 'data_archive_sha256=%s\n' "${data_archive_sha256}"
+        printf 'data_created_at=%s\n' "${data_created_at}"
+        printf 'data_dump_sha256=%s\n' "${data_dump_sha256}"
+    else
+        printf '%s\n' 'data_bundle=none'
+    fi
 } >> "${manifest_temporary}"
 mv "${manifest_temporary}" "${manifest_path}"
 
@@ -97,20 +163,44 @@ ln "${bundle_path}" "${stage_dir}/${bundle_name}"
 cp "${project_root}/docs/deployment/offline-release.md" "${stage_dir}/RELEASE.md"
 cp "${project_root}/docs/deployment/production-compose.md" "${stage_dir}/DEPLOY.md"
 
-tar -cf "${outer_temporary}" -C "${stage_dir}" \
-    "${bundle_name}" \
-    "${archive_name}" \
-    source-manifest.txt \
-    RELEASE.md \
-    DEPLOY.md
+if [ "${include_application_data}" = 1 ]; then
+    ln "${data_archive_path}" "${stage_dir}/${data_archive_name}"
+fi
+
+if [ "${include_application_data}" = 1 ]; then
+    tar -cf "${outer_temporary}" -C "${stage_dir}" \
+        "${bundle_name}" \
+        "${archive_name}" \
+        "${data_archive_name}" \
+        source-manifest.txt \
+        RELEASE.md \
+        DEPLOY.md
+else
+    tar -cf "${outer_temporary}" -C "${stage_dir}" \
+        "${bundle_name}" \
+        "${archive_name}" \
+        source-manifest.txt \
+        RELEASE.md \
+        DEPLOY.md
+fi
 
 actual_members=$(tar -tf "${outer_temporary}")
-expected_members=$(printf '%s\n' \
-    "${bundle_name}" \
-    "${archive_name}" \
-    source-manifest.txt \
-    RELEASE.md \
-    DEPLOY.md)
+if [ "${include_application_data}" = 1 ]; then
+    expected_members=$(printf '%s\n' \
+        "${bundle_name}" \
+        "${archive_name}" \
+        "${data_archive_name}" \
+        source-manifest.txt \
+        RELEASE.md \
+        DEPLOY.md)
+else
+    expected_members=$(printf '%s\n' \
+        "${bundle_name}" \
+        "${archive_name}" \
+        source-manifest.txt \
+        RELEASE.md \
+        DEPLOY.md)
+fi
 [ "${actual_members}" = "${expected_members}" ] \
     || release_fail "offline archive contains an unexpected member list"
 

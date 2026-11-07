@@ -5,6 +5,7 @@ INTEGRATION_COMPOSE := docker/compose/integration.sh
 PRODUCTION_COMPOSE := docker/compose/prod.sh
 POSTGRES_TUNING_CHECK := docker/scripts/postgres-tuning-check.sh
 WORKER_CLI := $(COMPOSE) run --rm --no-deps app bin/app
+DATA_HOST_PATH ?= $(CURDIR)/docker/data
 
 export HOST_UID ?= $(shell id -u)
 export HOST_GID ?= $(shell id -g)
@@ -48,8 +49,18 @@ release-payload: guard-user ## Save the frozen application image and write its c
 
 release-offline: release-payload ## Assemble the flat tagged offline transport archive
 	DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
-		OFFLINE_ARCHIVE_PATH="$(OFFLINE_ARCHIVE_PATH)" docker/release/build-offline-archive.sh
+		OFFLINE_ARCHIVE_PATH="$(OFFLINE_ARCHIVE_PATH)" \
+		RELEASE_INCLUDE_APPLICATION_DATA="$(RELEASE_INCLUDE_APPLICATION_DATA)" \
+		RELEASE_DATA_BACKUP_DIR="$(RELEASE_DATA_BACKUP_DIR)" \
+		RELEASE_DATA_CONTAINER="$(RELEASE_DATA_CONTAINER)" \
+		RELEASE_DATA_RESERVE_GB="$(RELEASE_DATA_RESERVE_GB)" \
+		docker/release/build-offline-archive.sh
 .PHONY: release-offline
+
+extract-release-data: guard-user ## Verify and extract the optional PostgreSQL backup from an unpacked release
+	RELEASE_EXTRACT_DIR="$(RELEASE_EXTRACT_DIR)" BACKUP_ROOT="$(BACKUP_ROOT)" \
+		RELEASE_DATA_DRY_RUN="$(RELEASE_DATA_DRY_RUN)" docker/release/extract-release-data.sh
+.PHONY: extract-release-data
 
 change-release: guard-user ## Verify/load the frozen image and recreate application processes only
 	DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
@@ -111,6 +122,13 @@ restart: down up ## Restart the development stack
 migrate: guard-user ## Apply application database migrations
 	$(COMPOSE) run --rm --no-deps app bin/app migrate:up --force-yes
 .PHONY: migrate
+
+datamos-download: guard-user ## Download an official Data.Mos snapshot and provenance manifest
+	$(COMPOSE) run --rm --no-deps --env DATAMOS_API_KEY \
+		--volume "$(DATA_HOST_PATH):/data:rw" app \
+		bin/app datamos:address-registry:download \
+		/data/datamos/addressreestr.jsonl.gz $(DATAMOS_DOWNLOAD_FLAGS)
+.PHONY: datamos-download
 
 worker-up: guard-user ## Migrate and start both durable worker services
 	$(COMPOSE) up --detach --no-build postgres

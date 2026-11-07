@@ -3,7 +3,8 @@
 - Дата full-data evidence: `2026-11-06`
 - Scope: GAR регионы `50` и `77`; Data.Mos/OSM mutation разрешена только для
   региона `77`
-- Source data не входит в Git и монтируется read-only в CLI container
+- Source data не входит в Git; download-команда получает отдельный writable
+  mount, import-команды используют тот же каталог read-only
 
 ## Runtime Boundary
 
@@ -11,6 +12,7 @@
 
 ```shell
 bin/app datamos:address-registry:import --batch-size=5000 --truncate
+bin/app datamos:address-registry:download --dry-run
 bin/app datamos:address-registry:enrich
 bin/app osm:address-aliases:import --batch-size=1000 --truncate
 bin/app opensearch:reindex --batch-size=10000 --concurrency=8
@@ -25,16 +27,22 @@ bin/app opensearch:reindex --batch-size=10000 --concurrency=8
 
 | Переменная | Default внутри container | Назначение |
 | --- | --- | --- |
-| `ADDRESS_SOURCE_DATA_PATH` | `../../../docker/data` | Host directory, read-only mount в `/data` |
-| `DATAMOS_ADDRESS_REGISTRY_SOURCE` | `/data/datamos/addressreestr.bson.gz` | BSON.GZ/BSON/JSON/JSONL или HTTP source |
+| `ADDRESS_SOURCE_DATA_PATH` | `../../../docker/data` | Host directory; обычный app mount read-only в `/data` |
+| `DATAMOS_ADDRESS_REGISTRY_SOURCE` | `/data/datamos/addressreestr.jsonl.gz` | JSONL.GZ snapshot; также поддержаны BSON.GZ/BSON/JSON/JSONL/HTTP |
+| `DATAMOS_API_KEY` | отсутствует | Secret для официального API; нужен только download-команде |
 | `OSM_ADDRESS_ALIASES_SOURCE` | `/data/geodata/moscow-address-aliases.jsonl` | JSONL/JSONL.GZ с подготовленными `addr2:*` |
 | `MOSCOW_REGION_CODE` | `77` | Partition, доступная enrichment/matching |
 
 ## Data.Mos Contract
 
-Импорт потоково читает BSON.GZ, нормализует source fields и выполняет
+`datamos:address-registry:download` получает dataset `60562` напрямую из
+официального API, pin-ит version/release и атомарно публикует JSONL.GZ вместе с
+provenance manifest. `--dry-run` проверяет key/version/count без записи.
+
+Импорт потоково читает JSONL.GZ/BSON.GZ, нормализует source fields и выполняет
 идемпотентный upsert по `source_key` в `datamos_address_registry`. `--dry-run`
-проверяет parser без записи; `--limit` ограничивает число исходных документов.
+проверяет parser без записи; `--limit` ограничивает число исходных документов,
+а `--require-manifest` до импорта сверяет filename, bytes и SHA-256.
 
 Enrichment выполняет три операции:
 

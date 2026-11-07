@@ -21,7 +21,7 @@ final readonly class GarXmlImportAdapter implements ImportGarPort
     public function import(ImportGar $command): ImportGarResult
     {
         $sourcePath = $this->catalog->canonicalSourcePath($command->sourcePath);
-        $files = $this->catalog->files($sourcePath);
+        $files = $this->catalog->files($sourcePath, $command->regions);
         $sourceKey = hash('sha256', $sourcePath);
         $manifestHash = $this->catalog->manifestHash($files);
         $connection = $this->connectionFactory->connect();

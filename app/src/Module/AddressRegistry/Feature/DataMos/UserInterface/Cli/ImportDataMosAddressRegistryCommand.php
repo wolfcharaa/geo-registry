@@ -50,6 +50,12 @@ final class ImportDataMosAddressRegistryCommand extends Command
                 'При --enrich не создавать datamos-only строки.',
             )
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Проверить чтение и нормализацию без записи.')
+            ->addOption(
+                'require-manifest',
+                null,
+                InputOption::VALUE_NONE,
+                'Потребовать и проверить companion snapshot manifest до чтения данных.',
+            )
             ->setHelp(<<<'HELP'
 Команда потоково читает выгрузку Data.Mos и делает идемпотентный upsert в
 datamos_address_registry. Передайте --enrich, чтобы связать записи по N_FIAS
@@ -76,6 +82,7 @@ HELP);
                 limit: self::nullableIntegerOption($input, 'limit'),
                 truncate: $input->getOption('truncate') === true,
                 dryRun: $input->getOption('dry-run') === true,
+                requireManifest: $input->getOption('require-manifest') === true,
                 progress: static function (
                     int $readRows,
                     int $writtenRows,

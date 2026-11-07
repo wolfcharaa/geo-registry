@@ -118,6 +118,8 @@ docker/compose/prod.sh run --rm --no-deps app bin/app gar:integrity --regions=50
 
 Миграции, import/rebuild и worker cutover выполняются только по соответствующим
 runbooks. Production Compose не является backup PostgreSQL, Nominatim или
-OpenSearch и не удаляет их данные. Проверяемый порядок создания logical dumps,
-shadow restore и rebuild OpenSearch описан в
+OpenSearch и не удаляет их данные. Offline release может по явному флагу нести
+application PostgreSQL dump, но Compose никогда не восстанавливает его
+автоматически. Проверяемый порядок создания logical dumps, shadow restore и
+rebuild OpenSearch описан в
 [data-backup-restore.md](data-backup-restore.md).

@@ -4,9 +4,10 @@
 - Область: application PostgreSQL, Nominatim и OpenSearch projection
 - Главное ограничение: restore никогда не выполняется поверх действующей БД
 
-Production Compose переключает только процессы приложения. Эта процедура
-фиксирует отдельный data rollback point и не входит в application image или
-offline archive.
+Production Compose переключает только процессы приложения. Logical backup не
+входит в application image. Он живёт отдельно либо по явному
+`RELEASE_INCLUDE_APPLICATION_DATA=1` упаковывается в full-data offline archive;
+в обоих случаях restore остаётся отдельной подтверждаемой операцией.
 
 ## Граница Ответственности
 
@@ -42,6 +43,11 @@ Backup создаётся во временном каталоге на том �
 `pg_restore --list` и checksum, а затем атомарно переименовывается. Незавершённый
 временный каталог удаляется; уже опубликованный backup никогда не
 перезаписывается.
+
+Для переносимого full-data release backup дополнительно оборачивается в
+`application-postgres-backup.tar` с двумя файлами и связывается checksum-ами с
+`source-manifest.txt`. Команда `make extract-release-data` проверяет оба уровня
+manifest до публикации обычного backup-каталога.
 
 ## Preconditions Release Window
 
