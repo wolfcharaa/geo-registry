@@ -2318,7 +2318,7 @@
             "dist": {
                 "type": "path",
                 "url": "../../library/MessageBusAsync",
-                "reference": "9d25f26cabe5f69c08aff331eea2ef985ff37bc3"
+                "reference": "0ea19e855fb0d1e476498e323c8dc4205652d8c3"
             },
             "require": {
                 "amphp/amp": "^3.1",
@@ -2370,6 +2370,18 @@
                 }
             ],
             "description": "Async-first PHP message bus with typed local dispatch and durable producer contracts",
+            "homepage": "https://github.com/wolfcharaa/message-bus-async",
+            "keywords": [
+                "amphp",
+                "command-bus",
+                "event-bus",
+                "message-bus",
+                "queue"
+            ],
+            "support": {
+                "issues": "https://github.com/wolfcharaa/message-bus-async/issues",
+                "source": "https://github.com/wolfcharaa/message-bus-async"
+            },
             "transport-options": {
                 "symlink": true,
                 "relative": true
@@ -2381,7 +2393,7 @@
             "dist": {
                 "type": "path",
                 "url": "../../library/MessageBusAsyncWorker",
-                "reference": "306ff70a634772bd51b0b9feb53cb79e20492d19"
+                "reference": "c9369b4230333537b3193d15e3855982a25dafeb"
             },
             "require": {
                 "amphp/amp": "^3.1",
@@ -2434,6 +2446,18 @@
                 }
             ],
             "description": "Optional worker runtime for romanfedorskij/message-bus-async",
+            "homepage": "https://github.com/wolfcharaa/message-bus-async-worker",
+            "keywords": [
+                "amphp",
+                "message-bus",
+                "postgresql",
+                "queue",
+                "worker"
+            ],
+            "support": {
+                "issues": "https://github.com/wolfcharaa/message-bus-async-worker/issues",
+                "source": "https://github.com/wolfcharaa/message-bus-async-worker"
+            },
             "transport-options": {
                 "symlink": true,
                 "relative": true
