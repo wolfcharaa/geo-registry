@@ -249,15 +249,16 @@ Docker memory фактически выполняются, но остаются
 - новый единый `app/bin/app` использует
   `thesis/symfony-console-module 0.1.0`; default `server:run`, migrations, GAR,
   OpenSearch и worker commands видны в одном lazy command registry;
-- commit `23e7f12` содержит оптимизацию PostgreSQL search; переход на `bin/app`
-  пока находится в рабочем дереве и требует отдельного commit после review.
+- commit `23e7f12` содержит оптимизацию PostgreSQL search; executable `bin/app`
+  является единым console entrypoint для server, migrations, GAR, OpenSearch и
+  worker operations.
 
 ## Проверено 2026-11-07
 
 - operational CLI закрыт через `gar:integrity`, `gar:activity`, `gar:releases`,
   `opensearch:status` и exact-confirmation cleanup; application fast gate —
-  `108 tests / 517 assertions`, real-service integration gate ранее подтвердил
-  `18 tests / 250 assertions`;
+  `114 tests / 540 assertions`, contract — `13 tests / 240 assertions`,
+  real-service integration — `19 tests / 256 assertions`;
 - target workers прошли enqueue/consume, pause/resume, exact drain/restart и
   stale recovery; one-shot drain/stop/kill/restart теперь требуют точный
   `worker-instance-id`;
@@ -288,10 +289,23 @@ Docker memory фактически выполняются, но остаются
   read-only restore preflight, exact confirmation и восстановление контрольной
   строки в новой shadow-БД. Временные БД, dump и integration container удалены;
   production data не менялись.
+- commits `2f4bb3a`, `7f7bec6` и `5288fb3` исправили реальный suggest GAR level
+  `8`, staged transitions level `2..7`, house-level ranking, параметризовали
+  Postman values и заменили HTML router errors на стабильный JSON;
+- на application revision `5288fb3` deep GAR integrity прошёл `13/13`, OpenSearch green parity —
+  `28649238/28649238`, `invalid_regions=0`; strict target Newman прошёл
+  `13/13` requests и `26/26` assertions со средним временем `83 ms`, включая
+  OpenSearch search, Nominatim reverse и тот же representative GAR identity;
+- legacy `78d2dd2` и target выбрали один object `11073052` первым в search,
+  вернули одинаковые find rows и выбранную suggest-цепочку. Открыты approval
+  top-N tail, дополнительных fuzzy candidates и Nominatim snapshot difference;
+- target JSON/JUnit evidence находится в session path
+  `/tmp/geo-registry-release-smoke/amphp-5288fb3.{json,xml}` и ещё требует
+  переноса в protected evidence location.
 
 Следующий delivery gate — выбрать protected `BACKUP_LOCATION` и выполнить
 полный backup/restore rehearsal подготовленного runbook. После него остаются
-full Nominatim/Postman parity, legacy queue approval и traffic cutover.
+approval semantic differences, legacy queue approval и traffic cutover.
 
 ## Первый Шаг Новой Сессии
 

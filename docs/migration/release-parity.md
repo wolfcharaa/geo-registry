@@ -1,6 +1,6 @@
 # Release Parity Runbook
 
-- Статус: `Executable gate ready; representative execution pending`
+- Статус: `Representative comparison complete; differences await approval`
 - Область: `R1 release parity`
 - Владелец решения: application release operator
 - Связанный cutover: [worker-cutover.md](worker-cutover.md)
@@ -177,6 +177,60 @@ make worker-status
 только evidence из [worker-cutover.md](worker-cutover.md); новый PostgreSQL
 worker status не заменяет эту проверку.
 
+## Target Evidence 2026-11-07
+
+Application commit `5288fb3` прошёл один согласованный target flow на canonical GAR регионов
+50/77 и Nominatim PBF `russia-260907.osm.pbf`:
+
+- `make check`: `114 tests / 540 assertions`;
+- `make contract`: `13 tests / 240 assertions`;
+- `make test-integration`: `19 tests / 256 assertions`;
+- `gar:integrity --regions=50,77 --deep --only-failed`: `13` checks,
+  `failed=0`, `unavailable=0`;
+- `opensearch:status`: green cluster, alias
+  `places-v20261106173307122`, source/target `28649238/28649238`,
+  `invalid_regions=0`;
+- два актуальных target worker instances имеют `running/idle`, по одному для
+  `address` и `runtime` queues;
+- strict Newman: `13/13` requests и `26/26` assertions, average `83 ms`,
+  range `32..231 ms`.
+
+Representative flow использовал Московскую область, Одинцово, Можайское шоссе
+и один GAR house identity, одновременно найденный через OpenSearch,
+`find-by-id` и Nominatim reverse. Во время подготовки gate выявлены и исправлены
+четыре target defect: улично-дорожная сеть GAR имеет level `8`, staged
+переходы level `2..7` должны вести к `thoroughfare`, house query должен отдавать
+приоритет базовому level `10`, а неизвестный API route должен возвращать JSON
+`404`, а не HTML.
+
+JUnit/JSON evidence находится в
+`/tmp/geo-registry-release-smoke/amphp-5288fb3.{xml,json}`. Это session artifact:
+до production approval его нужно перенести в утверждённое protected evidence
+location вместе с revision/dataset manifest.
+
+## Legacy Comparison Evidence 2026-11-07
+
+Read-only запросы выполнены к legacy commit `78d2dd2` на `8899` и target
+application commit `5288fb3` на `8900` с одинаковыми representative values:
+
+- `find-by-id(11073052)` в обеих реализациях вернул две одинаковые `adm`/`mun`
+  строки и GUID `44551f6d-4b23-49be-9631-b803e7618a89`;
+- `search(Одинцово Можайское 1, region=50)` после восстановления house-level
+  boost выбрал object `11073052` первым в обеих реализациях; top-5 пересекается
+  на первых двух objects, оставшийся tail различается;
+- staged `suggest` выбрал одинаковые objects и transitions:
+  `862378/level 2 -> thoroughfare`, затем `864576/level 8 -> search`;
+- target district suggestion вернул ещё три fuzzy candidates сверх двух legacy
+  candidates при запрошенном limit `5`;
+- target reverse вернул два GAR matches (`11073052`, `11182299`), legacy на тех
+  же координатах вернул только raw Nominatim fallback `Школьная улица`;
+- оба readiness endpoints сообщили `status=ok`; target дополнительно имеет
+  отдельный startup probe.
+
+Это semantic evidence текущей сессии, но не protected release artifact. Перед
+production approval одинаковые normalized responses и revision/dataset
+manifest нужно сохранить в утверждённом evidence location.
+
 ## Матрица Сравнения
 
 Для каждого representative запроса сохраняется не только status, но и
@@ -186,12 +240,12 @@ JSON bytes.
 
 | Сценарий | Legacy artifact | AMPHP artifact | Ожидание | Осознанное отличие |
 | --- | --- | --- | --- | --- |
-| `find-by-id` | pending | pending | тот же GAR identity и hierarchy | pending |
-| `search` | pending | pending | тот же representative address; target использует OpenSearch | pending |
-| staged `suggest` | pending | pending | те же переходы city/district/thoroughfare | pending |
-| `reverse-geocode` | pending | pending | та же GAR identity для согласованных координат | pending |
-| validation/not-found | pending | pending | те же status и stable error codes | pending |
-| health | `live`, `ready` | `live`, `ready`, `startup` | общие probes сохраняют смысл | target-only `startup` явно показывает завершение composition и не меняет address API |
+| `find-by-id` | direct HTTP @ `78d2dd2`: `11073052` | `amphp-5288fb3.json` | тот же GAR identity и hierarchy | Совпали две `adm`/`mun` строки и GUID |
+| `search` | direct HTTP @ `78d2dd2`: `11073052` rank 1 | `amphp-5288fb3.json`: `11073052` rank 1 | тот же representative address; target использует OpenSearch | Top-1/2 совпали; остальной top-5 различается без перенесённых structured street/house keys, approval pending |
+| staged `suggest` | direct HTTP: `862378 -> 864576` | `amphp-5288fb3.json`: `862378 -> 864576` | те же переходы city/district/thoroughfare | Выбранная цепочка совпала; target возвращает три дополнительных fuzzy district candidates, approval pending |
+| `reverse-geocode` | direct HTTP: raw `Школьная улица` fallback | `amphp-5288fb3.json`: GAR `11073052`, `11182299` | согласованный адрес либо явно принятая dataset-разница | Nominatim snapshots различаются; target GAR match лучше, но difference требует approval |
+| validation/not-found | pending | `amphp-5288fb3.json` | те же status и stable error codes | Legacy negative cases ещё не сохранены |
+| health | direct HTTP: `ready=ok` | `amphp-5288fb3.json`: `live`, `ready`, `startup` | общие probes сохраняют смысл | target-only `startup` явно показывает завершение composition и не меняет address API |
 
 Любое принятое отличие записывается здесь с причиной, compatibility impact и
 approval. `pending` нельзя интерпретировать как parity.

@@ -1588,7 +1588,8 @@ Scope подтверждён после core parity; full-data import выпол
 
 Read-only аудит и первая live semantic сверка выполнены `2026-11-06` после
 Data.Mos/OSM enrichment. Legacy остаётся запущенным на `8899`, target — на
-`8900`; сравнение выполнялось на одном GAR identity и московских данных.
+`8900`; повторная сверка `2026-11-07` использовала один GAR identity
+Московской области и одинаковые search/suggest/find/reverse inputs.
 
 #### E2.1 — HTTP Semantic Parity
 
@@ -1598,12 +1599,17 @@ Data.Mos/OSM enrichment. Legacy остаётся запущенным на `8899
   реализации выбрали object `80329459` по OSM alias.
 - [x] Восстановить legacy transition для городов федерального значения:
   Москва, Санкт-Петербург и Севастополь переходят сразу к `thoroughfare`.
+- [x] На representative object `11073052` подтвердить одинаковые `find-by-id`
+  строки, выбранную suggest-цепочку и первый search result. Staged transitions
+  исправлены commit `7f7bec6`, house-level boost — `5288fb3`.
 - [ ] Решить, является ли дополнительная fuzzy suggestion `Московка`
   допустимым расширением либо target должен повторить legacy candidate set.
 - [ ] Зафиксировать representative top-N fixture для домов и помещений; текущий
-  target PostgreSQL и legacy OpenSearch пересеклись на `2/5` результатов.
-- [ ] После включения target OpenSearch повторить fixture и закрыть house/unit
-  ranking через structured fields или application-side reranking.
+  target и legacy OpenSearch совпали в первых двух результатах, остальной tail
+  различается.
+- [ ] Закрыть полный house/unit top-N через structured street/house fields или
+  application-side reranking; совместимый level `10` boost уже восстановил
+  representative top-1 без перестройки индекса.
 
 `OPENSEARCH_SEARCH_ENABLED=0` сохраняется до решения последнего пункта. Нельзя
 считать совпадение первого документа достаточным relevance gate.
@@ -1731,11 +1737,18 @@ E2.5 production delivery/cutover`.
 ### R1 — Release Parity
 
 - [x] Выполнить fast и real-service integration gates.
-- [ ] Выполнить full Nominatim/Postman smoke.
-- [ ] Проверить import -> read-model build -> OpenSearch rebuild -> API flow.
-- [ ] Сравнить find/search/suggest/reverse responses на representative dataset.
+- [x] Выполнить full Nominatim/Postman smoke. На commit `5288fb3` strict Newman
+  прошёл `13/13` requests и `26/26` assertions для согласованного адреса
+  Одинцово/Можайское шоссе.
+- [x] Проверить import -> read-model build -> OpenSearch rebuild -> API flow.
+  Deep GAR integrity прошёл `13/13`, OpenSearch parity —
+  `28649238/28649238`, `invalid_regions=0`; strict search подтвердил backend
+  `opensearch`, reverse — тот же GAR identity через target Nominatim.
+- [x] Сравнить find/search/suggest/reverse responses на representative dataset.
+  Find, selected suggest chain и search top-1 совпали; top-N/fuzzy/Nominatim
+  differences перечислены в release parity matrix и ожидают approval.
 - [ ] Проверить live/ready/startup, shutdown, queue drain и restart.
-- [ ] Зафиксировать все осознанные contract differences.
+- [x] Зафиксировать выявленные contract/dataset differences.
 
 Готовность: release candidate имеет воспроизводимые artifacts и не зависит от
 непроверенного legacy runtime behavior.

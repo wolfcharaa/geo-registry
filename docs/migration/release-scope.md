@@ -1,6 +1,6 @@
 # Scope первого release
 
-- Статус: `Accepted implementation scope; release evidence pending`
+- Статус: `Accepted scope; target strict evidence passed; release pending`
 - Обновлено: `2026-11-07`
 - Связанный gate: [release-parity.md](release-parity.md)
 
@@ -68,6 +68,16 @@ managed worker runtime. Поддерживаются:
 `worker:schema:postgres` остаётся package utility для генерации reference SQL.
 Geo Registry production schema применяет versioned application migrations и не
 подменяет их runtime-генерацией схемы.
+
+## Target Evidence
+
+Application commit `5288fb3` прошёл strict target smoke: `13/13` HTTP requests и `26/26`
+assertions на одном согласованном GAR identity через PostgreSQL, OpenSearch и
+Nominatim. Deep GAR integrity и OpenSearch source/target parity также успешны.
+Representative legacy comparison выполнен; find и выбранная suggest-цепочка
+совпали, search снова выбирает тот же дом первым. До approval остаются top-N
+ranking tail, дополнительные fuzzy candidates, различие Nominatim snapshots,
+protected production backup restore, старые queues и operator traffic.
 
 ## Намеренно Deferred
 
