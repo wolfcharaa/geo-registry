@@ -262,7 +262,9 @@ Docker memory фактически выполняются, но остаются
   house top-3 и exact unit fixture;
 - target workers прошли enqueue/consume, pause/resume, exact drain/restart и
   stale recovery; one-shot drain/stop/kill/restart теперь требуют точный
-  `worker-instance-id`;
+  `worker-instance-id`; повторный controlled restart HTTP и двух idle workers
+  сохранил backlog `0`, корректно пометил старые instances `stopped`, поднял
+  новые `running/idle` и вернул live/ready/startup и Docker health в `ok`;
 - production application image собирается self-contained из трёх repositories,
   имеет pinned PHP/Composer bases, non-root runtime и immutable OCI digest;
 - production Compose содержит только `app`, `worker-address`, `worker-runtime`,

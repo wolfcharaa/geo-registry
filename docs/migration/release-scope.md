@@ -76,6 +76,8 @@ assertions на одном согласованном GAR identity через Po
 Nominatim. Deep GAR integrity и OpenSearch source/target parity также успешны.
 Representative legacy comparison выполнен; find и выбранная suggest-цепочка
 совпали, structured search совпадает с legacy в первых четырёх позициях top-5.
+Controlled HTTP/worker restart сохранил нулевой durable backlog и вернул все
+health probes в `ok`.
 До approval остаются пятый ranking candidate, дополнительные fuzzy candidates,
 различие Nominatim snapshots/candidate count, protected production backup
 restore, старые queues и operator traffic.

@@ -1750,7 +1750,10 @@ E2.5 production delivery/cutover`.
 - [x] Сравнить find/search/suggest/reverse responses на representative dataset.
   Find, selected suggest chain и search top-1 совпали; top-N/fuzzy/Nominatim
   differences перечислены в release parity matrix и ожидают approval.
-- [ ] Проверить live/ready/startup, shutdown, queue drain и restart.
+- [x] Проверить live/ready/startup, shutdown, queue drain и restart. Controlled
+  restart HTTP и двух idle workers сохранил нулевой PostgreSQL backlog; старые
+  instances стали `stopped`, новые зарегистрировались `running/idle`, все probes
+  вернулись в `ok`, Docker health — `healthy`.
 - [x] Зафиксировать выявленные contract/dataset differences.
 
 Готовность: release candidate имеет воспроизводимые artifacts и не зависит от

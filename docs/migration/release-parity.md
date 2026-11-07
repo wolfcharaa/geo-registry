@@ -191,8 +191,10 @@ Application commit `12fb32a` прошёл один согласованный ta
 - `opensearch:status`: green cluster, alias
   `places-v20261107100010468`, source/target `28649238/28649238`,
   `invalid_regions=0`;
-- два актуальных target worker instances имеют `running/idle`, по одному для
-  `address` и `runtime` queues;
+- controlled `TERM`/restart HTTP и двух idle workers завершился без ошибок:
+  старые instances стали `stopped`, новые имеют `running/idle`, durable backlog
+  до и после равен `0`, `live/ready/startup` вернули `200/ok`, Docker health —
+  `healthy`;
 - strict Newman: cold `13/13` requests и `26/26` assertions, average `122 ms`,
   range `30..663 ms`; после завершения merges warm run — average `82 ms`,
   range `36..210 ms`.
