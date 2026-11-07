@@ -1,66 +1,152 @@
-# Жизненный Цикл Данных
+# Получение, Импорт И Нормализация Данных
 
-Geo Registry разделяет исходные данные, canonical storage и перестраиваемые
-проекции. Git release не содержит ни одного из этих datasets.
+Результат этого руководства — наполненная application PostgreSQL с canonical
+GAR и partitioned `address_search` для регионов `50` и `77`. Data.Mos,
+OSM aliases, Nominatim и OpenSearch подключаются после базовой проверки GAR.
 
-## Что Откуда Берётся
+Git release не содержит datasets. Исходные архивы, распаковки и backups храните
+вне repository.
 
-| Слой | Источник | Назначение | Входит в backup |
-| --- | --- | --- | --- |
-| Canonical GAR | полная XML-выгрузка ФНС | адресные объекты, дома, помещения и иерархии | да, application PostgreSQL |
-| `address_search` | rebuild из canonical GAR | региональный runtime search | да, application PostgreSQL |
-| Data.Mos | отдельная выгрузка реестра адресов Москвы | московские metadata, координаты и datamos-only строки | да, после импорта в PostgreSQL |
-| OSM aliases | подготовленный JSONL `addr2:*` | альтернативные московские написания | да, после импорта в PostgreSQL |
-| Nominatim | утверждённый OSM PBF | reverse geocode | отдельный Nominatim backup |
-| OpenSearch | rebuild из `address_search` и aliases | optional быстрый/fuzzy read model | нет, перестраивается |
+## Какие Данные Нужны
 
-Application PostgreSQL является source of truth приложения. Nominatim —
-отдельная PostgreSQL lifecycle. OpenSearch никогда не заменяет их backup.
+| Слой | Источник | Для чего |
+| --- | --- | --- |
+| Canonical GAR | полная XML-выгрузка ФНС | адресные объекты, дома, помещения, hierarchies |
+| `address_search` | rebuild из canonical GAR | быстрый региональный поиск PostgreSQL |
+| Data.Mos | официальный реестр адресов Москвы | координаты и московские metadata |
+| OSM aliases | подготовленный JSONL с `addr2:*` | альтернативные написания адресов |
+| Nominatim | OSM PBF | reverse geocoding |
+| OpenSearch | rebuild из `address_search` | optional fuzzy/concurrent read model |
 
-## Выбрать GAR Release
+Source of truth приложения — application PostgreSQL. OpenSearch является
+перестраиваемой проекцией. Nominatim использует отдельную PostgreSQL database.
 
-После запуска PostgreSQL и применения migrations запросите официальный metadata
-endpoint ФНС:
+## 1. Подготовить Runtime
+
+Сначала выполните [первый запуск](getting-started.md), включая migrations:
+
+```shell
+make up
+make migrate
+```
+
+Для большого import заранее проверьте свободное место и профиль PostgreSQL:
+
+```shell
+make postgres-doctor
+```
+
+## 2. Выбрать Официальный GAR Release
+
+Приложение читает официальный metadata endpoint ФНС и показывает прямой URL
+полной XML-выгрузки:
 
 ```shell
 docker/compose/dev.sh run --rm --no-deps app \
   bin/app gar:releases --json
 ```
 
-Команда показывает URL, но намеренно не скачивает архив. Скачайте полную XML
-выгрузку отдельно, сохраните URL, дату и SHA-256, затем распакуйте её вне Git.
+Команда ничего не скачивает. Выберите `full_xml_url`, а не delta archive.
+Исходный каталог releases также доступен на
+[портале ФИАС ФНС](https://fias.nalog.ru/Updates).
 
-Importer рекурсивно читает все поддерживаемые XML под переданным каталогом. Для
-dataset только регионов `50` и `77` подготовьте отдельное дерево, содержащее
-общие справочники release и только региональные каталоги `50`/`77`. Не
-передавайте корень полной распаковки и не ожидайте, что `--regions` отфильтрует
-его: у `gar:import` такой опции нет.
+Зафиксируйте для provenance:
 
-## Загрузить Canonical GAR
+- `version_id`, дату и URL из команды;
+- имя скачанного файла;
+- SHA-256 архива;
+- дату скачивания.
 
-Пусть `GAR_SOURCE` указывает на XML-файл или подготовленный каталог:
+## 3. Скачать И Проверить Архив
+
+Ниже `<full_xml_url>` — URL из `gar:releases`, а каталог можно заменить на
+свой:
+
+```shell
+mkdir -p /srv/geo-registry-data/gar
+cd /srv/geo-registry-data/gar
+
+curl --fail --location --output gar-full.zip '<full_xml_url>'
+sha256sum gar-full.zip
+unzip -t gar-full.zip
+unzip -q gar-full.zip -d full
+```
+
+Полная распаковка значительно больше ZIP. Проверяйте свободное место до
+`unzip`; не распаковывайте архив внутри Git workspace.
+
+## 4. Оставить Только Регионы 50 И 77
+
+`gar:import` рекурсивно читает все поддерживаемые XML и не имеет опции
+`--regions`. Поэтому подготовьте отдельный source tree:
+
+```text
+regions-50-77/
+├── AS_*_TYPES_*.XML и другие общие справочники release
+├── version.txt
+├── 50/
+│   └── региональные AS_*.XML
+└── 77/
+    └── региональные AS_*.XML
+```
+
+Пример для распаковки, где файлы лежат непосредственно в `full/`:
+
+```shell
+mkdir -p /srv/geo-registry-data/gar/regions-50-77
+cp -a /srv/geo-registry-data/gar/full/50 \
+  /srv/geo-registry-data/gar/regions-50-77/50
+cp -a /srv/geo-registry-data/gar/full/77 \
+  /srv/geo-registry-data/gar/regions-50-77/77
+
+find /srv/geo-registry-data/gar/full -maxdepth 1 -type f \
+  \( -name 'AS_*.XML' -o -name 'version.txt' \) \
+  -exec cp -a -- {} /srv/geo-registry-data/gar/regions-50-77/ \;
+```
+
+Проверьте, что на верхнем уровне нет других региональных каталогов:
+
+```shell
+find /srv/geo-registry-data/gar/regions-50-77 \
+  -mindepth 1 -maxdepth 1 -type d -printf '%f\n'
+du -sh /srv/geo-registry-data/gar/regions-50-77
+```
+
+Ожидаются только `50` и `77`. Общие root XML нужны для справочников типов и
+операций; не копируйте только два региональных каталога.
+
+## 5. Импортировать Canonical GAR
+
+Importer использует streaming XMLReader, нормализует XML attributes в
+типизированные canonical tables, передаёт rows через PostgreSQL `COPY` во
+временные staging tables и запускает несколько worker processes. Каждый batch
+фиксирует checkpoint.
 
 ```shell
 docker/compose/dev.sh run --rm --no-deps \
-  --volume "${GAR_SOURCE}:/data/gar:ro" \
+  --volume /srv/geo-registry-data/gar/regions-50-77:/data/gar:ro \
   app bin/app gar:import /data/gar \
   --batch-size=50000 \
   --workers=4
 ```
 
-Импорт использует bounded XMLReader + PostgreSQL `COPY`, фиксирует checkpoint
-каждого batch и продолжает совместимую незавершённую операцию. `--restart`
-нужен только для сознательного отказа от checkpoint; изменившийся source без
-него отклоняется.
+Повтор команды продолжает совместимую незавершённую operation. `--restart`
+используйте только если нужно сознательно отказаться от checkpoint. Source,
+изменившийся после начала operation, отклоняется.
 
-Проверить состояние:
+Посмотреть progress:
 
 ```shell
+docker/compose/dev.sh run --rm --no-deps app bin/app gar:activity
 docker/compose/dev.sh run --rm --no-deps app \
   bin/app gar:status --regions=50,77
 ```
 
-## Построить Runtime Проекцию
+## 6. Построить Поисковую Проекцию
+
+Canonical tables повторяют структуру GAR. Для runtime search приложение
+денормализует активные administrative/municipal hierarchies в
+`address_search`, разделённую LIST partitions по `region_code`.
 
 ```shell
 docker/compose/dev.sh run --rm --no-deps app \
@@ -73,48 +159,81 @@ docker/compose/dev.sh run --rm --no-deps app \
   bin/app gar:status --regions=50,77 --exact
 ```
 
-Rebuild создаёт LIST-partitioned shadow table, проверяет parity и только затем
-атомарно переключает active `address_search`. Для ручного review до switch
-используйте `--build-only`; следующий обычный запуск продолжит готовую операцию.
+Rebuild строит shadow table, создаёт indexes, проверяет parity и атомарно
+переключает active table. `--build-only` оставляет проверенную shadow table в
+состоянии `ready`; следующий обычный запуск выполнит cutover.
 
-## Optional Data.Mos И OSM
+## 7. Добавить Data.Mos
 
-Development Compose монтирует host-каталог `ADDRESS_SOURCE_DATA_PATH` read-only
-как `/data`. После размещения источников по путям из `config/.env`:
+Официальный источник —
+[«Адресный реестр объектов недвижимости города Москвы»](https://data.mos.ru/opendata/60562).
+Importer принимает BSON.GZ, BSON, JSON, JSONL или совместимый paginated HTTP
+source, но не разбирает XML. Получите snapshot на официальной странице и, если
+портал отдаёт другой формат, преобразуйте его вне приложения с сохранением
+version/date/checksum. В repository готового converter или официального mirror
+нет; старый сторонний BSON snapshot нельзя выдавать за актуальную выгрузку.
+Готовый input сохраните вне Git, например в
+`<ADDRESS_SOURCE_DATA_PATH>/datamos/addressreestr.bson.gz`.
+
+Сначала проверьте parser на ограниченном наборе без записи:
+
+```shell
+docker/compose/dev.sh run --rm --no-deps app \
+  bin/app datamos:address-registry:import \
+  /data/datamos/addressreestr.bson.gz \
+  --limit=1000 --dry-run
+```
+
+Затем загрузите staging и обогатите только регион `77`:
 
 ```shell
 docker/compose/dev.sh run --rm --no-deps app \
   bin/app datamos:address-registry:import \
   /data/datamos/addressreestr.bson.gz \
   --batch-size=5000 --truncate --enrich
+```
 
+Enrichment сопоставляет `N_FIAS` с GAR UUID, добавляет metadata/coordinates и
+создаёт отсутствующие `datamos-only` адреса. Это WAL-heavy maintenance
+operation; выполняйте её до OpenSearch rebuild.
+
+## 8. Добавить OSM Aliases
+
+Importer aliases не разбирает произвольный PBF. Ему нужен заранее
+подготовленный JSONL/JSONL.GZ с основным `addr:*` и альтернативными
+`addr2:*`. Этот artifact относится к legacy enrichment pipeline, а не к
+официальному GAR download.
+
+```shell
 docker/compose/dev.sh run --rm --no-deps app \
   bin/app osm:address-aliases:import \
   /data/geodata/moscow-address-aliases.jsonl \
   --batch-size=1000 --truncate
 ```
 
-Обе операции применяются только к Москве (`MOSCOW_REGION_CODE=77`). Data.Mos
-поддерживает `--dry-run`; OSM importer не создаёт новые адреса, а привязывает
-aliases к существующим домам. Форматы и проверенные full-data counters описаны
-в [справочнике источников](../migration/address-source-enrichment.md).
+Importer не создаёт адреса и изменяет только московскую partition. Формат и
+контрольные SQL описаны в
+[справочнике enrichment](../migration/address-source-enrichment.md).
 
-## Nominatim И OpenSearch
+## 9. Настроить Nominatim
 
-Для российских данных замените Monaco defaults в ignored `config/.env` на
-утверждённый локальный PBF и отключите online updates, если snapshot должен быть
-неизменяемым:
+Для Москвы и Московской области подходит OSM PBF Центрального федерального
+округа с [Geofabrik](https://download.geofabrik.de/russia/central-fed-district.html).
+Зафиксируйте имя и checksum выбранного snapshot и укажите локальный файл:
 
 ```dotenv
 NOMINATIM_PBF_URL=
 NOMINATIM_DATA_PATH=/absolute/host/path/to/pbf-directory
-NOMINATIM_PBF_PATH=/data/nominatim/approved-snapshot.osm.pbf
+NOMINATIM_PBF_PATH=/data/nominatim/central-fed-district.osm.pbf
 NOMINATIM_REPLICATION_URL=
 NOMINATIM_UPDATE_MODE=none
 ```
 
-После любых изменений `address_search` или aliases полностью пересоберите
-OpenSearch:
+Nominatim database не заполняет GAR tables и переносится отдельным backup.
+
+## 10. Построить OpenSearch
+
+После финального `address_search`, Data.Mos и aliases:
 
 ```shell
 docker/compose/dev.sh run --rm --no-deps app \
@@ -122,70 +241,18 @@ docker/compose/dev.sh run --rm --no-deps app \
 docker/compose/dev.sh run --rm --no-deps app bin/app opensearch:status
 ```
 
-Включать `OPENSEARCH_SEARCH_ENABLED=1` разрешено только после green exact
-source/index parity и принятого relevance gate. PostgreSQL остаётся fallback.
+`OPENSEARCH_SEARCH_ENABLED=1` включайте только после green parity/status и
+relevance check. PostgreSQL остаётся fallback и source of truth.
 
-## Экспорт Готовых Данных
-
-Готовый переносимый набор — это два независимых logical backup:
-
-1. application PostgreSQL со schema, GAR, `address_search`, enrichment и
-   durable queues;
-2. Nominatim PostgreSQL с именем и SHA-256 исходного PBF.
-
-OpenSearch не экспортируется как canonical data. Перед backup остановите новые
-imports/rebuilds, поставьте workers на pause/drain и выберите защищённый
-`BACKUP_ROOT`:
+## 11. Проверить И Сохранить Результат
 
 ```shell
-make backup-data-preflight \
-  BACKUP_COMPONENT=application-postgres \
-  BACKUP_ROOT=/srv/backups/geo-registry
-
-make backup-data \
-  BACKUP_COMPONENT=application-postgres \
-  BACKUP_ROOT=/srv/backups/geo-registry
-
-make backup-data \
-  BACKUP_COMPONENT=nominatim \
-  BACKUP_ROOT=/srv/backups/geo-registry \
-  BACKUP_PROVENANCE_NAME=approved-snapshot.osm.pbf \
-  BACKUP_PROVENANCE_SHA256=<64-hex-characters>
+make smoke
+make smoke-release \
+  POSTMAN_ENVIRONMENT=config/release.postman_environment.json
 ```
 
-Каждый каталог содержит custom `pg_dump` и manifest с checksum/provenance.
-Скопируйте каталоги и внешний manifest в защищённое off-host хранилище.
-
-## Импорт Готовых Данных
-
-Restore никогда не выполняется поверх активной БД. На целевом host сначала
-проверьте backup, затем восстановите его в отсутствующую shadow database:
-
-```shell
-make verify-data-backup \
-  BACKUP_DIR=/srv/backups/geo-registry/application-postgres-<UTC> \
-  VERIFY_CONTAINER=<compatible-postgres-container>
-
-make restore-data-preflight \
-  BACKUP_DIR=/srv/backups/geo-registry/application-postgres-<UTC> \
-  RESTORE_CONTAINER=<target-postgres-container> \
-  RESTORE_DATABASE=geo_registry_restore_v1 \
-  RESTORE_DATABASE_OWNER=geo_registry \
-  RESTORE_ADMIN_USER=geo_registry
-
-make restore-data-shadow \
-  BACKUP_DIR=/srv/backups/geo-registry/application-postgres-<UTC> \
-  RESTORE_CONTAINER=<target-postgres-container> \
-  RESTORE_DATABASE=geo_registry_restore_v1 \
-  RESTORE_DATABASE_OWNER=geo_registry \
-  RESTORE_ADMIN_USER=geo_registry \
-  RESTORE_CONFIRM=create:<target-postgres-container>:geo_registry_restore_v1
-```
-
-Nominatim восстанавливается отдельно в совместимый PostgreSQL/Nominatim target.
-После application restore выполните migrations/integrity/worker status,
-пересоберите OpenSearch и только затем меняйте production DSN.
-
-Полный fail-closed порядок, rollback boundary и обязательные проверки описаны в
-[Backup и restore данных](../deployment/data-backup-restore.md). Для первого
-release дополнительно выполните [release parity runbook](../migration/release-parity.md).
+Готовый переносимый набор состоит из независимых backups application
+PostgreSQL и Nominatim. OpenSearch экспортировать как canonical data не нужно —
+он перестраивается. Полные команды preflight, backup, verification и shadow
+restore находятся в [runbook backup/restore](../deployment/data-backup-restore.md).

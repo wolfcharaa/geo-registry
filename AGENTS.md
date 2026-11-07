@@ -5,6 +5,9 @@ setup, and debugging. Use the global `git-conventions` skill as the single entry
 point for branch, staging, commit, history, tag, push, and pull-request rules.
 Until that global skill can be installed, its canonical prepared source is
 `skills/git-conventions/SKILL.md`.
+Before README, guides, reference, operator runbooks, library integration, or
+application data-lifecycle changes, read
+`skills/documentation-authoring/SKILL.md`.
 
 Before changing Thesis DIC composition, service lifetime, scope, provider, or
 disposer behavior, read `docs/development/thesis-dic.md`.
