@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Application\DependencyInjection;
 
+use App\Application\Console\Command\SafeWorkerControlActionCommand;
+use App\Application\Console\Command\SafeWorkerControlCommand;
 use Fedor\MessageBus\Worker\Cli\BootstrapResolver;
-use Fedor\MessageBus\Worker\Cli\Command\WorkerControlActionCommand;
-use Fedor\MessageBus\Worker\Cli\Command\WorkerControlCommand;
 use Fedor\MessageBus\Worker\Cli\Command\WorkerPostgresSchemaCommand;
 use Fedor\MessageBus\Worker\Cli\Command\WorkerRunCommand;
 use Fedor\MessageBus\Worker\Cli\Command\WorkerStatusCommand;
@@ -36,7 +36,7 @@ final readonly class WorkerCliModule implements Module
                 ->arg('bootstrapResolver', $bootstrapResolver)
                 ->tag(new LegacyCommandTag('worker:run', 'Run the AMPHP queue worker.')),
             $dic
-                ->object(WorkerControlCommand::class)
+                ->object(SafeWorkerControlCommand::class)
                 ->arg('bootstrapResolver', $bootstrapResolver)
                 ->tag(new LegacyCommandTag('worker:control', 'Send a worker control command.')),
             ...$this->controlCommands($dic, $bootstrapResolver),
@@ -60,7 +60,7 @@ final readonly class WorkerCliModule implements Module
         foreach (WorkerControlCommandType::cases() as $type) {
             $name = 'worker:' . $type->value;
             $commands[] = $dic
-                ->object(WorkerControlActionCommand::class)
+                ->object(SafeWorkerControlActionCommand::class)
                 ->args([
                     'type' => $dic->value($type),
                     'name' => $dic->value($name),

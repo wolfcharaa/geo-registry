@@ -1,7 +1,7 @@
 # Переключение Durable Workers
 
-- Статус: `Procedure ready; execution requires release approval`
-- Обновлено: `2026-11-04`
+- Статус: `Target lifecycle verified; production cutover requires release approval`
+- Обновлено: `2026-11-07`
 - Владелец решения: application release operator
 
 Документ задаёт проверяемый переход со старых RoadRunner/BoltDB queues на
@@ -51,8 +51,9 @@ Legacy storage находится в файлах, заданных `RR_JOBS_RUN
 7. Выполнить reverse-geocode probe для адреса без координат и подтвердить:
    queue job `succeeded`, PostgreSQL заполнен, OpenSearch либо обновлён, либо
    зафиксирован bounded warning без retry canonical effect.
-8. Проверить `make worker-restart`, затем убедиться, что новый instance снова
-   принимает jobs и старый отмечен stopped.
+8. Выписать точный active instance из `make worker-status`, выполнить
+   `make worker-restart WORKER_INSTANCE_ID=<exact-id>`, затем убедиться, что
+   новый instance снова принимает jobs и старый отмечен stopped.
 
 Шаг 4 закрывает последний W2 release gate. До появления evidence checkbox
 legacy queue drain в roadmap остаётся незавершённым.
@@ -61,23 +62,38 @@ legacy queue drain в roadmap остаётся незавершённым.
 
 - `make worker-pause` прекращает новые claims, но не прерывает текущий job.
 - `make worker-resume` возвращает paused workers к обработке.
-- `make worker-drain` завершает текущие jobs и останавливает consumers до
-  следующего process start.
-- `make worker-restart` создаёт persisted restart request; supervisor должен
-  поднять новый process после специального exit code.
+- `make worker-drain WORKER_INSTANCE_ID=<exact-id>` завершает текущий job и
+  останавливает ровно указанный process до supervisor restart.
+- `make worker-restart WORKER_INSTANCE_ID=<exact-id>` создаёт persisted restart
+  request для одного process; supervisor должен поднять новый instance после
+  специального exit code.
 - `make worker-status` и `make worker-logs` являются обязательной проверкой
   результата каждой control operation.
+
+One-shot `drain`, `stop`, `kill` и `restart` на application CLI требуют
+`--worker-instance-id`; group/name/all targets отклоняются до записи command.
+Причина — command TTL библиотеки: широкая one-shot команда остаётся видимой
+replacement process и может создать restart loop. `pause`/`resume` остаются
+desired-state operations и поддерживают group target.
 
 SIGTERM использует cooperative graceful stop. Принудительное завершение до
 истечения grace period разрешено только как incident action: lease recovery
 вернёт stale job в pending, поэтому handler effects обязаны оставаться
 идемпотентными.
 
+Development full-stack evidence от `2026-11-07` подтвердил group pause/resume
+и exact-instance drain/restart: оба replacement process зарегистрировались как
+`running/idle`, GAR queue осталась пустой. Небезопасный broad drain был погашен
+по точной command identity, worker восстановлен, а воспроизводивший его путь
+закрыт CLI guard-ом. Real-PostgreSQL integration отдельно подтверждает возврат
+stale `running` job в `pending` после истечения heartbeat lease.
+
 ## Rollback
 
 1. Остановить новый HTTP producer, чтобы PostgreSQL queue перестала расти.
-2. Выполнить `make worker-drain`; не удалять pending/running/failed queue rows и
-   не выполнять migration down.
+2. Для каждого active instance из `make worker-status` отдельно выполнить
+   `make worker-drain WORKER_INSTANCE_ID=<exact-id>`; не удалять
+   pending/running/failed queue rows и не выполнять migration down.
 3. Если возвращается старый HTTP runtime, восстановить его вместе с сохранёнными
    BoltDB files. Новые PostgreSQL jobs остаются замороженными до повторного
    forward cutover: wire-level перенос между transports не выполняется.

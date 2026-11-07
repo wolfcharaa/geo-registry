@@ -15,6 +15,13 @@ guard-user:
 	fi
 .PHONY: guard-user
 
+guard-worker-instance:
+	@if [ -z "$(WORKER_INSTANCE_ID)" ]; then \
+		echo "Set WORKER_INSTANCE_ID to an exact active instance from make worker-status." >&2; \
+		exit 1; \
+	fi
+.PHONY: guard-worker-instance
+
 config: ## Create local configuration when it is missing
 	@test -f config/.env || cp config/.env.example config/.env
 .PHONY: config
@@ -68,12 +75,12 @@ worker-resume: guard-user ## Resume claims for both workers
 	$(WORKER_CLI) worker:resume --group=geo-registry --reason="make worker-resume"
 .PHONY: worker-resume
 
-worker-drain: guard-user ## Drain both workers after their current jobs
-	$(WORKER_CLI) worker:drain --group=geo-registry --reason="make worker-drain"
+worker-drain: guard-user guard-worker-instance ## Drain one exact worker instance after its current job
+	$(WORKER_CLI) worker:drain --worker-instance-id="$(WORKER_INSTANCE_ID)" --reason="make worker-drain"
 .PHONY: worker-drain
 
-worker-restart: guard-user ## Request a supervised restart for both workers
-	$(WORKER_CLI) worker:restart --group=geo-registry --reason="make worker-restart"
+worker-restart: guard-user guard-worker-instance ## Restart one exact worker instance under its supervisor
+	$(WORKER_CLI) worker:restart --worker-instance-id="$(WORKER_INSTANCE_ID)" --reason="make worker-restart"
 .PHONY: worker-restart
 
 logs: ## Follow logs; set SERVICE=app to filter
