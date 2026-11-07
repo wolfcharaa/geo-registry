@@ -1624,9 +1624,10 @@ Data.Mos/OSM enrichment. Legacy остаётся запущенным на `8899
   и SHA-256 `ba44e02d9599a6419055bd9dc82b77237185cd45d1b44715649eb69916266107`.
 - [x] Выполнить representative reverse parity и проверить публикацию
   `AddressCoordinatesResolved` в PostgreSQL worker queue.
-- [ ] Нормализовать положение типа улицы перед exact route filter, например
-  `Можайское шоссе` из OSM и `Шоссе Можайское` из GAR; до этого строгий фильтр
-  безопасно возвращает Nominatim fallback, но теряет допустимый GAR match.
+- [x] Нормализовать положение полного типа улицы перед exact route filter,
+  например `Можайское шоссе` из OSM и `Шоссе Можайское` из GAR. Перестановка
+  ограничена белым списком типов; другой route или номер дома по-прежнему
+  отбрасывается.
 - [ ] Перенести bulk `gar:geocode` как bounded, resumable CLI/worker operation
   либо явно исключить массовое обогащение из release scope.
 
@@ -1639,6 +1640,9 @@ raw OSM identity из-за невоспроизводимого legacy snapshot.
 Повторный reverse не создал новых jobs. В ходе проверки удалена неверная
 эвристика `OKATO prefix = GAR region`: event теперь получает `region_code`
 непосредственно из regional address document.
+На координатах Можайского шоссе, 1 в Одинцове target с нормализацией
+порядка типа вернул четыре GAR документа базового дома, завершил четыре
+coordinate jobs с первой попытки и не создал jobs при повторном запросе.
 
 #### E2.3 — Operational CLI
 

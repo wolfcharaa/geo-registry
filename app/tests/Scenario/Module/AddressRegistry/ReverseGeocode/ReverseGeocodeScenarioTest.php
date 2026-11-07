@@ -113,6 +113,32 @@ final class ReverseGeocodeScenarioTest
         ), [770005, 770006]);
         Assert::same($port->publishedObjectIds, [770005, 770006]);
     }
+
+    public function testItMatchesAnEquivalentRouteTypeOrderAndRejectsAnotherRoute(): void
+    {
+        $port = new RecordingReverseGeocodePort(
+            withMatch: true,
+            route: 'Можайское шоссе',
+            candidateAddresses: [
+                'Московская область, г. Одинцово, Минское шоссе, д. 10',
+                'Московская область, г. Одинцово, Шоссе Можайское, д. 10',
+            ],
+        );
+
+        $result = Dic::run(
+            new ReverseGeocodeScenarioModule($port),
+            static fn(MessageBus $messageBus): ReverseGeocodeResult => $messageBus->ask(new ReverseGeocode(
+                latitude: 55.6698192,
+                longitude: 37.2569991,
+            )),
+        );
+
+        Assert::same(array_map(
+            static fn(SearchAddressMatch $match): int => $match->document->objectId,
+            $result->matches,
+        ), [770006]);
+        Assert::same($port->publishedObjectIds, [770006]);
+    }
 }
 
 /** @implements Module<Ref<MessageBus>> */
@@ -169,6 +195,9 @@ final class RecordingReverseGeocodePort implements
         private readonly bool $documentHasCoordinates = false,
         private readonly int $matchingDocumentCount = 1,
         private readonly bool $withDistractors = false,
+        private readonly string $route = 'Общая улица',
+        /** @var list<string> */
+        private readonly array $candidateAddresses = [],
     ) {}
 
     public function locate(
@@ -180,14 +209,14 @@ final class RecordingReverseGeocodePort implements
         $this->coordinates[] = [$latitude, $longitude];
 
         return new ReverseGeocodeLocation(
-            displayName: 'Регион Альфа, Тестоград, Общая улица, 10',
+            displayName: sprintf('Регион Альфа, Тестоград, %s, 10', $this->route),
             latitude: 55.750001,
             longitude: 37.610001,
             sourceType: 'way',
             sourceId: 770005,
             address: new ReverseGeocodeAddress(
-                query: 'Регион Альфа Тестоград Общая улица д 10',
-                route: 'Общая улица',
+                query: sprintf('Регион Альфа Тестоград %s д 10', $this->route),
+                route: $this->route,
                 houseNumber: '10',
             ),
         );
@@ -202,6 +231,13 @@ final class RecordingReverseGeocodePort implements
         }
 
         $matches = [];
+        if ($this->candidateAddresses !== []) {
+            foreach ($this->candidateAddresses as $offset => $address) {
+                $matches[] = $this->match(770005 + $offset, $address, $criteria->hierarchy);
+            }
+
+            return $matches;
+        }
         if ($this->withDistractors) {
             $matches[] = $this->match(
                 770003,

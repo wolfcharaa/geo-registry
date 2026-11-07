@@ -18,6 +18,22 @@ use Fedor\MessageBus\Context\MessageContextInterface;
 )]
 final readonly class ReverseGeocodeHandler
 {
+    private const array ROUTE_TYPES = [
+        'аллея',
+        'бульвар',
+        'дорога',
+        'линия',
+        'набережная',
+        'переулок',
+        'площадь',
+        'проезд',
+        'проспект',
+        'тракт',
+        'тупик',
+        'улица',
+        'шоссе',
+    ];
+
     public function __construct(
         private ReverseGeocodePort $locator,
         private MissingAddressCoordinatesPublisher $coordinates,
@@ -84,9 +100,40 @@ final readonly class ReverseGeocodeHandler
 
     private static function containsRoute(string $value, string $route): bool
     {
-        $route = str_replace(' ', '\\s+', preg_quote(trim($route), '/'));
+        if (trim($route) === '') {
+            return false;
+        }
 
-        return preg_match('/(?:^|[,\s])' . $route . '(?=$|[,])/iu', $value) === 1;
+        foreach (self::routeVariants($route) as $variant) {
+            $pattern = str_replace(' ', '\\s+', preg_quote($variant, '/'));
+            if (preg_match('/(?:^|[,\s])' . $pattern . '(?=$|[,])/iu', $value) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return non-empty-list<string> */
+    private static function routeVariants(string $route): array
+    {
+        $route = trim((string) preg_replace('/\s+/u', ' ', $route));
+        $parts = explode(' ', $route);
+        if (count($parts) < 2) {
+            return [$route];
+        }
+
+        $first = mb_strtolower($parts[0]);
+        $lastIndex = count($parts) - 1;
+        $last = mb_strtolower($parts[$lastIndex]);
+        if (in_array($first, self::ROUTE_TYPES, true)) {
+            return [$route, implode(' ', [...array_slice($parts, 1), $parts[0]])];
+        }
+        if (in_array($last, self::ROUTE_TYPES, true)) {
+            return [$route, implode(' ', [$parts[$lastIndex], ...array_slice($parts, 0, $lastIndex)])];
+        }
+
+        return [$route];
     }
 
     private static function normalizeHouseNumber(string $houseNumber): string
