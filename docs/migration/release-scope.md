@@ -71,13 +71,14 @@ Geo Registry production schema применяет versioned application migratio
 
 ## Target Evidence
 
-Application commit `5288fb3` прошёл strict target smoke: `13/13` HTTP requests и `26/26`
+Application commit `12fb32a` прошёл strict target smoke: `13/13` HTTP requests и `26/26`
 assertions на одном согласованном GAR identity через PostgreSQL, OpenSearch и
 Nominatim. Deep GAR integrity и OpenSearch source/target parity также успешны.
 Representative legacy comparison выполнен; find и выбранная suggest-цепочка
-совпали, search снова выбирает тот же дом первым. До approval остаются top-N
-ranking tail, дополнительные fuzzy candidates, различие Nominatim snapshots,
-protected production backup restore, старые queues и operator traffic.
+совпали, structured search совпадает с legacy в первых четырёх позициях top-5.
+До approval остаются пятый ranking candidate, дополнительные fuzzy candidates,
+различие Nominatim snapshots/candidate count, protected production backup
+restore, старые queues и operator traffic.
 
 ## Намеренно Deferred
 

@@ -505,7 +505,7 @@ fields и могут быть отключены независимо.
 
 ### Phase 8 — Cutover И Cleanup
 
-- [x] выполнить полный target Postman/smoke run (`5288fb3`: `13/13` requests,
+- [x] выполнить полный target Postman/smoke run (`12fb32a`: `13/13` requests,
   `26/26` assertions);
 - [x] сравнить representative search/suggest/find/reverse responses; top-N,
   fuzzy-candidate и Nominatim snapshot differences ожидают approval;

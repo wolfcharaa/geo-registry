@@ -1605,11 +1605,13 @@ Data.Mos/OSM enrichment. Legacy остаётся запущенным на `8899
 - [ ] Решить, является ли дополнительная fuzzy suggestion `Московка`
   допустимым расширением либо target должен повторить legacy candidate set.
 - [ ] Зафиксировать representative top-N fixture для домов и помещений; текущий
-  target и legacy OpenSearch совпали в первых двух результатах, остальной tail
-  различается.
-- [ ] Закрыть полный house/unit top-N через structured street/house fields или
-  application-side reranking; совместимый level `10` boost уже восстановил
-  representative top-1 без перестройки индекса.
+  target и legacy OpenSearch совпали в первых четырёх результатах, пятый
+  fuzzy-кандидат различается.
+- [x] Добавить structured street/house/building/structure fields и выполнить
+  blue-green rebuild `28649238/28649238`; commit `12fb32a` улучшил
+  representative overlap с `2/5` до `4/5`.
+- [ ] Решить, должен ли пятый fuzzy-кандидат точно повторять legacy либо overlap
+  `4/5` с одинаковым top-1/4 является допустимым relevance contract.
 
 `OPENSEARCH_SEARCH_ENABLED=0` сохраняется до решения последнего пункта. Нельзя
 считать совпадение первого документа достаточным relevance gate.
@@ -1737,7 +1739,7 @@ E2.5 production delivery/cutover`.
 ### R1 — Release Parity
 
 - [x] Выполнить fast и real-service integration gates.
-- [x] Выполнить full Nominatim/Postman smoke. На commit `5288fb3` strict Newman
+- [x] Выполнить full Nominatim/Postman smoke. На commit `12fb32a` strict Newman
   прошёл `13/13` requests и `26/26` assertions для согласованного адреса
   Одинцово/Можайское шоссе.
 - [x] Проверить import -> read-model build -> OpenSearch rebuild -> API flow.
