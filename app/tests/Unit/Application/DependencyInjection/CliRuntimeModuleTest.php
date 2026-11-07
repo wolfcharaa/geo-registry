@@ -46,12 +46,16 @@ final class CliRuntimeModuleTest
         Assert::true(str_contains($console, 'migrate:mark'));
         Assert::true(str_contains($console, 'gar:import'));
         Assert::true(str_contains($console, 'gar:status'));
+        Assert::true(str_contains($console, 'gar:integrity'));
+        Assert::true(str_contains($console, 'gar:activity'));
+        Assert::true(str_contains($console, 'gar:releases'));
         Assert::true(str_contains($console, 'gar:address-search:rebuild'));
         Assert::true(str_contains($console, 'datamos:address-registry:import'));
         Assert::true(str_contains($console, 'datamos:address-registry:enrich'));
         Assert::true(str_contains($console, 'osm:address-aliases:import'));
         Assert::true(str_contains($console, 'opensearch:reindex'));
         Assert::true(str_contains($console, 'opensearch:index:cleanup'));
+        Assert::true(str_contains($console, 'opensearch:status'));
         Assert::true(str_contains($console, 'server:run'));
         Assert::true(str_contains($console, 'worker:run'));
         Assert::true(str_contains($console, 'worker:status'));

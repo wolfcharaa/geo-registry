@@ -1,7 +1,7 @@
 ---
 module: AddressRegistry
-version: 0.12.0
-updated: 2026-11-04
+version: 0.13.0
+updated: 2026-11-07
 language: ru
 ---
 
@@ -216,6 +216,56 @@ bin/app gar:status --regions=50,77 --exact
 Команда read-only. Неизвестная строка `gar_versions` отображается как
 `gar_version=unknown`: import manifest hash при этом остаётся доступен и не
 подменяется вымышленной версией релиза.
+
+## Release Integrity GAR
+
+`bin/app gar:integrity --regions=50,77` выполняет быстрый fail-closed
+gate: проверяет завершённые import/rebuild checkpoints, сохранённую
+rebuild parity, LIST parent, непустые `adm`/`mun` projections и фактическую
+маршрутизацию строк в physical partitions.
+
+`--deep` добавляет точные проверки дубликатов, обязательных полей,
+canonical GAR references, владения регионом, полноты активных
+hierarchies и alias references. Тяжёлые SQL выполняются не более двух
+одновременно. Режим предназначен для release window:
+
+```shell
+bin/app gar:integrity --regions=50,77 --deep --only-failed
+```
+
+Любое число issues больше нуля или недоступная SQL-проверка возвращает
+exit code `1`; опции, разрешающей проигнорировать issues, нет.
+
+## Текущая Активность GAR
+
+`bin/app gar:activity` даёт один read-only snapshot для оперативной диагностики:
+
+- активные statements текущей application database из `pg_stat_activity`;
+- последние durable `gar_import` и `address_search_rebuild` operations;
+- зарегистрированные worker instances без `stopped_at`;
+- незавершённые или failed queue jobs с target binding prefix `gar.`.
+
+`--limit` ограничивает каждую динамическую секцию диапазоном `1..100`, default
+`20`. Полный worker control plane остаётся в `worker:status` и
+`worker:control`; `gar:activity` не посылает команды и не меняет operation
+state.
+
+Legacy `parser_logs` намеренно не читается и не является recovery/progress
+источником target. Состояние import/rebuild берётся только из их checkpoint
+tables, а worker activity — из versioned MessageBus runtime schema.
+
+## Optional Metadata GAR Releases
+
+`bin/app gar:releases` читает официальный metadata endpoint ФНС через native
+AMPHP HTTP client. По умолчанию возвращается последний release; `--all` и
+`--limit=1..50` показывают ограниченную историю, `--json` даёт
+machine-readable output. Response ограничен 4 MiB, timeout — диапазоном
+`1..60` секунд; redirects и неявные retry отключены.
+
+Команда только помогает оператору выбрать источник загрузки. Она не скачивает
+архив, не меняет import state и не участвует в `gar:integrity`: release с уже
+зафиксированным manifest не зависит от доступности внешнего metadata endpoint.
+`--url` оставлен для явного operator override и тестового mirror.
 
 ## Поиск И Идентификация Адреса
 
@@ -578,5 +628,25 @@ bin/app opensearch:index:cleanup \
   --confirm=places-v20261104123456789
 ```
 
-Собственного HTTP route, Postman request или MessageBus binding у обеих CLI
+### Операционная диагностика — `Feature/OpenSearch/Capability/ProjectionStatus`
+
+Read-only команда сверяет текущую OpenSearch projection с PostgreSQL source of
+truth и перечисляет physical indexes, которые не входят в active alias.
+
+```shell
+bin/app opensearch:status
+```
+
+Команда возвращает exit code `0`, только если cluster имеет `green` или
+`yellow` status без timeout, read alias указывает ровно на один physical index,
+в `address_search` нет строк с некорректным `region_code`, а точные source и
+target document counts совпадают. Inactive indexes печатаются для последующей
+явной cleanup operation, но сами по себе не делают status неуспешным.
+
+`opensearch:status` входит в CLI composition независимо от
+`OPENSEARCH_SEARCH_ENABLED`: оператор может проверить projection до включения
+online search. HTTP client, PostgreSQL pool и их lifecycle остаются общими с
+остальными lazy OpenSearch CLI commands.
+
+Собственного HTTP route, Postman request или MessageBus binding у этих CLI
 операций нет.

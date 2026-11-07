@@ -11,6 +11,13 @@ use Throwable;
 
 final readonly class PostgresOpenSearchProjectionSource
 {
+    private const string MANIFEST_SQL = <<<'SQL'
+SELECT
+    count(*)::bigint AS document_count,
+    count(*) FILTER (WHERE region_code IS NULL OR region_code NOT BETWEEN 1 AND 99)::bigint AS invalid_region_count
+FROM address_search
+SQL;
+
     public function __construct(
         private PostgresConnectionPool $postgres,
         private PostgresAddressDocumentHydrator $hydrator,
@@ -22,23 +29,12 @@ final readonly class PostgresOpenSearchProjectionSource
 
         try {
             $transaction->query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
-            $row = $transaction->query(<<<'SQL'
-SELECT
-    count(*)::bigint AS document_count,
-    count(*) FILTER (WHERE region_code IS NULL OR region_code NOT BETWEEN 1 AND 99)::bigint AS invalid_region_count
-FROM address_search
-SQL)->fetchRow();
-            if ($row === null) {
-                throw new OpenSearchProjectionFailed('PostgreSQL did not return an OpenSearch projection manifest.');
-            }
+            $manifest = self::manifestFromRow($transaction->query(self::MANIFEST_SQL)->fetchRow());
 
             return new PostgresOpenSearchProjectionSnapshot(
                 transaction: $transaction,
                 hydrator: $this->hydrator,
-                manifest: new OpenSearchProjectionManifest(
-                    documents: self::integer($row, 'document_count'),
-                    invalidRegionDocuments: self::integer($row, 'invalid_region_count'),
-                ),
+                manifest: $manifest,
             );
         } catch (Throwable $error) {
             if ($transaction->isActive()) {
@@ -47,6 +43,24 @@ SQL)->fetchRow();
 
             throw $error;
         }
+    }
+
+    public function manifest(): OpenSearchProjectionManifest
+    {
+        return self::manifestFromRow($this->postgres->query(self::MANIFEST_SQL)->fetchRow());
+    }
+
+    /** @param array<array-key, mixed>|null $row */
+    private static function manifestFromRow(?array $row): OpenSearchProjectionManifest
+    {
+        if ($row === null) {
+            throw new OpenSearchProjectionFailed('PostgreSQL did not return an OpenSearch projection manifest.');
+        }
+
+        return new OpenSearchProjectionManifest(
+            documents: self::integer($row, 'document_count'),
+            invalidRegionDocuments: self::integer($row, 'invalid_region_count'),
+        );
     }
 
     /** @param array<array-key, mixed> $row */

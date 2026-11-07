@@ -1,7 +1,7 @@
 # Scope первого release
 
 - Статус: `Accepted implementation scope; release evidence pending`
-- Обновлено: `2026-11-04`
+- Обновлено: `2026-11-07`
 - Связанный gate: [release-parity.md](release-parity.md)
 
 ## HTTP Surface
@@ -37,13 +37,22 @@ application commands:
 | `migrate:history` | Evidence текущей schema revision |
 | `gar:import` | Blocking CLI-only import canonical GAR XML |
 | `gar:address-search:rebuild` | Regional partitioned read-model rebuild и cutover |
+| `gar:status` | Import/rebuild manifests и региональные coverage counters |
+| `gar:integrity` | Fail-closed quick/deep release gate для выбранных регионов |
+| `gar:activity` | Read-only active SQL и durable GAR/worker activity snapshot |
 | `opensearch:reindex` | Blue-green projection build и alias switch |
+| `opensearch:status` | Fail-closed cluster/alias/source-target parity и inactive index inventory |
 | `opensearch:index:cleanup` | Явное удаление подтверждённого inactive index |
 
 Framework commands `migrate:create`, `migrate:new`, `migrate:redo` и особенно
 `migrate:mark` остаются доступными tooling-ом, но не являются шагами production
 release procedure. `completion`, `help` и `list` — стандартная Symfony Console
 surface, а не application contract.
+
+`gar:releases` также доступен как optional внешний metadata lookup перед
+выбором GAR source. Он не скачивает данные и не входит в release gate: после
+фиксации source manifest и checksum недоступность endpoint ФНС не должна
+останавливать import/parity sequence.
 
 ## Worker CLI Surface
 

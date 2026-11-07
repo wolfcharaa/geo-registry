@@ -106,7 +106,13 @@ docker/compose/dev.sh run --rm --no-deps \
   app bin/app gar:address-search:rebuild
 
 docker/compose/dev.sh run --rm --no-deps \
+  app bin/app gar:integrity --regions=50,77 --deep --only-failed
+
+docker/compose/dev.sh run --rm --no-deps \
   app bin/app opensearch:reindex
+
+docker/compose/dev.sh run --rm --no-deps \
+  app bin/app opensearch:status
 ```
 
 Каждая команда обязана завершиться нулевым exit code и своим parity check.

@@ -16,7 +16,9 @@ use App\Module\AddressRegistry\Feature\OpenSearch\Capability\RebuildProjection\R
 use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\Cleanup\OpenSearchProjectionCleaner;
 use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\Rebuild\OpenSearchProjectionRebuilder;
 use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\Rebuild\PostgresOpenSearchProjectionSource;
+use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\Status\NativeOpenSearchProjectionStatusInspector;
 use App\Module\AddressRegistry\Feature\OpenSearch\UserInterface\Cli\CleanupOpenSearchIndexCommand;
+use App\Module\AddressRegistry\Feature\OpenSearch\UserInterface\Cli\OpenSearchStatusCommand;
 use App\Module\AddressRegistry\Feature\OpenSearch\UserInterface\Cli\RebuildOpenSearchProjectionCommand;
 use App\Module\AddressRegistry\Infrastructure\Postgres\PostgresAddressDocumentHydrator;
 use Symfony\Component\Console\Command\Command;
@@ -85,6 +87,13 @@ final readonly class OpenSearchProjectionCliModule implements Module
         $cleanupRunner = $dic
             ->object(CleanupOpenSearchIndexRunner::class)
             ->arg('cleaner', $cleaner);
+        $statusInspector = $dic
+            ->object(NativeOpenSearchProjectionStatusInspector::class)
+            ->args([
+                'source' => $source,
+                'openSearch' => $client,
+                'alias' => $this->openSearchConfig->index,
+            ]);
 
         return [
             $dic
@@ -96,6 +105,9 @@ final readonly class OpenSearchProjectionCliModule implements Module
             $dic
                 ->object(CleanupOpenSearchIndexCommand::class)
                 ->arg('runner', $cleanupRunner),
+            $dic
+                ->object(OpenSearchStatusCommand::class)
+                ->arg('inspector', $statusInspector),
         ];
     }
 }

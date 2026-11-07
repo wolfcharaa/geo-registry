@@ -52,6 +52,12 @@ final class OpenSearchProjectionRebuildIntegrationTest
             Assert::same($openSearch->aliasTargets($alias), [$firstIndex]);
             Assert::same($openSearch->countDocuments($firstIndex), 20);
 
+            [$exitCode, $output] = self::runStatus($dsn, $url, $alias);
+            Assert::same($exitCode, 0);
+            Assert::true(str_contains($output, "alias name={$alias} targets={$firstIndex}"));
+            Assert::true(str_contains($output, 'parity source=20 target=20 invalid_regions=0 status=ok'));
+            Assert::true(str_contains($output, 'inactive count=0 indexes=none'));
+
             $levelRow = $pool->execute(<<<'SQL'
 SELECT level
 FROM address_search
@@ -88,6 +94,16 @@ SQL, ['level' => $originalLevel, 'object_id' => 770004]);
             Assert::same($openSearch->aliasTargets($alias), [$secondIndex]);
             Assert::true($openSearch->concreteIndexExists($firstIndex));
 
+            [$exitCode, $output] = self::runStatus($dsn, $url, $alias);
+            Assert::same($exitCode, 0);
+            Assert::true(str_contains($output, "alias name={$alias} targets={$secondIndex}"));
+            $inactiveIndexes = [$failedIndex, $firstIndex];
+            sort($inactiveIndexes);
+            Assert::true(str_contains(
+                $output,
+                'inactive count=2 indexes=' . implode(',', $inactiveIndexes),
+            ));
+
             [$exitCode] = self::runCleanup($dsn, $url, $alias, $firstIndex, 'wrong-confirmation');
             Assert::same($exitCode, 1);
             Assert::true($openSearch->concreteIndexExists($firstIndex));
@@ -122,6 +138,15 @@ SQL, ['level' => $originalLevel, 'object_id' => 770004]);
             'command' => 'opensearch:reindex',
             '--batch-size' => '2',
             '--concurrency' => '2',
+            '--no-ansi' => true,
+        ]);
+    }
+
+    /** @return array{int, string} */
+    private static function runStatus(string $dsn, string $url, string $alias): array
+    {
+        return self::runCli($dsn, $url, $alias, [
+            'command' => 'opensearch:status',
             '--no-ansi' => true,
         ]);
     }

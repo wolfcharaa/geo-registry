@@ -132,6 +132,34 @@ final readonly class OpenSearchClient
         return false;
     }
 
+    /** @return list<string> */
+    public function concreteIndexes(string $prefix, ?Cancellation $cancellation = null): array
+    {
+        if ($prefix === '') {
+            throw new OpenSearchException('OpenSearch index prefix must not be empty.');
+        }
+
+        $response = $this->request(
+            'GET',
+            '/_cat/indices',
+            ['format' => 'json', 'h' => 'index'],
+            cancellation: $cancellation,
+        );
+        $indexes = [];
+        foreach ($response as $row) {
+            $index = is_array($row) ? $row['index'] ?? null : null;
+            if (!is_string($index)) {
+                throw new OpenSearchException('OpenSearch returned an invalid index inventory.');
+            }
+            if (str_starts_with($index, $prefix)) {
+                $indexes[$index] = $index;
+            }
+        }
+        ksort($indexes);
+
+        return array_values($indexes);
+    }
+
     /** @param array<string, mixed> $document */
     public function indexDocument(
         string $index,

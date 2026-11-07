@@ -78,6 +78,9 @@ final readonly class CliRuntimeModule implements Module
         $dic->import(new MigrationCliModule($postgresConfig));
         $dic->import(new GarImportCliModule($postgresConfig));
         $dic->import(new GarStatusCliModule($postgres));
+        $dic->import(new GarIntegrityCliModule($postgres));
+        $dic->import(new GarActivityCliModule($postgres));
+        $dic->import(new GarReleasesCliModule($config));
         $dic->import(new AddressSearchRebuildCliModule($postgresConfig));
         $dic->import(new AddressSourceCliModule($postgresConfig, $addressSourceConfig));
         $dic->import(new OpenSearchProjectionCliModule($postgres, $config, $openSearchConfig));
