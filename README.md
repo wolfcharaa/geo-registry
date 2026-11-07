@@ -82,6 +82,10 @@ bin/app datamos:address-registry:download --dry-run
 официальный Data.Mos snapshot, Nominatim и OpenSearch описаны в
 [жизненном цикле данных](docs/guides/data-lifecycle.md).
 
+После наполнения projection mixed-load gate регионального поиска запускается
+через `make load-search`; сценарий и сравнение PostgreSQL/OpenSearch описаны в
+[руководстве нагрузочной проверки](docs/deployment/address-search-load-test.md).
+
 ## HTTP API
 
 Основные endpoints:

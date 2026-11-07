@@ -11,6 +11,13 @@ LOAD_CHECK_REQUESTS ?= 1000
 LOAD_CHECK_CONCURRENCY ?= 32
 LOAD_CHECK_MAX_FAILURES ?= 0
 LOAD_CHECK_MAX_P95_MS ?= 250
+ADDRESS_LOAD_BASE_URL ?= http://host.docker.internal:8080
+ADDRESS_LOAD_VARIANT ?= unspecified
+ADDRESS_LOAD_VUS ?= 16
+ADDRESS_LOAD_DURATION ?= 30s
+ADDRESS_LOAD_TIMEOUT ?= 10s
+ADDRESS_LOAD_MAX_P95_MS ?= 750
+ADDRESS_LOAD_MAX_P99_MS ?= 1500
 
 export HOST_UID ?= $(shell id -u)
 export HOST_GID ?= $(shell id -g)
@@ -266,6 +273,17 @@ load-check: guard-user ## Run the bounded HTTP load gate inside the running app 
 		--max-failures="$(LOAD_CHECK_MAX_FAILURES)" \
 		--max-p95-ms="$(LOAD_CHECK_MAX_P95_MS)" $(LOAD_CHECK_FLAGS)
 .PHONY: load-check
+
+load-search: guard-user ## Run the external mixed regional address-search load gate with k6
+	ADDRESS_LOAD_BASE_URL="$(ADDRESS_LOAD_BASE_URL)" \
+		ADDRESS_LOAD_VARIANT="$(ADDRESS_LOAD_VARIANT)" \
+		ADDRESS_LOAD_VUS="$(ADDRESS_LOAD_VUS)" \
+		ADDRESS_LOAD_DURATION="$(ADDRESS_LOAD_DURATION)" \
+		ADDRESS_LOAD_TIMEOUT="$(ADDRESS_LOAD_TIMEOUT)" \
+		ADDRESS_LOAD_MAX_P95_MS="$(ADDRESS_LOAD_MAX_P95_MS)" \
+		ADDRESS_LOAD_MAX_P99_MS="$(ADDRESS_LOAD_MAX_P99_MS)" \
+		docker/scripts/run-address-search-load.sh
+.PHONY: load-search
 
 smoke-release: registry-check ## Run strict executable Postman parity against prepared release data
 	POSTMAN_COLLECTION="$(POSTMAN_COLLECTION)" \

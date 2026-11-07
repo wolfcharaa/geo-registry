@@ -178,6 +178,11 @@ release gate и инструмент сравнения конфигураций
 Сравнивать результаты можно только на одном host, dataset, endpoint, revision и
 профиле concurrency; cold и warm прогоны сохраняются отдельно.
 
+Смешанный внешний workload настоящего `GET /api/addresses/search`, который
+проверяет JSON-контракт и отдельные p95 по регионам `50`/`77`, запускается через
+`make load-search`. Параметры, backend comparison и правила сохранения evidence
+описаны в [address-search-load-test.md](address-search-load-test.md).
+
 Автоматический fault gate входит в `make test-integration`: два worker-а делят
 socket, один завершает request budget, supervisor поднимает замену, после чего
 cluster штатно принимает `SIGTERM`. На работающем окружении controlled restart

@@ -154,6 +154,31 @@ Operator/product принял для этого release flow контракт: �
 исторических запросов дала одинаковый top-1 в `5/6` и top-10 overlap `31/60`;
 exact global ordering за пределами representative contract не обещается.
 
+## Внешний Mixed HTTP Workload 2026-11-08
+
+После добавления воспроизводимого `k6`-сценария оба backend-а проверены через
+опубликованный `GET /api/addresses/search`, а не прямым вызовом adapter-а.
+Одинаковая конфигурация: `2` HTTP workers, PostgreSQL pool `4`, `16` constant
+VU, `30s`, прогретый dataset и семь чередующихся запросов регионов `50`/`77`.
+Сценарий валидировал HTTP status, JSON envelope, регион, профиль, иерархию,
+непустой результат и согласованность `count`/`suggestions`.
+
+| Backend | Requests | Throughput | Average | p95 | p99 | Contract failures |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| PostgreSQL | 1 381 | 45.4 req/s | 349.6 ms | 686.5 ms | 818.3 ms | 0 |
+| OpenSearch | 11 820 | 392.9 req/s | 40.1 ms | 64.3 ms | 92.3 ms | 0 |
+
+Региональный p95 PostgreSQL/OpenSearch составил `527.2/66.8 ms` для региона
+`50` и `720.4/61.9 ms` для региона `77`. В closed-model профиле OpenSearch дал
+примерно `8.7x` по throughput и `10.7x` по общему p95. Число запросов различается
+ожидаемо: constant VU начинает следующую итерацию после завершения предыдущей,
+поэтому быстрый backend обрабатывает больше итераций за те же 30 секунд.
+
+Load generator работал в отдельном container, но на том же host, поэтому этот
+результат пригоден для относительного сравнения текущей конфигурации, а не как
+универсальный capacity SLA. Сценарий и правила повторения описаны в
+`docs/deployment/address-search-load-test.md`.
+
 ## Решение
 
 PostgreSQL остаётся обязательным fallback и source of truth. OpenSearch

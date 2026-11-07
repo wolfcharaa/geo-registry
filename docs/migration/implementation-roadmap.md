@@ -1911,6 +1911,18 @@ contract artifacts, но не implementation code.
 
 ## История Документа
 
+### 0.70.0 — 2026-11-08
+
+- добавлен внешний pinned `k6` mixed-load gate для семи адресных запросов
+  регионов `50`/`77` с проверкой HTTP и JSON-контракта;
+- thresholds требуют нулевые failures, обязательные samples обоих регионов и
+  bounded общий/региональный p95 и общий p99;
+- одинаковый workload на `2` HTTP workers, pool `4`, `16` VU и `30s`
+  подтвердил `45.4 req/s, p95 686.5 ms` для PostgreSQL и
+  `392.9 req/s, p95 64.3 ms` для OpenSearch без contract failures;
+- runner остаётся вне production image, а Makefile и deployment guide получили
+  воспроизводимый operator entrypoint `make load-search`.
+
 ### 0.69.0 — 2026-11-07
 
 - cluster workers публикуют supervisor-у typed IPC lifecycle/heartbeat без
