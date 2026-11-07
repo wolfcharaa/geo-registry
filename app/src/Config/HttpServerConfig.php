@@ -18,6 +18,10 @@ final readonly class HttpServerConfig
         public float $shutdownTimeoutSeconds,
         public int $workerMaxRequests,
         public int $workerMaxMemoryMegabytes,
+        public int $workerRestartBurst,
+        public float $workerRestartWindowSeconds,
+        public float $workerRestartBackoffInitialSeconds,
+        public float $workerRestartBackoffMaximumSeconds,
         public int $connectionLimit,
         public int $connectionsPerIpLimit,
         public int $concurrencyLimit,
@@ -48,6 +52,22 @@ final readonly class HttpServerConfig
         if ($this->workerMaxMemoryMegabytes > intdiv(PHP_INT_MAX, self::BYTES_PER_MEBIBYTE)) {
             throw new InvalidArgumentException('APP_HTTP_WORKER_MAX_MEMORY_MB is too large.');
         }
+        if ($this->workerRestartBurst < 0 || $this->workerRestartBurst > 1000) {
+            throw new InvalidArgumentException('APP_HTTP_WORKER_RESTART_BURST must be between 0 and 1000.');
+        }
+        if ($this->workerRestartWindowSeconds <= 0 || $this->workerRestartWindowSeconds > 3600) {
+            throw new InvalidArgumentException('APP_HTTP_WORKER_RESTART_WINDOW_SECONDS must be greater than zero and at most 3600.');
+        }
+        if ($this->workerRestartBackoffInitialSeconds <= 0 || $this->workerRestartBackoffInitialSeconds > 300) {
+            throw new InvalidArgumentException('APP_HTTP_WORKER_RESTART_BACKOFF_INITIAL_SECONDS must be greater than zero and at most 300.');
+        }
+        if ($this->workerRestartBackoffMaximumSeconds < $this->workerRestartBackoffInitialSeconds
+            || $this->workerRestartBackoffMaximumSeconds > 300
+        ) {
+            throw new InvalidArgumentException(
+                'APP_HTTP_WORKER_RESTART_BACKOFF_MAX_SECONDS must be at least the initial delay and at most 300.',
+            );
+        }
         if ($this->connectionLimit < 1) {
             throw new InvalidArgumentException('APP_HTTP_CONNECTION_LIMIT must be greater than zero.');
         }
@@ -72,6 +92,16 @@ final readonly class HttpServerConfig
             shutdownTimeoutSeconds: $environment->positiveFloat('APP_HTTP_SHUTDOWN_TIMEOUT_SECONDS', 30),
             workerMaxRequests: $environment->nonNegativeInteger('APP_HTTP_WORKER_MAX_REQUESTS', 0),
             workerMaxMemoryMegabytes: $environment->nonNegativeInteger('APP_HTTP_WORKER_MAX_MEMORY_MB', 0),
+            workerRestartBurst: $environment->nonNegativeInteger('APP_HTTP_WORKER_RESTART_BURST', 5),
+            workerRestartWindowSeconds: $environment->positiveFloat('APP_HTTP_WORKER_RESTART_WINDOW_SECONDS', 30),
+            workerRestartBackoffInitialSeconds: $environment->positiveFloat(
+                'APP_HTTP_WORKER_RESTART_BACKOFF_INITIAL_SECONDS',
+                0.5,
+            ),
+            workerRestartBackoffMaximumSeconds: $environment->positiveFloat(
+                'APP_HTTP_WORKER_RESTART_BACKOFF_MAX_SECONDS',
+                30,
+            ),
             connectionLimit: $environment->positiveInteger('APP_HTTP_CONNECTION_LIMIT', 512),
             connectionsPerIpLimit: $environment->nonNegativeInteger('APP_HTTP_CONNECTIONS_PER_IP_LIMIT', 64),
             concurrencyLimit: $environment->nonNegativeInteger('APP_HTTP_CONCURRENCY_LIMIT', 256),

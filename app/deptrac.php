@@ -62,7 +62,7 @@ return static function (DeptracConfig $config): void {
             ),
             $ampCore = Layer::withName('AMPHP Core')->collectors(
                 ClassLikeConfig::create(
-                    '^Amp\\(?:Cancellation|CancelledException|DeferredCancellation|Future|NullCancellation|TimeoutCancellation)$',
+                    '^Amp\\(?:Cancellation|CancelledException|CompositeCancellation|DeferredCancellation|Future|NullCancellation|TimeoutCancellation)$',
                 ),
             ),
             $ampRuntime = Layer::withName('AMPHP Runtime')->collectors(

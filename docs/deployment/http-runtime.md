@@ -21,6 +21,13 @@ PostgreSQL connections, HTTP clients и Thesis DIC disposers не наследу
 Worker logs передаются supervisor-у по IPC и сохраняют единый JSON/console
 formatter.
 
+Supervisor исключает первичный запуск worker pool из restart budget. После
+допустимого burst быстрых замен в скользящем окне каждый следующий запуск
+задерживается с экспоненциальным backoff до настроенного потолка. После окна без
+рестартов budget очищается. Это ограничивает crash-loop, но не скрывает его:
+каждая задержка записывается warning-событием
+`http.cluster.worker.restart.delayed`.
+
 Production image содержит закреплённые `ev 1.2.3`, `pq 2.2.3` и
 `raphf 2.0.2`, а также `pcntl`, `posix` и `sockets`. Revolt использует
 `EvDriver`; `amphp/postgres` при наличии `pq` выбирает неблокирующий pq-driver.
@@ -36,6 +43,10 @@ Production image содержит закреплённые `ev 1.2.3`, `pq 2.2.3
 | `APP_HTTP_SHUTDOWN_TIMEOUT_SECONDS` | `30` | `30` | Время graceful shutdown workers |
 | `APP_HTTP_WORKER_MAX_REQUESTS` | `0` | `10000` | Ротация worker после числа завершённых requests; `0` отключает лимит |
 | `APP_HTTP_WORKER_MAX_MEMORY_MB` | `0` | `256` | Ротация worker при достижении RSS в MiB; `0` отключает лимит |
+| `APP_HTTP_WORKER_RESTART_BURST` | `5` | `5` | Число быстрых замен за окно без задержки; `0..1000` |
+| `APP_HTTP_WORKER_RESTART_WINDOW_SECONDS` | `30` | `30` | Скользящее окно restart budget; `(0..3600]` |
+| `APP_HTTP_WORKER_RESTART_BACKOFF_INITIAL_SECONDS` | `0.5` | `0.5` | Первая задержка после исчерпания burst; `(0..300]` |
+| `APP_HTTP_WORKER_RESTART_BACKOFF_MAX_SECONDS` | `30` | `30` | Верхняя граница задержки, не меньше initial; `(0..300]` |
 | `APP_HTTP_CONNECTION_LIMIT` | `512` | `1024` | Одновременные connections на worker |
 | `APP_HTTP_CONNECTIONS_PER_IP_LIMIT` | `64` | `0` | Лимит на client IP; `0` отключает его за reverse proxy |
 | `APP_HTTP_CONCURRENCY_LIMIT` | `256` | `512` | Одновременные requests на worker; `0` отключает limiter |
@@ -57,6 +68,15 @@ graph, а supervisor автоматически запускает замену 
 из `/proc/self/status`; `memory_get_usage(true)` используется только как
 portable fallback. Memory limit должен оставлять запас относительно container
 limit для supervisor, второго worker, native extensions и ответа в полёте.
+
+Restart budget общий для supervisor process. Например, при production defaults
+первые пять замен за 30 секунд выполняются немедленно, затем задержки составляют
+`0.5`, `1`, `2`, `4`, `8`, `16`, `30` секунд. Штатная ротация также учитывается:
+если request/RSS budget вызывает больше пяти замен за 30 секунд, backoff
+намеренно сглаживает одновременный churn. Перезапуск container-а обнуляет
+in-memory историю, а внешний Compose restart policy остаётся вторым уровнем
+защиты, если завершится сам supervisor. Ожидание backoff отменяется сигналом
+остановки и не увеличивает graceful shutdown timeout.
 
 ## PostgreSQL Connection Budget
 
@@ -92,7 +112,9 @@ docker/compose/dev.sh logs app
 
 В логах должны присутствовать `http.cluster.starting`, по одному
 `http.server.started` на worker с разными `pid`/`worker_id`, а при остановке —
-`http.server.stopping` и `http.cluster.stopped`.
+`http.server.stopping` и `http.cluster.stopped`. Повторяющееся
+`http.cluster.worker.restart.delayed` означает crash-loop или слишком
+агрессивные request/RSS limits и требует проверки соседних worker error logs.
 
 Development допускает `APP_HTTP_WORKERS=1`. Fallback на `StreamSelectDriver`
 допустим только для запуска кода вне project image; production image и release

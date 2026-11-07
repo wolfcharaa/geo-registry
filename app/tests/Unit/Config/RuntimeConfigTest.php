@@ -32,6 +32,10 @@ final class RuntimeConfigTest
             'APP_HTTP_SHUTDOWN_TIMEOUT_SECONDS' => '25',
             'APP_HTTP_WORKER_MAX_REQUESTS' => '12000',
             'APP_HTTP_WORKER_MAX_MEMORY_MB' => '384',
+            'APP_HTTP_WORKER_RESTART_BURST' => '8',
+            'APP_HTTP_WORKER_RESTART_WINDOW_SECONDS' => '45',
+            'APP_HTTP_WORKER_RESTART_BACKOFF_INITIAL_SECONDS' => '0.75',
+            'APP_HTTP_WORKER_RESTART_BACKOFF_MAX_SECONDS' => '20',
             'APP_HTTP_CONNECTION_LIMIT' => '700',
             'APP_HTTP_CONNECTIONS_PER_IP_LIMIT' => '0',
             'APP_HTTP_CONCURRENCY_LIMIT' => '350',
@@ -84,6 +88,10 @@ final class RuntimeConfigTest
         Assert::same($http->workerMaxRequests, 12000);
         Assert::same($http->workerMaxMemoryMegabytes, 384);
         Assert::same($http->workerMaxMemoryBytes(), 384 * 1024 * 1024);
+        Assert::same($http->workerRestartBurst, 8);
+        Assert::same($http->workerRestartWindowSeconds, 45.0);
+        Assert::same($http->workerRestartBackoffInitialSeconds, 0.75);
+        Assert::same($http->workerRestartBackoffMaximumSeconds, 20.0);
         Assert::same($http->connectionLimit, 700);
         Assert::same($http->connectionsPerIpLimit, 0);
         Assert::same($http->concurrencyLimit, 350);
@@ -212,6 +220,15 @@ final class RuntimeConfigTest
     {
         HttpServerConfig::fromEnvironment(new EnvironmentSnapshot([
             'APP_HTTP_WORKER_MAX_MEMORY_MB' => (string) (intdiv(PHP_INT_MAX, 1024 * 1024) + 1),
+        ]));
+    }
+
+    #[ExpectException(InvalidArgumentException::class)]
+    public function testHttpWorkerRestartMaximumBackoffCannotBeLessThanInitialBackoff(): void
+    {
+        HttpServerConfig::fromEnvironment(new EnvironmentSnapshot([
+            'APP_HTTP_WORKER_RESTART_BACKOFF_INITIAL_SECONDS' => '2',
+            'APP_HTTP_WORKER_RESTART_BACKOFF_MAX_SECONDS' => '1',
         ]));
     }
 

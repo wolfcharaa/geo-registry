@@ -6,10 +6,12 @@ namespace App\Application\Runtime;
 
 use Amp\Cluster\Cluster;
 use Amp\Cluster\ClusterWatcher;
+use Amp\DeferredCancellation;
 use Amp\Parallel\Ipc\LocalIpcHub;
 use Amp\TimeoutCancellation;
 use App\Config\HttpServerConfig;
 use App\Infrastructure\Process\PipedProcessContextFactory;
+use App\Infrastructure\Process\ProcessRestartBackoff;
 use Psr\Log\LoggerInterface;
 use Revolt\EventLoop;
 use Revolt\EventLoop\UnsupportedFeatureException;
@@ -30,18 +32,35 @@ final readonly class HttpClusterRuntime
         }
 
         $hub = new LocalIpcHub();
+        $workerStartCancellation = new DeferredCancellation();
+        $restartBackoff = new ProcessRestartBackoff(
+            initialStartCount: $this->config->workers,
+            restartBurst: $this->config->workerRestartBurst,
+            windowSeconds: $this->config->workerRestartWindowSeconds,
+            initialDelaySeconds: $this->config->workerRestartBackoffInitialSeconds,
+            maximumDelaySeconds: $this->config->workerRestartBackoffMaximumSeconds,
+        );
         $watcher = new ClusterWatcher(
             [$this->entrypoint, 'server:run'],
             $this->logger,
             hub: $hub,
-            contextFactory: new PipedProcessContextFactory($hub),
+            contextFactory: new PipedProcessContextFactory(
+                $hub,
+                $restartBackoff,
+                $this->logger,
+                $workerStartCancellation->getCancellation(),
+            ),
         );
-        $signalWatchers = $this->installSignalHandlers($watcher);
+        $signalWatchers = $this->installSignalHandlers($watcher, $workerStartCancellation);
 
         $this->logger->info('Starting HTTP worker cluster', [
             'event' => 'http.cluster.starting',
             'pid' => getmypid(),
             'workers' => $this->config->workers,
+            'restart_burst' => $this->config->workerRestartBurst,
+            'restart_window_seconds' => $this->config->workerRestartWindowSeconds,
+            'restart_backoff_initial_seconds' => $this->config->workerRestartBackoffInitialSeconds,
+            'restart_backoff_maximum_seconds' => $this->config->workerRestartBackoffMaximumSeconds,
         ]);
 
         try {
@@ -54,6 +73,7 @@ final readonly class HttpClusterRuntime
                 ]);
             }
         } finally {
+            $workerStartCancellation->cancel();
             foreach ($signalWatchers as $watcherId) {
                 EventLoop::cancel($watcherId);
             }
@@ -69,20 +89,26 @@ final readonly class HttpClusterRuntime
      * @param ClusterWatcher<mixed, mixed> $watcher
      * @return list<string>
      */
-    private function installSignalHandlers(ClusterWatcher $watcher): array
-    {
+    private function installSignalHandlers(
+        ClusterWatcher $watcher,
+        DeferredCancellation $workerStartCancellation,
+    ): array {
         $watcherIds = [];
 
         try {
             foreach (Cluster::getSignalList() as $signal) {
                 $watcherIds[] = EventLoop::onSignal(
                     $signal,
-                    function (string $watcherId, int $signalNumber) use ($watcher): void {
+                    function (string $watcherId, int $signalNumber) use (
+                        $watcher,
+                        $workerStartCancellation,
+                    ): void {
                         EventLoop::cancel($watcherId);
                         $this->logger->info('Stopping HTTP worker cluster', [
                             'event' => 'http.cluster.stopping',
                             'signal' => $signalNumber,
                         ]);
+                        $workerStartCancellation->cancel();
                         $watcher->stop(new TimeoutCancellation($this->config->shutdownTimeoutSeconds));
                     },
                 );

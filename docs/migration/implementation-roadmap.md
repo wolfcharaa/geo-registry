@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
 - Статус: `Active; production-like runtime hardening`
-- Версия документа: `0.67.0`
+- Версия документа: `0.68.0`
 - Обновлено: `2026-11-07`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -1910,6 +1910,19 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.68.0 — 2026-11-07
+
+- HTTP supervisor получил общий restart budget, скользящее окно и
+  экспоненциальный backoff с настраиваемым burst/initial/max delay;
+- первичный запуск pool не расходует budget, а стабильное окно очищает историю;
+- lifecycle cancellation прерывает backoff при остановке supervisor-а, поэтому
+  restart delay не расширяет graceful shutdown window;
+- каждая задержка наблюдаема как structured warning
+  `http.cluster.worker.restart.delayed`; worker recycle integration проверяет
+  фактический delayed replacement на общем socket;
+- dev/prod environment examples и Compose topology экспортируют одинаковый
+  явный контракт защиты от crash-loop.
 
 ### 0.67.0 — 2026-11-07
 
