@@ -39,8 +39,9 @@ final class OpenSearchClientIntegrationTest
         $client->createIndex($index, OpenSearchAddressIndexDefinition::create());
 
         try {
-            $client->indexDocument($index, '770005-adm', self::document(77, 770005, 'Альфа'));
-            $client->indexDocument($index, '780005-adm', self::document(78, 780005, 'Бета'));
+            $client->indexDocument($index, '770005-adm', self::document(77, 770005, 'Альфа', 10));
+            $client->indexDocument($index, '770006-adm', self::document(77, 770006, 'Альфа', 11, ', кв. 1'));
+            $client->indexDocument($index, '780005-adm', self::document(78, 780005, 'Бета', 10));
             $client->refreshIndex($index);
 
             $matches = (new OpenSearchSearchAddressDecorator(
@@ -58,10 +59,11 @@ final class OpenSearchClientIntegrationTest
                 regionCode: 77,
             ), new NullCancellation());
 
-            Assert::same(count($matches), 1);
+            Assert::same(count($matches), 2);
             $match = $matches[0] ?? null;
             Assert::notNull($match);
             Assert::same($match->document->objectId, 770005);
+            Assert::same($match->document->level, 10);
             Assert::same($match->backend, 'opensearch');
             Assert::same($match->document->aliasCount, 1);
             $alias = $match->aliases[0] ?? null;
@@ -80,15 +82,21 @@ final class OpenSearchClientIntegrationTest
     }
 
     /** @return array<string, mixed> */
-    private static function document(int $regionCode, int $objectId, string $region): array
+    private static function document(
+        int $regionCode,
+        int $objectId,
+        string $region,
+        int $level,
+        string $suffix = '',
+    ): array
     {
         return [
             'object_id' => $objectId,
             'object_guid' => sprintf('00000000-0000-4000-8000-%012d', $objectId),
-            'address' => "Регион {$region}, г. Тестоград, ул. Общая, д. 10",
+            'address' => "Регион {$region}, г. Тестоград, ул. Общая, д. 10{$suffix}",
             'hierarchy_type' => 'adm',
             'region_code' => $regionCode,
-            'level' => 8,
+            'level' => $level,
             'postal_code' => (string) ($regionCode * 10000 + 1),
             'geo_lat' => 55.750001,
             'geo_lon' => 37.610001,

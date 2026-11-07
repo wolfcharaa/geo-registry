@@ -82,7 +82,13 @@ final class OpenSearchSearchAddressDecoratorTest
         Assert::notNull($http->request);
         $body = self::jsonObject(buffer($http->request->getBody()->getContent()));
         $query = self::object($body['query'] ?? null);
-        $bool = self::object($query['bool'] ?? null);
+        $functionScore = self::object($query['function_score'] ?? null);
+        Assert::same($functionScore['functions'] ?? null, [[
+            'filter' => ['term' => ['level' => 10]],
+            'weight' => 1000,
+        ]]);
+        $nestedQuery = self::object($functionScore['query'] ?? null);
+        $bool = self::object($nestedQuery['bool'] ?? null);
         $filters = self::list($bool['filter'] ?? null);
         Assert::same($filters, [
             ['term' => ['hierarchy_type' => 'mun']],

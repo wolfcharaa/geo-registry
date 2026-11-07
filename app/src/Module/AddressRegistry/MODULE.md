@@ -532,6 +532,9 @@ PostgreSQL остаётся fallback и источником истины.
 - Query всегда фильтрует `hierarchy_type`, а переданный `region_code`
   применяется до ranking. Порядок стабилизируют score, level, address и
   `object_id`.
+- Запрос с явным либо завершающим номером дома без маркера квартиры/помещения
+  получает совместимый с legacy boost для GAR level `10`, чтобы вложенные
+  level `11` units не вытесняли базовый дом.
 - Strict index mapping содержит только поля core document, regional key и typed
   aliases. Raw OpenSearch hit/response не покидает feature infrastructure.
 - Непустые hits получают `search_backend=opensearch`. Empty result, HTTP

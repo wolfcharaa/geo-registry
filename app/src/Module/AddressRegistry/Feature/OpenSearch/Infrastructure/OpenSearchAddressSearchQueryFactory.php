@@ -8,6 +8,10 @@ use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressCriteria;
 
 final class OpenSearchAddressSearchQueryFactory
 {
+    public function __construct(
+        private readonly OpenSearchAddressQueryIntent $intent = new OpenSearchAddressQueryIntent(),
+    ) {}
+
     /** @return array<string, mixed> */
     public function create(SearchAddressCriteria $criteria): array
     {
@@ -18,7 +22,7 @@ final class OpenSearchAddressSearchQueryFactory
             $filters[] = ['term' => ['region_code' => $criteria->regionCode]];
         }
 
-        return [
+        $query = [
             'bool' => [
                 'filter' => $filters,
                 'minimum_should_match' => 1,
@@ -111,6 +115,24 @@ final class OpenSearchAddressSearchQueryFactory
                         ],
                     ],
                 ],
+            ],
+        ];
+
+        if (!$this->intent->targetsHouse($criteria->query)) {
+            return $query;
+        }
+
+        return [
+            'function_score' => [
+                'query' => $query,
+                'functions' => [
+                    [
+                        'filter' => ['term' => ['level' => 10]],
+                        'weight' => 1000,
+                    ],
+                ],
+                'score_mode' => 'sum',
+                'boost_mode' => 'sum',
             ],
         ];
     }
