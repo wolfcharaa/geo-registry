@@ -30,6 +30,8 @@ final class RuntimeConfigTest
             'APP_USER_AGENT' => 'geo-registry/test',
             'APP_HTTP_WORKERS' => '3',
             'APP_HTTP_SHUTDOWN_TIMEOUT_SECONDS' => '25',
+            'APP_HTTP_WORKER_MAX_REQUESTS' => '12000',
+            'APP_HTTP_WORKER_MAX_MEMORY_MB' => '384',
             'APP_HTTP_CONNECTION_LIMIT' => '700',
             'APP_HTTP_CONNECTIONS_PER_IP_LIMIT' => '0',
             'APP_HTTP_CONCURRENCY_LIMIT' => '350',
@@ -79,6 +81,9 @@ final class RuntimeConfigTest
         Assert::same($http->timeoutSeconds, 3.5);
         Assert::same($http->workers, 3);
         Assert::same($http->shutdownTimeoutSeconds, 25.0);
+        Assert::same($http->workerMaxRequests, 12000);
+        Assert::same($http->workerMaxMemoryMegabytes, 384);
+        Assert::same($http->workerMaxMemoryBytes(), 384 * 1024 * 1024);
         Assert::same($http->connectionLimit, 700);
         Assert::same($http->connectionsPerIpLimit, 0);
         Assert::same($http->concurrencyLimit, 350);
@@ -199,6 +204,14 @@ final class RuntimeConfigTest
     {
         HttpServerConfig::fromEnvironment(new EnvironmentSnapshot([
             'APP_HTTP_CONNECTIONS_PER_IP_LIMIT' => '-1',
+        ]));
+    }
+
+    #[ExpectException(InvalidArgumentException::class)]
+    public function testHttpWorkerMemoryLimitMustFitIntoBytes(): void
+    {
+        HttpServerConfig::fromEnvironment(new EnvironmentSnapshot([
+            'APP_HTTP_WORKER_MAX_MEMORY_MB' => (string) (intdiv(PHP_INT_MAX, 1024 * 1024) + 1),
         ]));
     }
 

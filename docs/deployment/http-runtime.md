@@ -34,6 +34,8 @@ Production image содержит закреплённые `ev 1.2.3`, `pq 2.2.3
 | --- | ---: | ---: | --- |
 | `APP_HTTP_WORKERS` | `1` | `2` | Число HTTP worker processes, `1..64` |
 | `APP_HTTP_SHUTDOWN_TIMEOUT_SECONDS` | `30` | `30` | Время graceful shutdown workers |
+| `APP_HTTP_WORKER_MAX_REQUESTS` | `0` | `10000` | Ротация worker после числа завершённых requests; `0` отключает лимит |
+| `APP_HTTP_WORKER_MAX_MEMORY_MB` | `0` | `256` | Ротация worker при достижении RSS в MiB; `0` отключает лимит |
 | `APP_HTTP_CONNECTION_LIMIT` | `512` | `1024` | Одновременные connections на worker |
 | `APP_HTTP_CONNECTIONS_PER_IP_LIMIT` | `64` | `0` | Лимит на client IP; `0` отключает его за reverse proxy |
 | `APP_HTTP_CONCURRENCY_LIMIT` | `256` | `512` | Одновременные requests на worker; `0` отключает limiter |
@@ -47,6 +49,14 @@ Connection/concurrency limits относятся к одному HTTP worker. П
 эффективный верхний предел вдвое больше. Контейнер получает `nofile=65536`, но
 его нельзя считать разрешением бесконтрольно увеличивать application limits:
 нужно учитывать ingress, память и PostgreSQL capacity.
+
+Оба лимита ротации действуют только в cluster mode (`APP_HTTP_WORKERS > 1`).
+После завершения граничного request worker пишет
+`http.worker.recycle.requested`, graceful закрывает HTTP connections и свой DIC
+graph, а supervisor автоматически запускает замену на общем socket. RSS берётся
+из `/proc/self/status`; `memory_get_usage(true)` используется только как
+portable fallback. Memory limit должен оставлять запас относительно container
+limit для supervisor, второго worker, native extensions и ответа в полёте.
 
 ## PostgreSQL Connection Budget
 

@@ -62,6 +62,46 @@ final class HttpClusterRuntimeIntegrationTest
         Assert::true(str_contains($logs, '"event":"http.cluster.stopped"'), $logs);
     }
 
+    public function testWorkerIsReplacedAfterItsRequestBudgetIsExhausted(): void
+    {
+        $port = $this->freeTcpPort();
+        $root = dirname(__DIR__, 4);
+        $process = Process::start(
+            [PHP_BINARY, $root . '/bin/app', 'server:run'],
+            $root,
+            [
+                'APP_HTTP_WORKERS' => '2',
+                'APP_HTTP_WORKER_MAX_REQUESTS' => '1',
+                'APP_LISTEN' => '127.0.0.1:' . $port,
+                'DATABASE_DSN' => 'host=127.0.0.1 dbname=geo_registry_cluster_test',
+                'DATABASE_POOL_SIZE' => '1',
+                'LOG_FORMAT' => 'json',
+                'NOMINATIM_ENABLED' => '0',
+                'OPENSEARCH_ENABLED' => '0',
+                'REVOLT_DRIVER' => 'Revolt\\EventLoop\\Driver\\StreamSelectDriver',
+            ],
+        );
+        $stdout = $this->capture($process->getStdout());
+        $stderr = $this->capture($process->getStderr());
+
+        try {
+            $this->awaitLiveness($port);
+            delay(0.5);
+            $process->signal(SIGTERM);
+            $exitCode = $process->join(new TimeoutCancellation(10));
+        } finally {
+            $process->kill();
+        }
+
+        $logs = $stdout->await();
+        $errors = $stderr->await();
+
+        Assert::same($exitCode, 0, $errors);
+        Assert::true(str_contains($logs, '"event":"http.worker.recycle.requested"'), $logs);
+        Assert::true(substr_count($logs, '"message":"HTTP server started"') >= 3, $logs);
+        Assert::true(str_contains($logs, 'terminated cleanly, restarting'), $logs);
+    }
+
     private function awaitLiveness(int $port): void
     {
         $client = HttpClientBuilder::buildDefault();

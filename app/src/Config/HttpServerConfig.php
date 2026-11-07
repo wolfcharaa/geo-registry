@@ -8,12 +8,16 @@ use InvalidArgumentException;
 
 final readonly class HttpServerConfig
 {
+    private const BYTES_PER_MEBIBYTE = 1024 * 1024;
+
     public function __construct(
         public string $listen,
         public string $userAgent,
         public float $timeoutSeconds,
         public int $workers,
         public float $shutdownTimeoutSeconds,
+        public int $workerMaxRequests,
+        public int $workerMaxMemoryMegabytes,
         public int $connectionLimit,
         public int $connectionsPerIpLimit,
         public int $concurrencyLimit,
@@ -34,6 +38,15 @@ final readonly class HttpServerConfig
         }
         if ($this->shutdownTimeoutSeconds <= 0) {
             throw new InvalidArgumentException('APP_HTTP_SHUTDOWN_TIMEOUT_SECONDS must be greater than zero.');
+        }
+        if ($this->workerMaxRequests < 0) {
+            throw new InvalidArgumentException('APP_HTTP_WORKER_MAX_REQUESTS must be non-negative.');
+        }
+        if ($this->workerMaxMemoryMegabytes < 0) {
+            throw new InvalidArgumentException('APP_HTTP_WORKER_MAX_MEMORY_MB must be non-negative.');
+        }
+        if ($this->workerMaxMemoryMegabytes > intdiv(PHP_INT_MAX, self::BYTES_PER_MEBIBYTE)) {
+            throw new InvalidArgumentException('APP_HTTP_WORKER_MAX_MEMORY_MB is too large.');
         }
         if ($this->connectionLimit < 1) {
             throw new InvalidArgumentException('APP_HTTP_CONNECTION_LIMIT must be greater than zero.');
@@ -57,6 +70,8 @@ final readonly class HttpServerConfig
             timeoutSeconds: $environment->positiveFloat('HTTP_TIMEOUT_SECONDS', 10),
             workers: $environment->positiveInteger('APP_HTTP_WORKERS', 1),
             shutdownTimeoutSeconds: $environment->positiveFloat('APP_HTTP_SHUTDOWN_TIMEOUT_SECONDS', 30),
+            workerMaxRequests: $environment->nonNegativeInteger('APP_HTTP_WORKER_MAX_REQUESTS', 0),
+            workerMaxMemoryMegabytes: $environment->nonNegativeInteger('APP_HTTP_WORKER_MAX_MEMORY_MB', 0),
             connectionLimit: $environment->positiveInteger('APP_HTTP_CONNECTION_LIMIT', 512),
             connectionsPerIpLimit: $environment->nonNegativeInteger('APP_HTTP_CONNECTIONS_PER_IP_LIMIT', 64),
             concurrencyLimit: $environment->nonNegativeInteger('APP_HTTP_CONCURRENCY_LIMIT', 256),
@@ -75,5 +90,11 @@ final readonly class HttpServerConfig
     public function backlog(): int
     {
         return $this->backlog;
+    }
+
+    /** @return non-negative-int */
+    public function workerMaxMemoryBytes(): int
+    {
+        return $this->workerMaxMemoryMegabytes * self::BYTES_PER_MEBIBYTE;
     }
 }

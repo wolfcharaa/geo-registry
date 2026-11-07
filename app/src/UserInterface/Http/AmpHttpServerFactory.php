@@ -44,6 +44,13 @@ final readonly class AmpHttpServerFactory
         if ($this->config->compressionEnabled && extension_loaded('zlib')) {
             $middleware[] = new CompressionMiddleware();
         }
+        if ($this->config->workerMaxRequests > 0 || $this->config->workerMaxMemoryMegabytes > 0) {
+            $middleware[] = new HttpWorkerRecycleMiddleware(
+                $this->config->workerMaxRequests,
+                $this->config->workerMaxMemoryBytes(),
+                $this->logger,
+            );
+        }
 
         return new SocketHttpServer(
             $this->logger,
