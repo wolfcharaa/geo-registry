@@ -1650,14 +1650,23 @@ coordinate jobs с первой попытки и не создал jobs при 
   regional table/projection counts и Data.Mos/alias coverage. Default быстрый режим
   не сканирует 28,5 млн projection rows; `--exact` выполняет точную
   release-сверку только для явно заданных `--regions`.
-- [ ] Добавить `gar:integrity` с region-aware quick/deep checks и fail-closed
-  exit code для release gate.
-- [ ] Добавить `opensearch:status`: cluster health, alias targets, document
-  parity и inactive versioned indexes.
-- [ ] Решить scope `gar:activity`: активные PostgreSQL statements и состояния
-  target-owned import/rebuild/worker operations без legacy `parser_logs`.
-- [ ] Оставить `gar:releases` optional download-metadata utility; он не должен
-  блокировать release с уже зафиксированным GAR manifest.
+- [x] Добавить `gar:integrity` с region-aware quick/deep checks и fail-closed
+  exit code для release gate. Full dataset 50/77 прошёл `7/7` quick и
+  `13/13` deep checks; unavailable SQL также блокирует release. Deep queries
+  ограничены двумя concurrent AMPHP operations.
+- [x] Добавить `opensearch:status`: cluster health, alias targets, document
+  parity и inactive versioned indexes. Команда fail-closed для unhealthy
+  cluster, ambiguous/missing alias, invalid source regions и count mismatch;
+  inactive indexes остаются диагностическим inventory. Full dataset подтвердил
+  green cluster и точную parity `28649238/28649238`; два inactive index
+  перечислены без автоматического удаления.
+- [x] Реализовать `gar:activity`: активные PostgreSQL statements, последние
+  durable import/rebuild operations, worker instances и незавершённые/failed
+  GAR queue jobs. Legacy `parser_logs` не переносится; detailed worker control
+  остаётся в `worker:status`/`worker:control`.
+- [x] Оставить `gar:releases` optional download-metadata utility на native
+  AMPHP HTTP client с bounded response/timeout и без retry; команда не
+  блокирует release с уже зафиксированным GAR manifest.
 
 Не переносятся буквально `data:prepare`, `gar:bootstrap`, `gar:denormalize`,
 `gar:address-search:indexes` и `app:about`: их функции закрыты runbook,
@@ -1674,7 +1683,14 @@ nationwide import; региональный 50/77 path завершился бе
   общий настраиваемый `APP_IMAGE`; оба зарегистрированы как `running/idle`.
 - [x] Проверить enqueue/consume, heartbeat и отсутствие повторной публикации на
   full stack через `AddressCoordinatesResolved` для partition 50.
-- [ ] Проверить pause/resume, drain/restart и stale recovery на full stack.
+- [x] Проверить pause/resume, drain/restart и stale recovery. Full stack
+  подтвердил `running -> paused -> running`, exact drain address worker-а и
+  exact restart runtime worker-а с новыми `running/idle` instances. Broad
+  drain выявил replay one-shot command на replacement processes; application
+  CLI и Make targets теперь требуют exact `worker-instance-id` и отклоняют
+  широкий target с exit `2`. Stale heartbeat recovery подтверждён отдельным
+  real-PostgreSQL integration test: просроченный `running` job возвращается в
+  `pending` с сохранённой причиной.
 - [ ] В release window повторно доказать пустые legacy BoltDB queues, запретить
   новые legacy publications и сохранить operator approval.
 
