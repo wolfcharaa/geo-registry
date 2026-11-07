@@ -31,10 +31,11 @@ Git bundles, этого документа и manifest с branch, полными
 - локальные runtime artifacts и старые BoltDB queues.
 
 Это перенос исходного workspace, а не production image release и не offline
-release bundle. Отдельный application-only production Compose уже описывает
-self-contained HTTP/worker image, resource/health policy и точный namespace
-prefix, но offline archive, checksum manifest, release switch, backup и rollback
-остаются отдельным delivery slice.
+release bundle. Отдельный application-only production workflow уже описывает
+self-contained HTTP/worker image, resource/health policy, точный namespace
+prefix, offline archive, checksum manifest и симметричный code rollback.
+Backup/restore PostgreSQL/Nominatim/OpenSearch и data compatibility остаются
+отдельным delivery slice; source handoff их не заменяет.
 
 ## Сборка На Текущей Машине
 

@@ -143,19 +143,19 @@ partitioned `address_search` переключён, но остаются:
 3. настроить OpenSearch relevance и повторить representative parity после
    aliases; projection уже построена, но online decorator оставлен выключенным;
 4. повторить representative legacy/target semantic parity после aliases;
-5. решить судьбу legacy operational commands `gar:status`, `gar:activity`,
-   `gar:releases`, `gar:integrity`, `opensearch:status`, bulk `gar:geocode` и
-   orchestration `data:prepare`/`gar:bootstrap`;
-6. выполнить strict full Nominatim/Postman smoke и worker drain/restart/stale
-   recovery evidence;
+5. выполнить strict full Nominatim/Postman smoke и сохранить representative
+   legacy/target comparison evidence;
+6. зафиксировать backup/restore отдельно для application PostgreSQL, Nominatim
+   и rebuildable OpenSearch до первого production switch;
 7. отдельно подтвердить drain либо осознанное списание legacy RoadRunner/
    BoltDB queues;
 8. получить operator approval перед traffic cutover и удалить transitional
    `/geocode`/`/search` только после approval.
 
-Текущий Compose является development/data-migration topology, а не готовым
-production image release. Успешный import или Postman smoke не разрешает
-автоматически переключать production traffic.
+Development Compose остаётся data-migration topology. Отдельный production
+Compose и offline workflow готовы для immutable application image, но наличие
+release tooling не разрешает автоматически переключать production traffic без
+data backup/compatibility, parity и operator approval.
 
 ## Неизвестные Параметры Сервера
 
@@ -251,6 +251,33 @@ Docker memory фактически выполняются, но остаются
 - commit `23e7f12` содержит оптимизацию PostgreSQL search; переход на `bin/app`
   пока находится в рабочем дереве и требует отдельного commit после review.
 
+## Проверено 2026-11-07
+
+- operational CLI закрыт через `gar:integrity`, `gar:activity`, `gar:releases`,
+  `opensearch:status` и exact-confirmation cleanup; application fast gate —
+  `108 tests / 517 assertions`, real-service integration gate ранее подтвердил
+  `18 tests / 250 assertions`;
+- target workers прошли enqueue/consume, pause/resume, exact drain/restart и
+  stale recovery; one-shot drain/stop/kill/restart теперь требуют точный
+  `worker-instance-id`;
+- production application image собирается self-contained из трёх repositories,
+  имеет pinned PHP/Composer bases, non-root runtime и immutable OCI digest;
+- production Compose содержит только `app`, `worker-address`, `worker-runtime`,
+  использует полный `DOCKER_IMAGE_PREFIX` из deployment namespace и не владеет
+  PostgreSQL/OpenSearch/Nominatim;
+- commits `75fb404` и `f287e15` добавили production topology и offline delivery:
+  tracked release identity, checksum manifest, exact-image switch и
+  симметричный rollback;
+- изолированный test release `v0.0.0-e2e` создал flat archive из пяти файлов
+  размером около `47 MiB`; Git bundle проверен в пустом bare repository,
+  `verify-release` успешно прошёл как с уже загруженным digest, так и после
+  удаления test image и восстановления через checksum + `docker load`;
+- production release/tag не создавался, traffic и data services не менялись.
+
+Следующий delivery gate — отдельный проверяемый backup/restore runbook для
+application PostgreSQL, Nominatim и rebuildable OpenSearch. После него остаются
+full Nominatim/Postman parity, legacy queue approval и traffic cutover.
+
 ## Первый Шаг Новой Сессии
 
 До любых изменений выполнить из корня `geo-registry`:
@@ -329,6 +356,8 @@ timestamps, exit code и собственный parity result. Не объявл
 - [server-handoff.md](server-handoff.md) — перенос и server preflight.
 - [release-parity.md](release-parity.md) — full-data R1 runbook.
 - [worker-cutover.md](worker-cutover.md) — drain/cutover/rollback workers.
+- [offline-release.md](../deployment/offline-release.md) — image archive,
+  manifest, release switch и code rollback.
 - [parity-fixture.md](parity-fixture.md) — synthetic baseline.
 
 ## Как Обновлять Этот Handoff

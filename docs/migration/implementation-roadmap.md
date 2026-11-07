@@ -1703,11 +1703,17 @@ nationwide import; региональный 50/77 path завершился бе
   filesystem, bounded resources и readiness healthcheck. Полный registry path
   поступает только через обязательный `DOCKER_IMAGE_PREFIX`; lifecycle
   PostgreSQL, OpenSearch и Nominatim не связан с application release switch.
-- [ ] Перенести либо заменить legacy offline release archive, manifest,
-  release switch и rollback procedure.
+- [x] Перенести либо заменить legacy offline release archive, manifest,
+  release switch и rollback procedure. Новый application-only workflow
+  фиксирует version/tag/digest в Git, проверяет platform/runtime и SHA-256,
+  собирает flat tar из Docker payload, manifest, annotated-tag Git bundle и
+  standalone docs. Изолированный `v0.0.0-e2e` rehearsal подтвердил оба пути
+  `verify-release`: reuse загруженного digest и checksum + `docker load` после
+  удаления test image. Switch пересоздаёт только HTTP и два worker services;
+  rollback использует тот же механизм с предыдущим tag/payload.
 - [ ] Зафиксировать backup/restore для application PostgreSQL, target
   Nominatim и rebuildable OpenSearch отдельно.
-- [ ] Обновить `release-scope.md`, `spiral-to-amphp.md`, server context и README
+- [x] Обновить `release-scope.md`, `spiral-to-amphp.md`, server context и README
   после закрытия каждого фактического gate.
 - [ ] После rollback window удалить transitional `/geocode` и `/search`,
   остановить Spiral/RoadRunner и архивировать старые MessageBus packages.

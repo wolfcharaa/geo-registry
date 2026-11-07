@@ -469,7 +469,7 @@ blocking I/O в HTTP path.
 ### Phase 5 — CLI И Data Pipelines
 
 - [x] подключить Thesis Symfony Console Module и единый `bin/app`;
-- [ ] перенести status/releases/integrity/index maintenance commands;
+- [x] перенести status/releases/integrity/index maintenance commands;
 - [x] перенести GAR XML import в blocking CLI/worker runtime;
 - [x] перенести build/shadow rebuild `address_search`;
 - [x] перенести OpenSearch blue-green reindex;
@@ -507,11 +507,12 @@ fields и могут быть отключены независимо.
 
 - [ ] выполнить полный Postman/smoke parity run;
 - [ ] сравнить representative search/suggest/find/reverse responses;
-- [ ] проверить rebuild/reindex на production-like dataset;
-- [ ] проверить readiness, shutdown, worker drain и restart;
+- [x] проверить rebuild/reindex на production-like dataset;
+- [x] проверить readiness, shutdown, worker drain и restart;
+- [x] добавить immutable production image/Compose и offline release/rollback;
 - [ ] удалить временные demo `/geocode` и `/search` routes;
 - [ ] удалить migration bridges и stale Spiral references;
-- [ ] обновить README и operator documentation;
+- [x] обновить README и operator documentation;
 - [ ] зафиксировать решение о decommission исходного runtime.
 
 Готовность: AMPHP-сервис является единственным runtime для согласованного scope,

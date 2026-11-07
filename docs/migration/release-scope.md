@@ -92,6 +92,9 @@ image. Полный registry namespace передаётся как `DOCKER_IMAGE
 release image metadata разделены.
 
 Точный contract сборки, resource/health policy и команды запуска описаны в
-[production-compose.md](../deployment/production-compose.md). Offline archive,
-checksum manifest, release switch и rollback пока остаются незакрытым E2.5
-gate и не подразумеваются самим наличием production Compose.
+[production-compose.md](../deployment/production-compose.md). Application
+offline archive, checksum manifest, exact-image release switch и симметричный
+code rollback описаны в
+[offline-release.md](../deployment/offline-release.md). Backup/restore и
+обратная совместимость данных остаются отдельным gate: наличие image rollback
+не разрешает запуск старого кода поверх несовместимой schema.
