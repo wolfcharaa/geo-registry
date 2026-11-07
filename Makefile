@@ -12,6 +12,7 @@ LOAD_CHECK_CONCURRENCY ?= 32
 LOAD_CHECK_MAX_FAILURES ?= 0
 LOAD_CHECK_MAX_P95_MS ?= 250
 ADDRESS_LOAD_BASE_URL ?= http://host.docker.internal:8080
+ADDRESS_LOAD_CONTRACT ?= target
 ADDRESS_LOAD_VARIANT ?= unspecified
 ADDRESS_LOAD_VUS ?= 16
 ADDRESS_LOAD_DURATION ?= 30s
@@ -276,6 +277,7 @@ load-check: guard-user ## Run the bounded HTTP load gate inside the running app 
 
 load-search: guard-user ## Run the external mixed regional address-search load gate with k6
 	ADDRESS_LOAD_BASE_URL="$(ADDRESS_LOAD_BASE_URL)" \
+		ADDRESS_LOAD_CONTRACT="$(ADDRESS_LOAD_CONTRACT)" \
 		ADDRESS_LOAD_VARIANT="$(ADDRESS_LOAD_VARIANT)" \
 		ADDRESS_LOAD_VUS="$(ADDRESS_LOAD_VUS)" \
 		ADDRESS_LOAD_DURATION="$(ADDRESS_LOAD_DURATION)" \

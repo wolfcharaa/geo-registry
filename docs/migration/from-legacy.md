@@ -71,3 +71,8 @@ legacy `--workers/--truncate`: он строит shadow table и переклю�
 [backup/restore](../deployment/data-backup-restore.md). Полный инженерный журнал
 решений остаётся в [Spiral to AMPHP roadmap](spiral-to-amphp.md), но не заменяет
 эту operator-инструкцию.
+
+Актуальное performance-сравнение на 30 exact/alias/fuzzy запросах находится в
+[OpenSearch benchmark](opensearch-benchmark.md). Оно отдельно показывает
+target OpenSearch path и legacy hot-cache path: cached legacy latency нельзя
+интерпретировать как скорость его поискового backend-а.

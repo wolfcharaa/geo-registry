@@ -179,6 +179,51 @@ Load generator работал в отдельном container, но на том 
 универсальный capacity SLA. Сценарий и правила повторения описаны в
 `docs/deployment/address-search-load-test.md`.
 
+## Расширенный Fuzzy/Alias HTTP Workload 2026-11-08
+
+Следующий срез расширил контракт до `30` уникальных запросов: по десять exact,
+реальных OSM alias и fuzzy cases. Каждый case хранит ожидаемый `object_id`;
+target обязан находить его в top-10. Legacy выполняет тот же HTTP workload без
+target-only `region_code`, а expected-match failures сохраняются как отдельная
+метрика и не останавливают прогон.
+
+Обе системы имели по два HTTP worker-а. Target использовал OpenSearch projection
+без query cache. Legacy использовал штатный RoadRunner KV query cache с default
+TTL `300s`, поэтому это сравнение deployed hot paths, а не изолированных
+OpenSearch query implementations.
+
+| Runtime | VU / duration | Throughput | Average | p95 | p99 | Expected-match failures |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Target OpenSearch | `16 / 30s` | 506.5 req/s | 31.0 ms | 48.0 ms | 59.4 ms | 0% |
+| Legacy hot cache | `16 / 30s` | 832.8 req/s | 18.9 ms | 19.7 ms | 307.4 ms | 20.0% |
+| Target OpenSearch | `64 / 15s` | 566.3 req/s | 112.2 ms | 169.3 ms | 198.7 ms | 0% |
+| Legacy hot cache | `64 / 15s` | 921.5 req/s | 69.0 ms | 81.7 ms | 910.5 ms | 20.0% |
+
+При `16` VU legacy hot path дал примерно `1.64x` throughput и `2.43x` меньший
+p95, но его p99 оказался примерно `5.18x` хуже. Legacy не нашёл ожидаемый object
+в `10%` exact и `50%` fuzzy iterations; alias cases совпали полностью. Target
+нашёл ожидаемый object во всех трёх группах.
+
+Ступень `16 -> 64` VU увеличила target throughput только на `11.8%`, одновременно
+подняв p95 в `3.5x`. Во время нагрузки application использовал около `130-145%`
+CPU, PostgreSQL менее `1%`, а OpenSearch — `1676-2010%` CPU. Search thread pool
+имел `37` threads и не зафиксировал rejected tasks. Текущий target bottleneck —
+CPU query work OpenSearch; PHP event loop и PostgreSQL pool не являются
+ограничением этого сценария.
+
+Legacy на той же ступени прибавил только `10.7%` throughput, а p95 вырос в
+`4.1x`. Application container использовал `211-219%` CPU, тогда как legacy
+OpenSearch — `0.15-1.53%`, PostgreSQL — `0-4.4%`. Следовательно, hot-cache
+bottleneck находится в двух RoadRunner/PHP HTTP workers и response path.
+Наблюдавшаяся ротация workers при `RR_HTTP_MAX_JOBS=1000` совпадает с длинным
+p99 tail, но отдельная причинная проверка recycle policy ещё не выполнялась.
+
+Практический вывод: target уже выигрывает по fuzzy recall и tail predictability,
+но уступает cached legacy по median/p95 и throughput. Следующий честный
+backend-only эксперимент должен отключить legacy query cache либо добавить
+эквивалентный bounded cache target-у; смешивать эти варианты в одном выводе
+нельзя.
+
 ## Решение
 
 PostgreSQL остаётся обязательным fallback и source of truth. OpenSearch

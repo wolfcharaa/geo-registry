@@ -1911,6 +1911,17 @@ contract artifacts, но не implementation code.
 
 ## История Документа
 
+### 0.71.0 — 2026-11-08
+
+- k6 workload расширен до 30 exact/alias/fuzzy cases с закреплённым ожидаемым
+  `object_id` и отдельными target/legacy contract modes;
+- target нашёл ожидаемый top-10 object во всех cases; legacy сохранил HTTP
+  contract, но потерял ожидаемый object в 10% exact и 50% fuzzy iterations;
+- сравнение 16/64 VU локализовало target bottleneck в OpenSearch CPU, а legacy
+  hot-cache ceiling — в двух RoadRunner/PHP HTTP workers;
+- documented comparison отделяет deployed legacy query cache от backend-only
+  benchmark и не объявляет cached latency скоростью legacy OpenSearch.
+
 ### 0.70.0 — 2026-11-08
 
 - добавлен внешний pinned `k6` mixed-load gate для семи адресных запросов

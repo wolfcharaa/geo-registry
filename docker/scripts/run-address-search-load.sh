@@ -23,6 +23,7 @@ esac
 exec docker run --rm \
     --add-host host.docker.internal:host-gateway \
     --env ADDRESS_LOAD_BASE_URL="${base_url}" \
+    --env ADDRESS_LOAD_CONTRACT="${ADDRESS_LOAD_CONTRACT:-target}" \
     --env ADDRESS_LOAD_DURATION="${ADDRESS_LOAD_DURATION:-30s}" \
     --env ADDRESS_LOAD_MAX_P95_MS="${ADDRESS_LOAD_MAX_P95_MS:-750}" \
     --env ADDRESS_LOAD_MAX_P99_MS="${ADDRESS_LOAD_MAX_P99_MS:-1500}" \
