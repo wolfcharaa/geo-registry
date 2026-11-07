@@ -63,8 +63,8 @@ final class PostgresAddressSuggestionReaderIntegrationTest
             $streetDistrict = $street->district;
             Assert::notNull($streetDistrict);
             Assert::same($streetDistrict->objectId, 770002);
-            Assert::same($street->nextStage->value, 'search');
-            Assert::true($street->readyForSearch);
+            Assert::same($street->nextStage->value, 'thoroughfare');
+            Assert::false($street->readyForSearch);
         } finally {
             IntegrationDatabase::resetSchema($pool);
             $pool->close();
@@ -124,6 +124,10 @@ SQL);
             ), new NullCancellation());
 
             Assert::same(self::ids($streets), [770004]);
+            $street = $streets[0] ?? null;
+            Assert::notNull($street);
+            Assert::same($street->nextStage->value, 'search');
+            Assert::true($street->readyForSearch);
         } finally {
             IntegrationDatabase::resetSchema($pool);
             $pool->close();

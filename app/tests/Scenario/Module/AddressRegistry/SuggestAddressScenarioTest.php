@@ -304,7 +304,7 @@ final class RecordingSuggestionPort implements
         $this->thoroughfareCriteria[] = $criteria;
 
         return $criteria->query === 'Общая'
-            ? [$this->suggestion(770004, 'Общая', 'ул.', 7, $criteria->hierarchy)]
+            ? [$this->suggestion(770004, 'Общая', 'ул.', 8, $criteria->hierarchy)]
             : [];
     }
 

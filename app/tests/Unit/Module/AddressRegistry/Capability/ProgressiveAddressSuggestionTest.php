@@ -8,7 +8,9 @@ use App\Module\AddressRegistry\Capability\AddressHierarchy;
 use App\Module\AddressRegistry\Capability\ProgressiveAddressSuggestion;
 use App\Module\AddressRegistry\Capability\SuggestionStage;
 use Testo\Assert;
+use Testo\Assert\ExpectException;
 use Testo\Test;
+use UnexpectedValueException;
 
 #[Test]
 final class ProgressiveAddressSuggestionTest
@@ -29,6 +31,30 @@ final class ProgressiveAddressSuggestionTest
 
         Assert::same($suggestion->nextStage, SuggestionStage::AdministrativeArea);
         Assert::false($suggestion->readyForSearch);
+    }
+
+    public function testAdministrativeAndPlanningLevelsProceedToThoroughfares(): void
+    {
+        foreach ([2, 5, 7] as $level) {
+            $suggestion = $this->suggestion('Одинцово', 'г.', $level);
+
+            Assert::same($suggestion->nextStage, SuggestionStage::Thoroughfare);
+            Assert::false($suggestion->readyForSearch);
+        }
+    }
+
+    public function testRoadNetworkLevelIsReadyForSearch(): void
+    {
+        $suggestion = $this->suggestion('Можайское', 'ш.', 8);
+
+        Assert::same($suggestion->nextStage, SuggestionStage::Search);
+        Assert::true($suggestion->readyForSearch);
+    }
+
+    #[ExpectException(UnexpectedValueException::class)]
+    public function testItRejectsAddressObjectLevels(): void
+    {
+        $this->suggestion('Дом', 'д.', 9);
     }
 
     private function suggestion(string $name, string $typeName, int $level): ProgressiveAddressSuggestion

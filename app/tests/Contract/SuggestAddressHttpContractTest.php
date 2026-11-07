@@ -261,7 +261,7 @@ final readonly class ContractSuggestionPort implements
     ): array {
         $this->guard($cancellation);
 
-        return [$this->suggestion(770004, 'Общая', 'ул.', 7, $criteria->hierarchy)];
+        return [$this->suggestion(770004, 'Общая', 'ул.', 8, $criteria->hierarchy)];
     }
 
     private function guard(Cancellation $cancellation): void

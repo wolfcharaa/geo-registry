@@ -8,7 +8,10 @@ use function in_array;
 use function mb_strtolower;
 use function preg_match;
 use function preg_replace;
+use function sprintf;
 use function trim;
+
+use UnexpectedValueException;
 
 final readonly class ProgressiveAddressSuggestion
 {
@@ -27,9 +30,13 @@ final readonly class ProgressiveAddressSuggestion
     ) {
         $this->nextStage = match (true) {
             $this->isFederalCity() => SuggestionStage::Thoroughfare,
-            $level >= 7 => SuggestionStage::Search,
-            $level >= 5 => SuggestionStage::Thoroughfare,
-            default => SuggestionStage::AdministrativeArea,
+            $level <= 1 => SuggestionStage::AdministrativeArea,
+            $level <= 7 => SuggestionStage::Thoroughfare,
+            $level === 8 => SuggestionStage::Search,
+            default => throw new UnexpectedValueException(sprintf(
+                'GAR suggestion level %d is not supported.',
+                $level,
+            )),
         };
         $this->readyForSearch = $this->nextStage === SuggestionStage::Search;
     }
