@@ -78,16 +78,17 @@ workspace и после проверки может быть удалён.
 
 ```shell
 mkdir -p workspace/library
-git clone --branch docs/async-migration-roadmap \
+git clone --branch main \
   geo-registry.bundle workspace/geo-registry
-git clone --branch feature/async-core-registry \
+git clone --branch main \
   message-bus-async.bundle workspace/library/MessageBusAsync
 git clone --branch main \
   message-bus-async-worker.bundle workspace/library/MessageBusAsyncWorker
 ```
 
-Имена веток выше соответствуют текущей подготовленной линии. Manifest является
-authoritative для каждого нового архива. После clone все три `HEAD` должны
+Для public release используются `main` и annotated tags. Manifest остаётся
+authoritative для каждого конкретного source archive: если в нём указана другая
+ветка, в `--branch` подставляется её значение. После clone все три `HEAD` должны
 совпасть с полными commit IDs manifest; dirty checkout продолжать нельзя.
 
 ## Read-Only Preflight

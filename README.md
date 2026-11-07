@@ -1,14 +1,37 @@
 # Geo Registry
 
-Минимальная основа для долгоживущего неблокирующего PHP-сервиса на
-`amphp/http-server`. В development-контур входят отдельная PostgreSQL приложения,
-Nominatim и OpenSearch.
+Неблокирующий сервис поиска российских адресов по GAR/FIAS на AMPHP. Canonical
+GAR и региональная поисковая проекция хранятся в PostgreSQL; Nominatim отвечает
+за reverse geocode, а OpenSearch является необязательной перестраиваемой
+проекцией для конкурентного и fuzzy-поиска.
 
-Целевые layer/runtime/data boundaries описаны в
-[docs/architecture.md](docs/architecture.md). Текущий HTTP scaffold является
-переходным и не задаёт placement новых business scenarios.
+Первая публичная линия — `v0.1.x`. Приложение выпускается вместе с совместимыми
+`message-bus-async` и `message-bus-async-worker` `v0.1.x`; данные, dumps,
+OpenSearch indexes и Nominatim volumes в Git release не входят.
+
+Начать лучше в таком порядке:
+
+1. [Первый запуск](docs/guides/getting-started.md) — получить три репозитория,
+   настроить окружение и проверить пустой runtime.
+2. [Жизненный цикл данных](docs/guides/data-lifecycle.md) — выбрать GAR release,
+   наполнить PostgreSQL, построить проекции и перенести готовые данные.
+3. [Переход с legacy](docs/migration/from-legacy.md) — понять, что заменено, а
+   что нельзя переносить напрямую.
+4. [HTTP contract](docs/api/openapi.yaml) и
+   [Postman collection](docs/api/postman/geo-registry.postman_collection.json) —
+   подключить клиента.
+5. [Source release](docs/deployment/source-release.md) — выпустить согласованные
+   теги трёх репозиториев; production image/offline delivery выполняются
+   отдельным gate.
+
+Архитектурные границы описаны в
+[docs/architecture.md](docs/architecture.md).
 
 ## Быстрый старт
+
+Команды ниже предполагают соседнюю workspace из трёх репозиториев, описанную в
+[руководстве первого запуска](docs/guides/getting-started.md). После `migrate`
+application PostgreSQL имеет только схему: реальные адреса загружаются отдельно.
 
 ```shell
 make config
