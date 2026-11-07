@@ -65,6 +65,9 @@ return static function (DeptracConfig $config): void {
                     '^Amp\\(?:Cancellation|CancelledException|CompositeCancellation|DeferredCancellation|Future|NullCancellation|TimeoutCancellation)$',
                 ),
             ),
+            $ampCache = Layer::withName('AMPHP Cache')->collectors(
+                ClassLikeConfig::create('^Amp\\Cache\\'),
+            ),
             $ampRuntime = Layer::withName('AMPHP Runtime')->collectors(
                 ClassLikeConfig::create('^Amp\\(?:Cluster\\|Parallel\\|Socket\\|Sync\\)'),
                 ClassLikeConfig::create('^Revolt\\EventLoop(?:\\|$)'),
@@ -180,6 +183,7 @@ return static function (DeptracConfig $config): void {
                 $sharedKernel,
                 $messageBusCore,
                 $ampCore,
+                $ampCache,
                 $httpServer,
                 $httpClient,
                 $postgres,
@@ -198,6 +202,7 @@ return static function (DeptracConfig $config): void {
             Ruleset::forLayer($thesisDic),
             Ruleset::forLayer($thesisConsole)->accesses($thesisDic, $console),
             Ruleset::forLayer($ampCore),
+            Ruleset::forLayer($ampCache)->accesses($ampCore, $ampRuntime),
             Ruleset::forLayer($ampRuntime),
             Ruleset::forLayer($httpServer),
             Ruleset::forLayer($httpClient),

@@ -394,6 +394,14 @@ AMPHP CLI process с bounded NDJSON concurrency; HTTP/per-item failure оста�
 старый alias активным. Предыдущие и failed physical indexes удаляются только
 отдельной cleanup command с точным подтверждением и active-target guard.
 
+Опциональный `ADDRESS_SEARCH_CACHE_ENABLED=1` добавляет внешний decorator над
+итоговым `SearchAddressPort`, поэтому hit обходит и OpenSearch, и PostgreSQL
+fallback. Bounded LRU принадлежит одному HTTP worker process; identity включает
+все typed criteria и namespace, concurrent misses одного ключа объединяются.
+Ошибки/cancellation не кэшируются, а короткие TTL ограничивают stale projection
+после alias cutover или обновления координат. Shared Redis/L2 в текущую
+архитектуру не входит.
+
 Nominatim используется через application-owned typed client/feature port.
 `NOMINATIM_ENABLED=0` исключает его client, health check и HTTP routes из graph.
 Community Docker image допустим в development; production image/digest и data

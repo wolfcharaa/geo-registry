@@ -13,6 +13,7 @@
         "ext-posix": "*",
         "ext-sockets": "*",
         "ext-xmlreader": "*",
+        "amphp/cache": "^2.0",
         "amphp/cluster": "^2.0",
         "amphp/http-client": "^5.3",
         "amphp/http-server": "^3.4",

@@ -13,6 +13,7 @@ use App\Application\Health\StartupState;
 use App\Application\MessageBus\MessageBusRegistrySource;
 use App\Application\Observability\CorrelationContext;
 use App\Application\Runtime\HttpRuntime;
+use App\Config\AddressSearchCacheConfig;
 use App\Config\EnvironmentSnapshot;
 use App\Config\HttpServerConfig;
 use App\Config\LoggingConfig;
@@ -33,6 +34,7 @@ use App\Module\AddressRegistry\Feature\ReverseGeocode\Infrastructure\NominatimRe
 use App\Module\AddressRegistry\Feature\ReverseGeocode\UserInterface\Http\ReverseGeocodeAction;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\UserInterface\Http\ReverseGeocodePresenter;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\UserInterface\Http\ReverseGeocodeRequestMapper;
+use App\Module\AddressRegistry\Feature\SearchCache\Infrastructure\AddressSearchResultCache;
 use App\Module\AddressRegistry\UserInterface\Http\AddressSuggestionPresenter;
 use App\Module\AddressRegistry\UserInterface\Http\FindAddressById\FindAddressByIdAction;
 use App\Module\AddressRegistry\UserInterface\Http\FindAddressById\FindAddressByIdPresenter;
@@ -67,6 +69,7 @@ final readonly class HttpRuntimeModule implements Module
     public function configure(Dic $dic): Ref
     {
         $httpConfig = HttpServerConfig::fromEnvironment($this->environment);
+        $addressSearchCacheConfig = AddressSearchCacheConfig::fromEnvironment($this->environment);
         $loggingConfig = LoggingConfig::fromEnvironment($this->environment);
         $postgresConfig = PostgresConfig::fromEnvironment($this->environment);
         $nominatimConfig = NominatimConfig::fromEnvironment($this->environment);
@@ -125,6 +128,16 @@ final readonly class HttpRuntimeModule implements Module
                     'password' => $openSearchConfig->password,
                 ])
             : null;
+        $addressSearchCache = $addressSearchCacheConfig->enabled
+            ? $dic->object(
+                AddressSearchResultCache::class,
+                static fn(): AddressSearchResultCache => AddressSearchResultCache::local(
+                    $addressSearchCacheConfig->maxEntries,
+                    $addressSearchCacheConfig->ttlSeconds,
+                    $addressSearchCacheConfig->emptyTtlSeconds,
+                ),
+            )
+            : null;
         $reverseGeocodeEnabled = ($registrySource->services[ReverseGeocodeHandler::class] ?? null)
             === ReverseGeocodeHandler::class;
         $reverseGeocodeLocator = $reverseGeocodeEnabled
@@ -142,6 +155,8 @@ final readonly class HttpRuntimeModule implements Module
                 openSearch: $openSearchConfig->searchEnabled ? $openSearch : null,
                 openSearchIndex: $openSearchConfig->searchEnabled ? $openSearchConfig->index : null,
                 logger: $logger,
+                searchCache: $addressSearchCache,
+                searchCacheNamespace: $addressSearchCacheConfig->namespace,
             ),
             $postgres,
             $codecs,

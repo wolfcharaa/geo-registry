@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Config;
 
+use App\Config\AddressSearchCacheConfig;
 use App\Config\AddressSourceConfig;
 use App\Config\ConsoleConfig;
 use App\Config\EnvironmentSnapshot;
@@ -43,6 +44,11 @@ final class RuntimeConfigTest
             'APP_HTTP_CONCURRENCY_LIMIT' => '350',
             'APP_HTTP_BACKLOG' => '900',
             'APP_HTTP_COMPRESSION_ENABLED' => 'false',
+            'ADDRESS_SEARCH_CACHE_ENABLED' => 'true',
+            'ADDRESS_SEARCH_CACHE_MAX_ENTRIES' => '2048',
+            'ADDRESS_SEARCH_CACHE_TTL_SECONDS' => '120',
+            'ADDRESS_SEARCH_CACHE_EMPTY_TTL_SECONDS' => '10',
+            'ADDRESS_SEARCH_CACHE_NAMESPACE' => 'release-42',
             'HTTP_TIMEOUT_SECONDS' => '3.5',
             'LOG_FORMAT' => 'console',
             'DATAMOS_ADDRESS_REGISTRY_SOURCE' => '/data/datamos/registry.bson.gz',
@@ -69,6 +75,7 @@ final class RuntimeConfigTest
         ]);
 
         $http = HttpServerConfig::fromEnvironment($environment);
+        $addressSearchCache = AddressSearchCacheConfig::fromEnvironment($environment);
         $addressSources = AddressSourceConfig::fromEnvironment($environment);
         $logging = LoggingConfig::fromEnvironment($environment);
         $console = ConsoleConfig::fromEnvironment($environment);
@@ -101,6 +108,11 @@ final class RuntimeConfigTest
         Assert::same($http->concurrencyLimit, 350);
         Assert::same($http->backlog, 900);
         Assert::same($http->compressionEnabled, false);
+        Assert::same($addressSearchCache->enabled, true);
+        Assert::same($addressSearchCache->maxEntries, 2048);
+        Assert::same($addressSearchCache->ttlSeconds, 120);
+        Assert::same($addressSearchCache->emptyTtlSeconds, 10);
+        Assert::same($addressSearchCache->namespace, 'release-42');
         Assert::same($logging->service, 'geo-registry-test');
         Assert::same($logging->format, LogFormat::Console);
         Assert::same($postgres->dsn, 'host=postgres db=geo');
@@ -127,6 +139,23 @@ final class RuntimeConfigTest
     {
         OpenSearchConfig::fromEnvironment(new EnvironmentSnapshot([
             'OPENSEARCH_PASSWORD' => 'secret',
+        ]));
+    }
+
+    #[ExpectException(InvalidArgumentException::class)]
+    public function testAddressSearchCacheRejectsAnEmptyTtlGreaterThanTheResultTtl(): void
+    {
+        AddressSearchCacheConfig::fromEnvironment(new EnvironmentSnapshot([
+            'ADDRESS_SEARCH_CACHE_TTL_SECONDS' => '5',
+            'ADDRESS_SEARCH_CACHE_EMPTY_TTL_SECONDS' => '6',
+        ]));
+    }
+
+    #[ExpectException(InvalidArgumentException::class)]
+    public function testAddressSearchCacheRejectsAnUnsafeNamespace(): void
+    {
+        AddressSearchCacheConfig::fromEnvironment(new EnvironmentSnapshot([
+            'ADDRESS_SEARCH_CACHE_NAMESPACE' => 'release/current',
         ]));
     }
 

@@ -224,6 +224,39 @@ backend-only эксперимент должен отключить legacy query
 эквивалентный bounded cache target-у; смешивать эти варианты в одном выводе
 нельзя.
 
+## Target L1 Cache Workload 2026-11-08
+
+После расширенного сравнения target получил optional process-local bounded LRU
+над итоговым OpenSearch/PostgreSQL `SearchAddressPort`. Два прогона использовали
+тот же host, два HTTP worker-а, 16 VU, 30 cases, 30 секунд и один OpenSearch
+index с двумя primary shards. Во втором прогоне cache начинал пустым, имел
+`512` entries и TTL `60s`; relevance gate остался обязательным.
+
+| Target runtime | HTTP requests | Throughput | Average | p95 | p99 | OpenSearch upstream searches |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Cache disabled | 15,372 | 511.9 req/s | 30.64 ms | 47.26 ms | 58.01 ms | 15,372 |
+| L1 cache enabled | 156,550 | 5,217.8 req/s | 2.83 ms | 5.62 ms | 7.19 ms | 60 |
+
+Cache увеличил throughput в `10.19x`, уменьшил p95 в `8.41x` и p99 в `8.07x`.
+OpenSearch `query_total` вырос на `30,744` при выключенном cache и на `120` при
+включённом: из-за двух primary shards это соответственно `15,372` и `60`
+upstream searches. Шестьдесят cold запросов точно соответствуют 30 cache keys в
+каждом из двух независимых worker processes; остальные ответы не создавали
+сетевой трафик к OpenSearch. Все exact/alias/fuzzy cases нашли ожидаемый
+`object_id`, HTTP/contract failures отсутствовали.
+
+Накопленный shard-level `query_time_in_millis` вырос на `79,147 ms` без cache и
+только на `268 ms` с cache, хотя второй прогон обслужил в `10.18x` больше HTTP
+requests. Это подтверждает снижение OpenSearch CPU/query work, а не только
+улучшение latency внутри PHP.
+
+Этот результат доказывает эффективность для повторяющегося hot set, но не
+является capacity ceiling для произвольного адресного потока. Workload содержит
+только 30 ключей и полностью помещается в LRU. Следующий gate должен измерить
+mixed/high-cardinality распределение, eviction rate, RSS на worker и поведение
+на границе TTL; только после него можно увеличивать default entries или делать
+вывод о необходимости shared L2.
+
 ## Решение
 
 PostgreSQL остаётся обязательным fallback и source of truth. OpenSearch

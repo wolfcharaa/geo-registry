@@ -1911,6 +1911,19 @@ contract artifacts, но не implementation code.
 
 ## История Документа
 
+### 0.72.0 — 2026-11-08
+
+- добавлен optional process-local bounded LRU над итоговым
+  `SearchAddressPort`, с отдельными TTL для результата/miss и полным criteria
+  identity;
+- concurrent cold misses одного ключа объединяются внутри worker-а, тогда как
+  два cluster workers намеренно имеют независимые cache generations;
+- исключения и cancellation не кэшируются; development default выключен,
+  production example включает cache с 512 entries и TTL 60/5 секунд;
+- одинаковый 30-query workload показал рост `511.9 → 5217.8 req/s`, снижение
+  p95 `47.26 → 5.62 ms` и только 60 OpenSearch searches на 156,550 HTTP
+  requests без потери relevance.
+
 ### 0.71.0 — 2026-11-08
 
 - k6 workload расширен до 30 exact/alias/fuzzy cases с закреплённым ожидаемым

@@ -86,6 +86,20 @@ label не переключает приложение. Расширенный r
 host, dataset, revision, worker/pool limits, VU и duration. PostgreSQL и
 OpenSearch сравниваются только на одном workload и одинаковых budgets.
 
+Для cache evidence нужны два отдельных запуска одного revision. Backend-only
+baseline выполняется с `ADDRESS_SEARCH_CACHE_ENABLED=0`. Затем application
+workers перезапускаются с `ADDRESS_SEARCH_CACHE_ENABLED=1`, чтобы cache начинал
+с пустого состояния; первый measured run одновременно показывает cold fill и
+hot path. Снимайте OpenSearch `query_total` до и после каждого запуска: один
+HTTP request может увеличить shard-level counter больше чем на один, поэтому
+учитывайте число primary shards.
+
+Текущие 30 cases являются намеренно горячим малым набором. Такой run доказывает
+ценность cache для повторов, но не capacity на уникальных пользовательских
+строках. Перед production tuning нужен отдельный high-cardinality workload,
+который превышает `ADDRESS_SEARCH_CACHE_MAX_ENTRIES`, и mixed distribution с
+небольшим популярным head и длинным tail.
+
 Для поиска saturation повторите measured run с `64` VU, не меняя остальные
 условия. Небольшой прирост throughput при кратном росте p95 означает, что
 система достигла текущего capacity ceiling:

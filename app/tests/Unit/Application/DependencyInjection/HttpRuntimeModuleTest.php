@@ -44,6 +44,20 @@ final class HttpRuntimeModuleTest
         Assert::same($runtimeClass, HttpRuntime::class);
     }
 
+    public function testItBuildsTheHttpRuntimeWithAddressSearchCacheEnabled(): void
+    {
+        $runtimeClass = Dic::run(
+            new HttpRuntimeModule(
+                new EnvironmentSnapshot(['ADDRESS_SEARCH_CACHE_ENABLED' => 'true']),
+                MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_http.php'),
+                MessageCodecRegistryLoader::fromFile(dirname(__DIR__, 4) . '/config/message_bus_codecs.php'),
+            ),
+            static fn(HttpRuntime $runtime): string => $runtime::class,
+        );
+
+        Assert::same($runtimeClass, HttpRuntime::class);
+    }
+
     public function testItBuildsWithoutOptionalIntegrationGraphs(): void
     {
         $runtimeClass = Dic::run(

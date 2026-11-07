@@ -1,7 +1,7 @@
 ---
 module: AddressRegistry
-version: 0.13.0
-updated: 2026-11-07
+version: 0.14.0
+updated: 2026-11-08
 language: ru
 ---
 
@@ -526,7 +526,46 @@ GAR match. Если у document отсутствует хотя бы одна к
 - Drain/restart/cutover и legacy BoltDB gate описаны в
   [worker-cutover.md](../../../../docs/migration/worker-cutover.md).
 
-## Optional OpenSearch Search Feature
+## Optional Search Features
+
+### Кэширование повторных поисков — `Feature/SearchCache`
+
+HTTP runtime может сохранить итоговый typed result `SearchAddressPort` в
+локальном bounded LRU каждого worker process. Повтор полностью обходит
+OpenSearch и PostgreSQL fallback, не меняя MessageBus и HTTP-контракт поиска.
+
+**Правила**
+
+- Feature включается только через `ADDRESS_SEARCH_CACHE_ENABLED=1`; development
+  default `0` позволяет измерять backend без скрытого hot cache.
+- Identity включает нормализованный query, hierarchy, profile, limit,
+  `region_code`, версию формата ключа и операторский namespace.
+- Cache хранит не более `ADDRESS_SEARCH_CACHE_MAX_ENTRIES` на один worker;
+  успешный result живёт `ADDRESS_SEARCH_CACHE_TTL_SECONDS`, пустой — отдельный
+  короткий `ADDRESS_SEARCH_CACHE_EMPTY_TTL_SECONDS`.
+- Ошибка и cancellation не создают entry. Concurrent cold misses одного ключа
+  внутри worker-а используют один in-flight lookup; разные worker processes не
+  разделяют память и могут выполнить по одному cold lookup каждый.
+- Cache оборачивает уже собранную цепочку OpenSearch → PostgreSQL fallback,
+  поэтому hit не обращается ни к одному backend-у, а miss сохраняет прежнюю
+  fallback/cancellation семантику.
+- Переключение alias или обновление координат может быть видно через старый
+  entry только до TTL. Namespace bump либо restart workers сразу создаёт новую
+  локальную generation.
+
+**Вход**
+
+- HTTP остаётся владельцем `Capability/SearchAddress`: `GET
+  /api/addresses/search` через `SearchAddressAction`.
+- Postman: [HTTP-контракты модуля](../../../../docs/api/postman/geo-registry.postman_collection.json),
+  folder `Addresses`, requests `Search` и `Search Missing Query`.
+
+**Подключение/условие**
+
+- Decorator и process singleton store собираются только в `HttpRuntimeModule`;
+  CLI и worker graph не получают cache state.
+- Лимит записей умножается на `APP_HTTP_WORKERS`; worker recycle естественно
+  очищает только локальную часть cache.
 
 ### Декоратор полнотекстового поиска — `Feature/OpenSearch`
 

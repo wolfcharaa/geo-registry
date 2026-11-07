@@ -21,6 +21,8 @@ use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\OpenSearchAddre
 use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\OpenSearchSearchAddressDecorator;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Capability\ReverseGeocodeHandler;
 use App\Module\AddressRegistry\Feature\ReverseGeocode\Infrastructure\RuntimeAddressCoordinatesPublisher;
+use App\Module\AddressRegistry\Feature\SearchCache\Infrastructure\AddressSearchResultCache;
+use App\Module\AddressRegistry\Feature\SearchCache\Infrastructure\CachedSearchAddressDecorator;
 use App\Module\AddressRegistry\Infrastructure\Postgres\PostgresAddressDocumentHydrator;
 use App\Module\AddressRegistry\Infrastructure\Postgres\PostgresAddressSuggestionReader;
 use App\Module\AddressRegistry\Infrastructure\Postgres\PostgresFindAddressByIdReader;
@@ -36,6 +38,7 @@ final class AddressRegistryMessageBusServices
      * @param Ref<object>|null $openSearch
      * @param Ref<object>|null $coordinateOpenSearch
      * @param Ref<object>|null $logger
+     * @param Ref<AddressSearchResultCache>|null $searchCache
      * @return array<string, Ref<object>>
      */
     public static function configure(
@@ -48,6 +51,8 @@ final class AddressRegistryMessageBusServices
         ?Ref $coordinateOpenSearch = null,
         ?string $coordinateOpenSearchIndex = null,
         ?Ref $logger = null,
+        ?Ref $searchCache = null,
+        ?string $searchCacheNamespace = null,
     ): array {
         $findById = ($source->services[FindAddressByIdHandler::class] ?? null) === FindAddressByIdHandler::class;
         $search = ($source->services[SearchAddressHandler::class] ?? null) === SearchAddressHandler::class;
@@ -105,6 +110,19 @@ final class AddressRegistryMessageBusServices
                         'queries' => $dic->object(OpenSearchAddressSearchQueryFactory::class),
                         'results' => $dic->object(OpenSearchAddressSearchResultMapper::class),
                         'logger' => $logger,
+                    ])
+                    ->canBeScoped();
+            }
+            if ($searchCache !== null) {
+                if ($searchCacheNamespace === null) {
+                    throw new \LogicException('Address search cache decorator requires a namespace.');
+                }
+                $reader = $dic
+                    ->object(CachedSearchAddressDecorator::class)
+                    ->args([
+                        'reader' => $reader,
+                        'cache' => $searchCache,
+                        'namespace' => $searchCacheNamespace,
                     ])
                     ->canBeScoped();
             }

@@ -57,11 +57,24 @@ Production image содержит закреплённые `ev 1.2.3`, `pq 2.2.3
 | `HTTP_DATABASE_POOL_SIZE` | `4` | `4` | PostgreSQL connections на HTTP worker |
 | `WORKER_DATABASE_POOL_SIZE` | `4` | `4` | PostgreSQL connections на queue worker process |
 | `REVOLT_DRIVER` | `EvDriver` | `EvDriver` | Явный production loop driver |
+| `ADDRESS_SEARCH_CACHE_ENABLED` | `0` | `1` | Локальный bounded cache итогов `SearchAddressPort` |
+| `ADDRESS_SEARCH_CACHE_MAX_ENTRIES` | `512` | `512` | Максимум записей на один HTTP worker, `1..100000` |
+| `ADDRESS_SEARCH_CACHE_TTL_SECONDS` | `60` | `60` | TTL непустого результата, `1..3600` |
+| `ADDRESS_SEARCH_CACHE_EMPTY_TTL_SECONDS` | `5` | `5` | TTL пустого результата, `1..300` и не больше основного TTL |
+| `ADDRESS_SEARCH_CACHE_NAMESPACE` | `v1` | `v1` | Версия локальной generation, безопасные `1..64` символа |
 
 Connection/concurrency limits относятся к одному HTTP worker. При двух workers
 эффективный верхний предел вдвое больше. Контейнер получает `nofile=65536`, но
 его нельзя считать разрешением бесконтрольно увеличивать application limits:
 нужно учитывать ingress, память и PostgreSQL capacity.
+
+Search cache также принадлежит одному worker process. При двух workers hot set
+может занимать до `2 × ADDRESS_SEARCH_CACHE_MAX_ENTRIES`, а первый одинаковый
+запрос может один раз дойти до backend-а в каждом процессе. Внутри worker-а
+concurrent cold misses одного ключа объединяются. Кэш хранит итоговые immutable
+matches, не сохраняет exception/cancellation и полностью очищается при recycle.
+Увеличивать число entries следует по измеренному hit rate и RSS, а не только по
+числу уникальных пользовательских строк.
 
 Оба лимита ротации действуют только в cluster mode (`APP_HTTP_WORKERS > 1`).
 После завершения граничного request worker пишет
