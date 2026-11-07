@@ -1,6 +1,6 @@
 # Release Parity Runbook
 
-- Статус: `Representative comparison complete; differences await approval`
+- Статус: `Representative search contract approved; other differences await approval`
 - Область: `R1 release parity`
 - Владелец решения: application release operator
 - Связанный cutover: [worker-cutover.md](worker-cutover.md)
@@ -248,9 +248,16 @@ application commit `12fb32a` на `8900` с одинаковыми representativ
 лексический tie-break. Target содержит те же objects на позициях 5/6, но
 небольшой BM25 delta (`5216.5767` против `5209.2993`) меняет их порядок. Поэтому
 exact fifth candidate связывает contract с внутренним score/tie-break поискового
-движка. Рекомендуемый relevance contract: одинаковый top-1, порядок первых
-четырёх и тот же unordered top-6 set; принятие остаётся operator/product
-approval, а не техническим выводом теста.
+движка. Release relevance contract для этого representative flow: одинаковый
+top-1, порядок первых четырёх и тот же unordered top-6 set. Operator/product
+принял его `2026-11-07`; порядок score-tie tail не является compatibility
+contract.
+
+Расширенная read-only сверка шести исторических search-запросов дала одинаковый
+top-1 в `5/6` случаев и суммарный top-10 overlap `31/60`. Поэтому принятое
+решение не объявляет exact global ordering: оно относится к зафиксированному
+Одинцово flow, а другие запросы остаются regression evidence для будущего
+ranking tuning.
 
 Это semantic evidence текущей сессии, но не protected release artifact. Перед
 production approval одинаковые normalized responses и revision/dataset
@@ -266,7 +273,7 @@ JSON bytes.
 | Сценарий | Legacy artifact | AMPHP artifact | Ожидание | Осознанное отличие |
 | --- | --- | --- | --- | --- |
 | `find-by-id` | direct HTTP @ `78d2dd2`: `11073052` | `amphp-12fb32a-warm.json` | тот же GAR identity и hierarchy | Совпали две `adm`/`mun` строки и GUID |
-| `search` | direct HTTP @ `78d2dd2`: `11073052` rank 1 | `amphp-12fb32a-warm.json`: `11073052` rank 1 | тот же representative address; target использует OpenSearch | Первые четыре top-5 совпали; пятый fuzzy candidate различается, approval pending |
+| `search` | direct HTTP @ `78d2dd2`: `11073052` rank 1 | `amphp-12fb32a-warm.json`: `11073052` rank 1 | тот же representative address; target использует OpenSearch | Top-1 и первые четыре совпали; позиции 5/6 содержат тот же unordered set, contract принят `2026-11-07` |
 | staged `suggest` | direct HTTP: `862378 -> 864576` | `amphp-12fb32a-warm.json`: `862378 -> 864576` | те же переходы city/district/thoroughfare | Выбранная цепочка совпала; target возвращает три дополнительных fuzzy district candidates, approval pending |
 | `reverse-geocode` | direct HTTP: raw `Школьная улица` fallback | `amphp-12fb32a-warm.json`: пять GAR candidates, `11073052` первый | согласованный адрес либо явно принятая dataset-разница | Nominatim snapshots различаются; target GAR match лучше, но candidate count/difference требует approval |
 | validation/not-found | direct HTTP @ `78d2dd2` | `amphp-12fb32a-warm.json` | те же status и stable error codes | Missing query совпал; invalid parent status/code совпали; target-only `route_not_found` расширяет legacy `404` envelope |

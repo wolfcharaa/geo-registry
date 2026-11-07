@@ -120,5 +120,6 @@ GROUP BY s.region_code;
 ```
 
 OpenSearch alias переключается только после source/index parity нового
-versioned index. `OPENSEARCH_SEARCH_ENABLED` не следует включать только по факту
-успешного rebuild: отдельно требуется relevance gate.
+versioned index. Для `OPENSEARCH_SEARCH_ENABLED=1` нужны green parity/status и
+принятый relevance contract. Для подготовленной release projection оба условия
+выполнены; после смены dataset или ranking gate запускается повторно.

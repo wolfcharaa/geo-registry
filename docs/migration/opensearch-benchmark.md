@@ -1,10 +1,11 @@
 # PostgreSQL И OpenSearch: Server Benchmark
 
-- Дата evidence: `2026-11-06`
+- Дата evidence: `2026-11-06`; release relevance audit: `2026-11-07`
 - Dataset: GAR, регионы `50` и `77`, затем полный Data.Mos/OSM enrichment
 - Документы после enrichment: `28 649 238`
 - Aliases после исправленного region-77 matching: `794`
-- Решение: OpenSearch projection построена, online decorator пока выключен
+- Решение: OpenSearch projection построена; online decorator разрешён для
+  проверенной release projection после green parity/status
 
 Этот benchmark отвечает на узкий migration-вопрос: даёт ли OpenSearch пользу
 поверх уже оптимизированной региональной PostgreSQL projection. Результаты не
@@ -133,22 +134,35 @@ OpenSearch дал примерно `15.1x` по average и `12.5x` по p95. П�
 `amphp/http-client`, который переиспользует keep-alive connections и открывает
 дополнительные sockets только при конкурентной потребности.
 
-Relevance gate улучшился по известным проблемам literal street и OSM alias, но
-ещё не закрыт полностью. Top-10 overlap пяти корректных запросов после смены
-dataset/ranking — `15/50` (`30%`), первый результат совпал в одном случае из
-пяти. OpenSearch всё ещё иногда предпочитает помещение/квартиру точному дому,
-когда номер встречается несколько раз. Нужны structured house/unit fields или
-application-side reranking; один общий text score не кодирует эту семантику.
+На этом промежуточном этапе top-10 overlap пяти корректных запросов составлял
+`15/50`, а top-1 совпал в `1/5` случаев: OpenSearch иногда предпочитал
+помещение/квартиру точному дому, когда номер встречался несколько раз. Gate стал
+основанием для structured house/unit fields; эти показатели не описывают
+финальную release projection.
+
+## Release Relevance Audit 2026-11-07
+
+Commit `12fb32a` добавил structured street/house/building/structure keys, после
+чего полный blue-green rebuild прошёл с exact parity `28649238/28649238`.
+Representative запрос `Одинцово Можайское 1` совпал с legacy по top-1 и порядку
+первых четырёх объектов. На позициях 5/6 обе системы содержат один набор
+`Татарки`/`Часцы`: legacy применяет lexical tie-break к одинаковому score,
+target меняет порядок из-за небольшого BM25 delta.
+
+Operator/product принял для этого release flow контракт: одинаковый top-1,
+порядок первых четырёх и одинаковый unordered top-6. Расширенная сверка шести
+исторических запросов дала одинаковый top-1 в `5/6` и top-10 overlap `31/60`;
+exact global ordering за пределами representative contract не обещается.
 
 ## Решение
 
-PostgreSQL остаётся default backend: он уже достаточно быстр для большинства
-региональных запросов, точнее следует literal input и не требует дополнительных
-`~9.5 GiB` resident memory OpenSearch process. OpenSearch projection сохраняется
-как rebuildable optional read model: она оправдана при высокой конкуренции,
-fuzzy/alias search и когда снижение нагрузки на canonical PostgreSQL важнее
-стоимости отдельного service.
+PostgreSQL остаётся обязательным fallback и source of truth. OpenSearch
+сохраняется как rebuildable optional read model: она оправдана при высокой
+конкуренции, fuzzy/alias search и когда снижение нагрузки на canonical
+PostgreSQL важнее стоимости отдельного service.
 
-`OPENSEARCH_SEARCH_ENABLED` остаётся `0`: performance benefit и alias/fuzzy
-recall доказаны, но production cutover требует закрыть house/unit relevance
-fixture. Наличие построенного alias само по себе не разрешает переключение.
+Для подготовленной release projection `OPENSEARCH_SEARCH_ENABLED=1` разрешён
+после green exact parity и успешного `opensearch:status`; наличие одного alias
+без этих проверок переключение не разрешает. Production example уже включает
+search decorator. Development default остаётся `0`, потому что свежая установка
+ещё не имеет построенного read alias и должна безопасно использовать PostgreSQL.

@@ -78,14 +78,15 @@ Representative legacy comparison выполнен; find и выбранная su
 совпали, structured search совпадает с legacy в первых четырёх позициях top-5.
 Controlled HTTP/worker restart сохранил нулевой durable backlog и вернул все
 health probes в `ok`.
-До approval остаются пятый ranking candidate, дополнительные fuzzy candidates,
-различие Nominatim snapshots/candidate count, protected production backup
-restore, старые queues и operator traffic.
+До approval остаются дополнительные fuzzy candidates, различие Nominatim
+snapshots/candidate count, protected production backup restore, старые queues и
+operator traffic.
 
-По search recommendation уже подготовлена: первые четыре позиции должны
-совпадать, а одинаковый top-6 set принимается без фиксации порядка score-tie
-tail. Legacy сам ранжирует текущие позиции 5/6 с одинаковым score; окончательное
-принятие этого contract остаётся product/operator решением.
+Search contract принят `2026-11-07`: одинаковый top-1, порядок первых четырёх и
+одинаковый unordered top-6 без фиксации порядка score-tie tail. Production
+example уже включает OpenSearch search; для конкретной projection включение
+разрешено только после green parity и `opensearch:status`. Development default
+остаётся `0`, пока локально не построен read alias.
 
 ## Намеренно Deferred
 

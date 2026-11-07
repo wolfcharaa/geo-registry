@@ -510,8 +510,9 @@ fields и могут быть отключены независимо.
 
 - [x] выполнить полный target Postman/smoke run (`12fb32a`: `13/13` requests,
   `26/26` assertions);
-- [x] сравнить representative search/suggest/find/reverse responses; top-N,
-  fuzzy-candidate и Nominatim snapshot differences ожидают approval;
+- [x] сравнить representative search/suggest/find/reverse responses;
+  search top-1/top-4 + unordered top-6 contract принят, fuzzy-candidate и
+  Nominatim snapshot differences ожидают approval;
 - [x] проверить rebuild/reindex на production-like dataset;
 - [x] проверить readiness, shutdown, worker drain и restart;
 - [x] добавить immutable production image/Compose и offline release/rollback;

@@ -234,8 +234,9 @@ Docker memory фактически выполняются, но остаются
 - port `9200` принадлежит legacy OpenSearch: alias
   `geo_registry_addresses` указывает на индекс из `28 692 782` документов и не
   является target projection;
-- target config сохраняет `OPENSEARCH_INDEX=places`; search и coordinate update
-  flags выключены до relevance gate;
+- historical checkpoint: target config сохранял `OPENSEARCH_INDEX=places`, а
+  search и coordinate update flags были выключены до relevance gate; актуальное
+  решение о search contract приведено ниже;
 - `NOMINATIM_ENABLED=0` исключает отсутствующий Nominatim из runtime graph;
   при одновременном отключении Nominatim/OpenSearch readiness с одним
   PostgreSQL отвечал примерно за `1.3 ms` вместо прежних `18 s`; после запуска
@@ -305,15 +306,18 @@ Docker memory фактически выполняются, но остаются
   OpenSearch search, Nominatim reverse и тот же representative GAR identity;
 - legacy `78d2dd2` и target выбрали один object `11073052` первым в search,
   совпали в первых четырёх top-5, вернули одинаковые find rows и выбранную
-  suggest-цепочку. Открыты approval пятого ranking candidate, дополнительных
-  fuzzy candidates и Nominatim snapshot/candidate-count difference;
+  suggest-цепочку. Search contract top-1/top-4 + unordered top-6 принят
+  `2026-11-07`; расширенная сверка шести исторических запросов дала одинаковый
+  top-1 в `5/6` и top-10 overlap `31/60`, поэтому exact global ordering не
+  обещается. Открыты approval дополнительных fuzzy candidates и Nominatim
+  snapshot/candidate-count difference;
 - target JSON/JUnit evidence находится в session path
   `/tmp/geo-registry-release-smoke/amphp-12fb32a-warm.{json,xml}` и ещё требует
   переноса в protected evidence location.
 
 Следующий delivery gate — выбрать protected `BACKUP_LOCATION` и выполнить
 полный backup/restore rehearsal подготовленного runbook. После него остаются
-approval semantic differences, legacy queue approval и traffic cutover.
+approval fuzzy/Nominatim differences, legacy queue approval и traffic cutover.
 
 ## Первый Шаг Новой Сессии
 

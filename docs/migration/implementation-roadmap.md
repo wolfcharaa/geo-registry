@@ -1611,15 +1611,18 @@ Data.Mos/OSM enrichment. Legacy остаётся запущенным на `8899
 - [x] Добавить structured street/house/building/structure fields и выполнить
   blue-green rebuild `28649238/28649238`; commit `12fb32a` улучшил
   representative overlap с `2/5` до `4/5`.
-- [ ] Решить, должен ли пятый fuzzy-кандидат точно повторять legacy либо overlap
-  `4/5` с одинаковым top-1/4 является допустимым relevance contract. Расширенный
-  запрос с `limit=20` подтвердил одинаковый top-6 set: legacy ставит
-  `Татарки`/`Часцы` на 5/6 с равным score и lexical tie-break, target меняет
-  только их порядок из-за малого BM25 delta. Рекомендация — принять
-  top-1/top-4 + unordered top-6.
+- [x] Принять для release representative flow relevance contract: одинаковый
+  top-1, порядок первых четырёх и одинаковый unordered top-6. Расширенный запрос
+  с `limit=20` подтвердил, что legacy ставит `Татарки`/`Часцы` на 5/6 с равным
+  score и lexical tie-break, а target меняет только их порядок из-за малого
+  BM25 delta. Contract утверждён operator/product решением `2026-11-07`.
 
-`OPENSEARCH_SEARCH_ENABLED=0` сохраняется до решения последнего пункта. Нельзя
-считать совпадение первого документа достаточным relevance gate.
+Production example разрешает `OPENSEARCH_SEARCH_ENABLED=1` после green parity и
+успешного `opensearch:status`. Development default остаётся `0`, потому что
+свежая установка ещё не имеет построенного read alias; это operational guard,
+а не незакрытый relevance gate. Расширенная сверка шести исторических запросов
+дала одинаковый top-1 в `5/6` и top-10 overlap `31/60`; exact global ordering за
+пределами утверждённого representative contract не обещается.
 
 #### E2.2 — Nominatim И Coordinate Enrichment
 
@@ -1758,8 +1761,9 @@ E2.5 production delivery/cutover`.
   isolated integration smoke связывает XML import, partitioned build и
   PostgreSQL search на representative fixture.
 - [x] Сравнить find/search/suggest/reverse responses на representative dataset.
-  Find, selected suggest chain и search top-1 совпали; top-N/fuzzy/Nominatim
-  differences перечислены в release parity matrix и ожидают approval.
+  Find, selected suggest chain и search top-1 совпали; top-1/top-4 + unordered
+  top-6 search contract принят `2026-11-07`, а fuzzy/Nominatim differences
+  перечислены в release parity matrix и ожидают approval.
 - [x] Проверить live/ready/startup, shutdown, queue drain и restart. Controlled
   restart HTTP и двух idle workers сохранил нулевой PostgreSQL backlog; старые
   instances стали `stopped`, новые зарегистрировались `running/idle`, все probes
