@@ -1,8 +1,8 @@
 # Roadmap реализации Geo Registry на AMPHP
 
-- Статус: `Active; local R1 preparation continues, full-data execution deferred to data server`
-- Версия документа: `0.65.0`
-- Обновлено: `2026-11-06`
+- Статус: `Active; production-like runtime hardening`
+- Версия документа: `0.66.0`
+- Обновлено: `2026-11-07`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
 
@@ -1910,6 +1910,19 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.66.0 — 2026-11-07
+
+- HTTP runtime получил application-owned `amphp/cluster` supervisor и
+  настраиваемое число независимых PHP worker processes на одном socket;
+- supervisor не разрешает HTTP DIC graph, а каждый worker создаёт и dispose-ит
+  собственные clients, MessageBus services и PostgreSQL pool;
+- production image закрепил `ext-ev + ext-pq + ext-raphf`, сохранив
+  `ext-pgsql`/PDO для COPY, migrations и blocking CLI boundaries;
+- Compose разделил HTTP/queue-worker pool budgets, поднял `nofile` и получил
+  явные connection, concurrency, backlog и graceful-shutdown settings;
+- worker logs агрегируются через cluster IPC, аварийно завершившиеся workers
+  перезапускаются, `SIGUSR1` выполняет controlled worker restart.
 
 ### 0.65.0 — 2026-11-06
 

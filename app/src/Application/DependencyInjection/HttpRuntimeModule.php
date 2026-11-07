@@ -43,6 +43,7 @@ use App\Module\AddressRegistry\UserInterface\Http\SearchAddress\SearchAddressReq
 use App\Module\AddressRegistry\UserInterface\Http\SuggestAddress\SuggestAddressAction;
 use App\Module\AddressRegistry\UserInterface\Http\SuggestAddress\SuggestAddressPresenter;
 use App\Module\AddressRegistry\UserInterface\Http\SuggestAddress\SuggestAddressRequestMapper;
+use App\UserInterface\Http\AmpHttpServerFactory;
 use App\UserInterface\Http\CorrelationMiddleware;
 use App\UserInterface\Http\RouterFactory;
 use Fedor\MessageBus\Codec\MessageCodecRegistry;
@@ -270,6 +271,12 @@ final readonly class HttpRuntimeModule implements Module
                 'suggestAddress' => $suggestAddress,
                 'reverseGeocode' => $reverseGeocode,
             ]);
+        $serverFactory = $dic
+            ->object(AmpHttpServerFactory::class)
+            ->args([
+                'config' => $dic->value($httpConfig),
+                'logger' => $logger,
+            ]);
 
         return $dic
             ->object(HttpRuntime::class)
@@ -279,6 +286,7 @@ final readonly class HttpRuntimeModule implements Module
                 'routerFactory' => $routerFactory,
                 'startupState' => $startupState,
                 'messageBus' => $messageBus,
+                'serverFactory' => $serverFactory,
             ]);
     }
 }

@@ -13,11 +13,18 @@ services:
     environment:
       APP_LISTEN: "${APP_LISTEN:-0.0.0.0:8080}"
       APP_NAME: "${APP_NAME:-geo-registry}"
+      APP_HTTP_BACKLOG: "${APP_HTTP_BACKLOG:-512}"
+      APP_HTTP_COMPRESSION_ENABLED: "${APP_HTTP_COMPRESSION_ENABLED:-1}"
+      APP_HTTP_CONCURRENCY_LIMIT: "${APP_HTTP_CONCURRENCY_LIMIT:-256}"
+      APP_HTTP_CONNECTION_LIMIT: "${APP_HTTP_CONNECTION_LIMIT:-512}"
+      APP_HTTP_CONNECTIONS_PER_IP_LIMIT: "${APP_HTTP_CONNECTIONS_PER_IP_LIMIT:-64}"
+      APP_HTTP_SHUTDOWN_TIMEOUT_SECONDS: "${APP_HTTP_SHUTDOWN_TIMEOUT_SECONDS:-30}"
+      APP_HTTP_WORKERS: "${APP_HTTP_WORKERS:-1}"
       APP_USER_AGENT: "${APP_USER_AGENT:-geo-registry/0.1}"
       DATAMOS_ADDRESS_REGISTRY_SOURCE: "${DATAMOS_ADDRESS_REGISTRY_SOURCE:-/data/datamos/addressreestr.jsonl.gz}"
       COMPOSER_HOME: /tmp/composer
       DATABASE_DSN: "${DATABASE_DSN:-host=postgres port=5432 user=app password=local-app-only db=app application_name=geo-registry}"
-      DATABASE_POOL_SIZE: "${DATABASE_POOL_SIZE:-10}"
+      DATABASE_POOL_SIZE: "${HTTP_DATABASE_POOL_SIZE:-4}"
       HTTP_TIMEOUT_SECONDS: "${HTTP_TIMEOUT_SECONDS:-10}"
       LOG_FORMAT: "${LOG_FORMAT:-console}"
       NOMINATIM_ENABLED: "${NOMINATIM_ENABLED:-1}"
@@ -39,6 +46,7 @@ services:
       OPENSEARCH_REFRESH_INTERVAL: "${OPENSEARCH_REFRESH_INTERVAL:-1s}"
       OPENSEARCH_BULK_REFRESH_INTERVAL: "${OPENSEARCH_BULK_REFRESH_INTERVAL:--1}"
       OPENSEARCH_REINDEX_MEMORY_LIMIT: "${OPENSEARCH_REINDEX_MEMORY_LIMIT:-512M}"
+      REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\EvDriver}'
     ports:
       - "${APP_PORT:-8080}:8080"
     volumes:
@@ -54,6 +62,11 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    stop_grace_period: 40s
 
   worker-address:
     profiles: [worker]
@@ -77,8 +90,9 @@ services:
       APP_NAME: "${APP_NAME:-geo-registry}"
       COMPOSER_HOME: /tmp/composer
       DATABASE_DSN: "${DATABASE_DSN:-host=postgres port=5432 user=app password=local-app-only db=app application_name=geo-registry-worker-address}"
-      DATABASE_POOL_SIZE: "${DATABASE_POOL_SIZE:-10}"
+      DATABASE_POOL_SIZE: "${WORKER_DATABASE_POOL_SIZE:-4}"
       LOG_FORMAT: "${LOG_FORMAT:-console}"
+      REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\EvDriver}'
     volumes:
       - ../../../app:/app
     depends_on:
@@ -86,6 +100,10 @@ services:
         condition: service_healthy
     restart: unless-stopped
     stop_grace_period: 40s
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   worker-runtime:
     profiles: [worker]
@@ -109,7 +127,7 @@ services:
       APP_NAME: "${APP_NAME:-geo-registry}"
       COMPOSER_HOME: /tmp/composer
       DATABASE_DSN: "${DATABASE_DSN:-host=postgres port=5432 user=app password=local-app-only db=app application_name=geo-registry-worker-runtime}"
-      DATABASE_POOL_SIZE: "${DATABASE_POOL_SIZE:-10}"
+      DATABASE_POOL_SIZE: "${WORKER_DATABASE_POOL_SIZE:-4}"
       LOG_FORMAT: "${LOG_FORMAT:-console}"
       OPENSEARCH_ENABLED: "${OPENSEARCH_ENABLED:-1}"
       OPENSEARCH_COORDINATE_UPDATES_ENABLED: "${OPENSEARCH_COORDINATE_UPDATES_ENABLED:-0}"
@@ -118,6 +136,7 @@ services:
       OPENSEARCH_URL: "${OPENSEARCH_URL:-http://opensearch:9200}"
       OPENSEARCH_USERNAME: "${OPENSEARCH_USERNAME:-}"
       OPENSEARCH_TIMEOUT_SECONDS: "${OPENSEARCH_TIMEOUT_SECONDS:-60}"
+      REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\EvDriver}'
     volumes:
       - ../../../app:/app
     depends_on:
@@ -125,6 +144,10 @@ services:
         condition: service_healthy
     restart: unless-stopped
     stop_grace_period: 40s
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   postgres:
     image: ghcr.io/cargosense/postgis:17-3.6-alpine@sha256:03374f4feb0267d755a9d81cc834f8a129f9a99734dd0a029f0bceb3f5689361

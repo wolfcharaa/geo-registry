@@ -28,6 +28,13 @@ final class RuntimeConfigTest
             'APP_VERSION' => 'test',
             'APP_LISTEN' => '0.0.0.0:9000',
             'APP_USER_AGENT' => 'geo-registry/test',
+            'APP_HTTP_WORKERS' => '3',
+            'APP_HTTP_SHUTDOWN_TIMEOUT_SECONDS' => '25',
+            'APP_HTTP_CONNECTION_LIMIT' => '700',
+            'APP_HTTP_CONNECTIONS_PER_IP_LIMIT' => '0',
+            'APP_HTTP_CONCURRENCY_LIMIT' => '350',
+            'APP_HTTP_BACKLOG' => '900',
+            'APP_HTTP_COMPRESSION_ENABLED' => 'false',
             'HTTP_TIMEOUT_SECONDS' => '3.5',
             'LOG_FORMAT' => 'console',
             'DATAMOS_ADDRESS_REGISTRY_SOURCE' => '/data/datamos/registry.bson.gz',
@@ -70,6 +77,13 @@ final class RuntimeConfigTest
         Assert::same($addressSources->moscowRegionCode, 77);
         Assert::same($http->listen, '0.0.0.0:9000');
         Assert::same($http->timeoutSeconds, 3.5);
+        Assert::same($http->workers, 3);
+        Assert::same($http->shutdownTimeoutSeconds, 25.0);
+        Assert::same($http->connectionLimit, 700);
+        Assert::same($http->connectionsPerIpLimit, 0);
+        Assert::same($http->concurrencyLimit, 350);
+        Assert::same($http->backlog, 900);
+        Assert::same($http->compressionEnabled, false);
         Assert::same($logging->service, 'geo-registry-test');
         Assert::same($logging->format, LogFormat::Console);
         Assert::same($postgres->dsn, 'host=postgres db=geo');
@@ -170,6 +184,22 @@ final class RuntimeConfigTest
             LoggingConfig::fromEnvironment(new EnvironmentSnapshot([]))->format,
             LogFormat::Json,
         );
+    }
+
+    #[ExpectException(InvalidArgumentException::class)]
+    public function testHttpWorkerCountHasAnUpperBound(): void
+    {
+        HttpServerConfig::fromEnvironment(new EnvironmentSnapshot([
+            'APP_HTTP_WORKERS' => '65',
+        ]));
+    }
+
+    #[ExpectException(InvalidArgumentException::class)]
+    public function testHttpPerIpConnectionLimitMustBeNonNegative(): void
+    {
+        HttpServerConfig::fromEnvironment(new EnvironmentSnapshot([
+            'APP_HTTP_CONNECTIONS_PER_IP_LIMIT' => '-1',
+        ]));
     }
 
     #[ExpectException(InvalidArgumentException::class)]

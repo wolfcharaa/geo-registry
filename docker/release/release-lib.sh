@@ -121,7 +121,7 @@ release_validate_image() {
 
     docker run --rm --entrypoint php "${release_exact_image}" -r '
         $errors = [];
-        foreach (["pcntl", "pdo_pgsql", "pgsql", "xmlreader"] as $extension) {
+        foreach (["ev", "pcntl", "pdo_pgsql", "pgsql", "posix", "pq", "raphf", "sockets", "xmlreader"] as $extension) {
             if (!extension_loaded($extension)) {
                 $errors[] = "missing extension: " . $extension;
             }
@@ -132,6 +132,10 @@ release_validate_image() {
             require "vendor/autoload.php";
             if (!class_exists("App\\Application\\DependencyInjection\\CliRuntimeModule")) {
                 $errors[] = "application autoload is incomplete";
+            }
+            $driver = Revolt\EventLoop::getDriver()::class;
+            if ($driver !== Revolt\EventLoop\Driver\EvDriver::class) {
+                $errors[] = "unexpected production event-loop driver: " . $driver;
             }
         }
         if ($errors !== []) {

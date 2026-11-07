@@ -140,6 +140,7 @@ make worker-logs
 - [Архитектурные границы](docs/architecture.md)
 - [Thesis DIC и scopes](docs/development/thesis-dic.md)
 - [PostgreSQL tuning](docs/postgresql-tuning.md)
+- [Production-like HTTP runtime](docs/deployment/http-runtime.md)
 - [Production Compose](docs/deployment/production-compose.md)
 - [Source release](docs/deployment/source-release.md)
 - [Offline release](docs/deployment/offline-release.md)

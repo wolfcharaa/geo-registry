@@ -8,16 +8,25 @@ use App\Application\MessageBus\MessageBusRegistrySource;
 use App\Application\MessageBus\MessageCodecRegistryLoader;
 use App\Application\Runtime\CliRuntime;
 use App\Config\EnvironmentSnapshot;
+use Amp\Cluster\Cluster;
+use Symfony\Component\Console\Input\ArgvInput;
 use Thesis\Dic;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-exit(Dic::run(
+/** @var list<string> $argv */
+$exitCode = Dic::run(
     new CliRuntimeModule(
         EnvironmentSnapshot::capture(),
         MessageBusRegistrySource::fromFile(dirname(__DIR__) . '/config/message_bus_registry.php'),
         MessageCodecRegistryLoader::fromFile(dirname(__DIR__) . '/config/message_bus_codecs.php'),
         MessageBusRegistrySource::fromFile(dirname(__DIR__) . '/config/message_bus_http.php'),
     ),
-    static fn(CliRuntime $runtime): int => $runtime->run(),
-));
+    static fn(CliRuntime $runtime): int => $runtime->run(new ArgvInput($argv)),
+);
+
+if (Cluster::isWorker()) {
+    return $exitCode;
+}
+
+exit($exitCode);

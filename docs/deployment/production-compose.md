@@ -82,6 +82,14 @@ Placeholder credentials и endpoints нужно заменить до запус
 задать `NOMINATIM_ENABLED=0` или `OPENSEARCH_ENABLED=0`. Тогда HTTP graph и
 readiness не выполняют сетевые запросы к отключённому service.
 
+HTTP process является supervisor-ом с двумя worker processes по умолчанию.
+Workers разделяют listening socket, но каждый собирает собственный Thesis DIC
+graph и PostgreSQL pool; supervisor application graph и pool не создаёт.
+Production image использует `ext-ev + ext-pq`, а process/socket/resource budgets
+задаются через `APP_HTTP_*`, `HTTP_DATABASE_POOL_SIZE` и
+`WORKER_DATABASE_POOL_SIZE`. Полный контракт и формула PostgreSQL capacity
+описаны в [production-like HTTP runtime](http-runtime.md).
+
 ## Проверка И Запуск
 
 ```shell

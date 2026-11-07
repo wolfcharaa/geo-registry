@@ -101,15 +101,19 @@ reverse-geocode через idempotent `runtime_async` event. Массовый п
 projection требует отдельного product requirement, Nominatim capacity/rate
 budget, persisted checkpoint и самостоятельного data-quality approval.
 
-Также не входят multi-process/fork orchestration старого RoadRunner, outbox и
-новые raw source-specific поля core contracts. Старые RoadRunner/BoltDB queues
-должны быть drained либо явно списаны в release window; само наличие нового
-PostgreSQL worker не закрывает этот gate.
+RoadRunner-specific worker pool и fork уже собранного application container не
+переносятся. Вместо них HTTP runtime использует application-owned
+`amphp/cluster`: supervisor запускает независимые PHP processes с собственными
+DIC graphs и PostgreSQL pools, передавая им один listening socket. Outbox и
+новые raw source-specific поля core contracts также не входят в scope. Старые
+RoadRunner/BoltDB queues должны быть drained либо явно списаны в release window;
+само наличие нового PostgreSQL worker не закрывает этот gate.
 
 ## Delivery Boundary
 
-Production Compose управляет только HTTP process и двумя workers одной release
-revision. PostgreSQL приложения, OpenSearch и Nominatim не являются дочерними
+Production Compose управляет HTTP supervisor-ом с настраиваемым числом HTTP
+workers и двумя queue workers одной release revision. PostgreSQL приложения,
+OpenSearch и Nominatim не являются дочерними
 services application release и не должны пересоздаваться при переключении
 image. Полный registry namespace передаётся как `DOCKER_IMAGE_PREFIX`; Compose
 не содержит deployment-specific владельца registry. Runtime configuration и

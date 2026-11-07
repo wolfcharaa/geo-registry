@@ -13,7 +13,9 @@ x-app-service: &app-service
   environment:
     APP_NAME: "${APP_NAME:-geo-registry}"
     APP_VERSION: "${RELEASE_VERSION:?Set the frozen release version}"
+    DATABASE_POOL_SIZE: "${WORKER_DATABASE_POOL_SIZE:-4}"
     LOG_FORMAT: "${LOG_FORMAT:-json}"
+    REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\EvDriver}'
   read_only: true
   tmpfs:
     - /tmp:rw,noexec,nosuid,size=64m
@@ -28,16 +30,29 @@ x-app-service: &app-service
       max-file: "${LOG_MAX_FILES:-5}"
       max-size: "${LOG_MAX_SIZE:-20m}"
   restart: unless-stopped
+  ulimits:
+    nofile:
+      soft: 65536
+      hard: 65536
 
 services:
   app:
     <<: *app-service
-    command: ["bin/app"]
+    command: ["bin/app", "server:run"]
     environment:
       APP_LISTEN: "0.0.0.0:8080"
       APP_NAME: "${APP_NAME:-geo-registry}"
       APP_VERSION: "${RELEASE_VERSION:?Set the frozen release version}"
+      APP_HTTP_BACKLOG: "${APP_HTTP_BACKLOG:-1024}"
+      APP_HTTP_COMPRESSION_ENABLED: "${APP_HTTP_COMPRESSION_ENABLED:-1}"
+      APP_HTTP_CONCURRENCY_LIMIT: "${APP_HTTP_CONCURRENCY_LIMIT:-512}"
+      APP_HTTP_CONNECTION_LIMIT: "${APP_HTTP_CONNECTION_LIMIT:-1024}"
+      APP_HTTP_CONNECTIONS_PER_IP_LIMIT: "${APP_HTTP_CONNECTIONS_PER_IP_LIMIT:-0}"
+      APP_HTTP_SHUTDOWN_TIMEOUT_SECONDS: "${APP_HTTP_SHUTDOWN_TIMEOUT_SECONDS:-30}"
+      APP_HTTP_WORKERS: "${APP_HTTP_WORKERS:-2}"
+      DATABASE_POOL_SIZE: "${HTTP_DATABASE_POOL_SIZE:-4}"
       LOG_FORMAT: "${LOG_FORMAT:-json}"
+      REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\EvDriver}'
     ports:
       - "${APP_BIND_HOST:-127.0.0.1}:${APP_PORT:-8080}:8080"
     healthcheck:
@@ -49,7 +64,7 @@ services:
     mem_limit: "${APP_MEMORY_LIMIT:-1g}"
     cpus: "${APP_CPUS:-2}"
     pids_limit: "${APP_PIDS_LIMIT:-256}"
-    stop_grace_period: "${APP_STOP_GRACE_PERIOD:-30s}"
+    stop_grace_period: "${APP_STOP_GRACE_PERIOD:-40s}"
 
   worker-address:
     <<: *app-service

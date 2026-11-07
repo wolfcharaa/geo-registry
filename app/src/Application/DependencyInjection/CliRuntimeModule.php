@@ -9,14 +9,20 @@ use App\Application\Console\Command\MessageBusRegistryCheckCommand;
 use App\Application\Console\Command\RunHttpServerCommand;
 use App\Application\MessageBus\ApplicationRegistryCompiler;
 use App\Application\MessageBus\MessageBusRegistrySource;
+use App\Application\Observability\CorrelationContext;
 use App\Application\Runtime\CliRuntime;
+use App\Application\Runtime\HttpClusterRuntime;
 use App\Config\AddressSourceConfig;
 use App\Config\ConsoleConfig;
 use App\Config\EnvironmentSnapshot;
+use App\Config\HttpServerConfig;
+use App\Config\LoggingConfig;
 use App\Config\OpenSearchConfig;
 use App\Config\PostgresConfig;
+use App\Infrastructure\Logging\StdoutLoggerFactory;
 use App\Infrastructure\Postgres\PostgresPoolFactory;
 use Fedor\MessageBus\Codec\MessageCodecRegistry;
+use Monolog\Logger;
 use Thesis\Dic;
 use Thesis\Dic\Module;
 use Thesis\Dic\Ref;
@@ -38,6 +44,8 @@ final readonly class CliRuntimeModule implements Module
     public function configure(Dic $dic): Ref
     {
         $config = ConsoleConfig::fromEnvironment($this->environment);
+        $httpConfig = HttpServerConfig::fromEnvironment($this->environment);
+        $loggingConfig = LoggingConfig::fromEnvironment($this->environment);
         $addressSourceConfig = AddressSourceConfig::fromEnvironment($this->environment);
         $postgresConfig = PostgresConfig::fromEnvironment($this->environment);
         $openSearchConfig = OpenSearchConfig::fromEnvironment($this->environment);
@@ -66,13 +74,35 @@ final readonly class CliRuntimeModule implements Module
                 'message-bus:registry:check',
                 'Compile and validate the explicit application MessageBus registry.',
             ));
+        $httpRuntime = $dic->import(new HttpRuntimeModule(
+            $this->environment,
+            $this->httpMessageBusRegistry ?? MessageBusRegistrySource::empty(),
+            $codecs,
+        ));
+        $clusterCorrelationContext = $dic->object(CorrelationContext::class);
+        $clusterLoggerFactory = $dic
+            ->object(StdoutLoggerFactory::class)
+            ->arg('context', $clusterCorrelationContext);
+        $clusterLogger = $dic
+            ->object(Logger::class, [$clusterLoggerFactory, 'create'])
+            ->args([
+                'config' => $dic->value($loggingConfig),
+                'runtime' => 'http-supervisor',
+            ]);
+        $clusterRuntime = $dic
+            ->object(HttpClusterRuntime::class)
+            ->args([
+                'config' => $dic->value($httpConfig),
+                'logger' => $clusterLogger,
+                'entrypoint' => $dic->value(dirname(__DIR__, 3) . '/bin/app'),
+            ]);
         $dic
             ->object(RunHttpServerCommand::class)
-            ->arg('runtime', $dic->import(new HttpRuntimeModule(
-                $this->environment,
-                $this->httpMessageBusRegistry ?? MessageBusRegistrySource::empty(),
-                $codecs,
-            )))
+            ->args([
+                'config' => $dic->value($httpConfig),
+                'runtimeProvider' => $dic->provider($httpRuntime),
+                'clusterRuntimeProvider' => $dic->provider($clusterRuntime),
+            ])
             ->tag(new CommandTag('server:run', 'Run the AMPHP HTTP server.'));
 
         $dic->import(new MigrationCliModule($postgresConfig));

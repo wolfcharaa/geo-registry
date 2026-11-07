@@ -10,7 +10,10 @@
         "ext-pdo": "*",
         "ext-pdo_pgsql": "*",
         "ext-pgsql": "*",
+        "ext-posix": "*",
+        "ext-sockets": "*",
         "ext-xmlreader": "*",
+        "amphp/cluster": "^2.0",
         "amphp/http-client": "^5.3",
         "amphp/http-server": "^3.4",
         "amphp/http-server-router": "^2.0",
@@ -25,6 +28,10 @@
         "thesis/symfony-console-module": "^0.1.0",
         "yiisoft/db-migration": "^2.2",
         "yiisoft/db-pgsql": "^2.0"
+    },
+    "suggest": {
+        "ext-ev": "Recommended production event-loop driver.",
+        "ext-pq": "Required with ext-ev for non-blocking PostgreSQL connections."
     },
     "require-dev": {
         "deptrac/deptrac": "^4.7",

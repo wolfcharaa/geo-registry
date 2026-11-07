@@ -46,8 +46,13 @@ final readonly class EnvironmentSnapshot
         return $value !== '' ? $value : null;
     }
 
+    /** @return positive-int */
     public function positiveInteger(string $name, int $default): int
     {
+        if ($default < 1) {
+            throw new InvalidArgumentException(sprintf('Default value for %s must be a positive integer.', $name));
+        }
+
         $value = $this->optionalString($name);
         if ($value === null) {
             return $default;
@@ -56,6 +61,26 @@ final readonly class EnvironmentSnapshot
         $integer = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($integer === false) {
             throw new InvalidArgumentException(sprintf('%s must be a positive integer.', $name));
+        }
+
+        return $integer;
+    }
+
+    /** @return non-negative-int */
+    public function nonNegativeInteger(string $name, int $default): int
+    {
+        if ($default < 0) {
+            throw new InvalidArgumentException(sprintf('Default value for %s must be a non-negative integer.', $name));
+        }
+
+        $value = $this->optionalString($name);
+        if ($value === null) {
+            return $default;
+        }
+
+        $integer = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+        if ($integer === false) {
+            throw new InvalidArgumentException(sprintf('%s must be a non-negative integer.', $name));
         }
 
         return $integer;
