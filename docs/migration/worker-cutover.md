@@ -88,6 +88,19 @@ Development full-stack evidence от `2026-11-07` подтвердил group pau
 закрыт CLI guard-ом. Real-PostgreSQL integration отдельно подтверждает возврат
 stale `running` job в `pending` после истечения heartbeat lease.
 
+Свежий pre-cutover snapshot `2026-11-07 10:25 UTC` снят штатной legacy-командой
+`php app.php rr:jobs:list`: pipelines `gar` и `runtime` активны, у обеих
+`active=0`, `delayed=0`, `reserved=0`. Текущие mutable BoltDB files:
+
+- `jobs-gar.db`: `32768` bytes,
+  SHA-256 `1f90450d68e12e7f0a5093eda62168b0f6a652100bc447e0578711d4c869a508`;
+- `jobs-runtime.db`: `65536` bytes,
+  SHA-256 `00da206d67bb49ae5f0bccbbd0d889beaa7f04a56a3d6d929a8c657bdf7f460a`.
+
+Это не cutover backup: legacy producers/consumers продолжают работать, поэтому
+files могут измениться после snapshot. Финальные counts, копии и checksums
+снимаются только после запрета новых publications в release window.
+
 ## Rollback
 
 1. Остановить новый HTTP producer, чтобы PostgreSQL queue перестала расти.

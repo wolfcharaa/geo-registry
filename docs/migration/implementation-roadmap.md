@@ -1688,7 +1688,9 @@ nationwide import; региональный 50/77 path завершился бе
 #### E2.4 — Workers И Queue Cutover
 
 - [x] Снять текущий legacy evidence: RoadRunner `gar` и `runtime` имеют
-  `queue=0`, `active=0`, `delayed=0`, `reserved=0`; это snapshot, не cutover.
+  `queue=0`, `active=0`, `delayed=0`, `reserved=0`; свежий штатный
+  `rr:jobs:list` snapshot и SHA-256 обоих mutable BoltDB files повторно сняты
+  `2026-11-07 10:25 UTC`. Это snapshot, не cutover.
 - [x] Снять target evidence: `worker:status` пуст, worker services не запущены.
 - [x] Запустить оба target worker services на той же application revision через
   общий настраиваемый `APP_IMAGE`; оба зарегистрированы как `running/idle`.
