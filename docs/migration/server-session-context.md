@@ -258,7 +258,8 @@ Docker memory фактически выполняются, но остаются
 - operational CLI закрыт через `gar:integrity`, `gar:activity`, `gar:releases`,
   `opensearch:status` и exact-confirmation cleanup; application fast gate —
   `114 tests / 544 assertions`, contract — `13 tests / 240 assertions`,
-  real-service integration — `19 tests / 256 assertions`;
+  real-service integration — `19 tests / 259 assertions`, включая стабильный
+  house top-3 и exact unit fixture;
 - target workers прошли enqueue/consume, pause/resume, exact drain/restart и
   stale recovery; one-shot drain/stop/kill/restart теперь требуют точный
   `worker-instance-id`;

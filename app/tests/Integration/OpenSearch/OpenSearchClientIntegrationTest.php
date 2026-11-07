@@ -10,6 +10,7 @@ use App\Infrastructure\Http\AmpHttpClientFactory;
 use App\Infrastructure\OpenSearch\OpenSearchClientFactory;
 use App\Module\AddressRegistry\Capability\AddressHierarchy;
 use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressCriteria;
+use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressMatch;
 use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressPort;
 use App\Module\AddressRegistry\Capability\SearchAddress\SearchProfile;
 use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\OpenSearchAddressIndexDefinition;
@@ -24,7 +25,7 @@ use Testo\Test;
 #[Test]
 final class OpenSearchClientIntegrationTest
 {
-    public function testItUsesTheNativeClientAgainstAnEphemeralIndex(): void
+    public function testItKeepsRepresentativeHouseAndUnitRankingAgainstAnEphemeralIndex(): void
     {
         $httpClient = AmpHttpClientFactory::create(10);
         $client = (new OpenSearchClientFactory($httpClient))->create(
@@ -45,14 +46,15 @@ final class OpenSearchClientIntegrationTest
             $client->indexDocument($index, '780005-adm', self::document(78, 780005, 'Бета', 10));
             $client->refreshIndex($index);
 
-            $matches = (new OpenSearchSearchAddressDecorator(
+            $reader = new OpenSearchSearchAddressDecorator(
                 client: $client,
                 index: $index,
                 fallback: new FailingSearchAddressPort(),
                 queries: new OpenSearchAddressSearchQueryFactory(),
                 results: new OpenSearchAddressSearchResultMapper(),
                 logger: new NullLogger(),
-            ))->search(new SearchAddressCriteria(
+            );
+            $matches = $reader->search(new SearchAddressCriteria(
                 query: 'Тестоград Общая 10',
                 hierarchy: AddressHierarchy::Administrative,
                 profile: SearchProfile::Search,
@@ -60,7 +62,10 @@ final class OpenSearchClientIntegrationTest
                 regionCode: 77,
             ), new NullCancellation());
 
-            Assert::same(count($matches), 3);
+            Assert::same(array_map(
+                static fn(SearchAddressMatch $match): int => $match->document->objectId,
+                $matches,
+            ), [770005, 770006, 770007]);
             $match = $matches[0] ?? null;
             Assert::notNull($match);
             Assert::same($match->document->objectId, 770005);
@@ -70,6 +75,22 @@ final class OpenSearchClientIntegrationTest
             $alias = $match->aliases[0] ?? null;
             Assert::notNull($alias);
             Assert::same($alias->source, 'osm');
+
+            $unitMatches = $reader->search(new SearchAddressCriteria(
+                query: 'Тестоград, Общая улица, дом 10, кв. 1',
+                hierarchy: AddressHierarchy::Administrative,
+                profile: SearchProfile::Search,
+                limit: 5,
+                regionCode: 77,
+            ), new NullCancellation());
+
+            Assert::same(array_map(
+                static fn(SearchAddressMatch $unitMatch): int => $unitMatch->document->objectId,
+                $unitMatches,
+            ), [770006]);
+            $unitMatch = $unitMatches[0] ?? null;
+            Assert::notNull($unitMatch);
+            Assert::same($unitMatch->document->level, 11);
         } finally {
             $client->deleteIndex($index);
         }

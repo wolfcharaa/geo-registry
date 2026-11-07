@@ -1604,9 +1604,10 @@ Data.Mos/OSM enrichment. Legacy остаётся запущенным на `8899
   исправлены commit `7f7bec6`, house-level boost — `5288fb3`.
 - [ ] Решить, является ли дополнительная fuzzy suggestion `Московка`
   допустимым расширением либо target должен повторить legacy candidate set.
-- [ ] Зафиксировать representative top-N fixture для домов и помещений; текущий
-  target и legacy OpenSearch совпали в первых четырёх результатах, пятый
-  fuzzy-кандидат различается.
+- [x] Зафиксировать representative top-N fixture для домов и помещений. Real
+  OpenSearch integration закрепляет полный порядок house-кандидатов и строгий
+  unit result; live target и legacy совпали в первых четырёх результатах,
+  пятый fuzzy-кандидат различается.
 - [x] Добавить structured street/house/building/structure fields и выполнить
   blue-green rebuild `28649238/28649238`; commit `12fb32a` улучшил
   representative overlap с `2/5` до `4/5`.
