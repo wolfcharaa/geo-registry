@@ -241,6 +241,16 @@ application commit `12fb32a` на `8900` с одинаковыми representativ
 - оба readiness endpoints сообщили `status=ok`; target дополнительно имеет
   отдельный startup probe.
 
+Дополнительный запрос с `limit=20` показал, что search difference ограничен
+границей limit, а не candidate set. В legacy позиции 5/6 — `81524836` (Татарки) и
+`80467807` (Часцы) — имеют одинаковый score `1528.1375`, после чего срабатывает
+лексический tie-break. Target содержит те же objects на позициях 5/6, но
+небольшой BM25 delta (`5216.5767` против `5209.2993`) меняет их порядок. Поэтому
+exact fifth candidate связывает contract с внутренним score/tie-break поискового
+движка. Рекомендуемый relevance contract: одинаковый top-1, порядок первых
+четырёх и тот же unordered top-6 set; принятие остаётся operator/product
+approval, а не техническим выводом теста.
+
 Это semantic evidence текущей сессии, но не protected release artifact. Перед
 production approval одинаковые normalized responses и revision/dataset
 manifest нужно сохранить в утверждённом evidence location.

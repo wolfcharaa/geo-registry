@@ -1612,7 +1612,11 @@ Data.Mos/OSM enrichment. Legacy остаётся запущенным на `8899
   blue-green rebuild `28649238/28649238`; commit `12fb32a` улучшил
   representative overlap с `2/5` до `4/5`.
 - [ ] Решить, должен ли пятый fuzzy-кандидат точно повторять legacy либо overlap
-  `4/5` с одинаковым top-1/4 является допустимым relevance contract.
+  `4/5` с одинаковым top-1/4 является допустимым relevance contract. Расширенный
+  запрос с `limit=20` подтвердил одинаковый top-6 set: legacy ставит
+  `Татарки`/`Часцы` на 5/6 с равным score и lexical tie-break, target меняет
+  только их порядок из-за малого BM25 delta. Рекомендация — принять
+  top-1/top-4 + unordered top-6.
 
 `OPENSEARCH_SEARCH_ENABLED=0` сохраняется до решения последнего пункта. Нельзя
 считать совпадение первого документа достаточным relevance gate.

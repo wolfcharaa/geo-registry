@@ -82,6 +82,11 @@ health probes в `ok`.
 различие Nominatim snapshots/candidate count, protected production backup
 restore, старые queues и operator traffic.
 
+По search recommendation уже подготовлена: первые четыре позиции должны
+совпадать, а одинаковый top-6 set принимается без фиксации порядка score-tie
+tail. Legacy сам ранжирует текущие позиции 5/6 с одинаковым score; окончательное
+принятие этого contract остаётся product/operator решением.
+
 ## Намеренно Deferred
 
 Data.Mos import/enrichment и импорт OSM aliases реализованы как optional
