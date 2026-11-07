@@ -477,7 +477,8 @@ blocking I/O в HTTP path.
 - [x] перенести OpenSearch blue-green reindex;
 - [x] заменить дочерний `php app.php` на новый console entrypoint;
 - [x] проверить cleanup/recovery при частичном failure;
-- [ ] добавить smoke-команды для import -> build -> search.
+- [x] добавить isolated integration smoke для import -> build -> search; full-data
+  operator commands остаются раздельными и не объединяются в опасный one-click.
 
 Готовность: полный dataset можно подготовить без Spiral/RoadRunner, HTTP process
 не выполняет blocking batch work.

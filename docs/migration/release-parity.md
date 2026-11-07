@@ -184,8 +184,9 @@ Application commit `12fb32a` прошёл один согласованный ta
 
 - `make check`: `114 tests / 544 assertions`;
 - `make contract`: `13 tests / 240 assertions`;
-- `make test-integration`: `19 tests / 259 assertions`; house fixture закрепил
-  полный top-3, unit fixture — единственный exact level `11` result;
+- `make test-integration`: `20 tests / 267 assertions`; isolated data-flow smoke
+  выполняет XML import -> partitioned build -> PostgreSQL search, house fixture
+  закрепляет полный top-3, unit fixture — единственный exact level `11` result;
 - `gar:integrity --regions=50,77 --deep --only-failed`: `13` checks,
   `failed=0`, `unavailable=0`;
 - `opensearch:status`: green cluster, alias

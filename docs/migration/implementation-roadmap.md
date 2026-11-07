@@ -1754,7 +1754,9 @@ E2.5 production delivery/cutover`.
 - [x] Проверить import -> read-model build -> OpenSearch rebuild -> API flow.
   Deep GAR integrity прошёл `13/13`, OpenSearch parity —
   `28649238/28649238`, `invalid_regions=0`; strict search подтвердил backend
-  `opensearch`, reverse — тот же GAR identity через target Nominatim.
+  `opensearch`, reverse — тот же GAR identity через target Nominatim. Отдельный
+  isolated integration smoke связывает XML import, partitioned build и
+  PostgreSQL search на representative fixture.
 - [x] Сравнить find/search/suggest/reverse responses на representative dataset.
   Find, selected suggest chain и search top-1 совпали; top-N/fuzzy/Nominatim
   differences перечислены в release parity matrix и ожидают approval.
