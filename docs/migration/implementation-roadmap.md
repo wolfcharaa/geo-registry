@@ -1646,8 +1646,10 @@ coordinate jobs с первой попытки и не создал jobs при 
 
 #### E2.3 — Operational CLI
 
-- [ ] Добавить `gar:status`: manifest/source inventory, operation checkpoints,
-  regional table/projection counts и Data.Mos/alias coverage.
+- [x] Добавить `gar:status`: manifest/source inventory, operation checkpoints,
+  regional table/projection counts и Data.Mos/alias coverage. Default быстрый режим
+  не сканирует 28,5 млн projection rows; `--exact` выполняет точную
+  release-сверку только для явно заданных `--regions`.
 - [ ] Добавить `gar:integrity` с region-aware quick/deep checks и fail-closed
   exit code для release gate.
 - [ ] Добавить `opensearch:status`: cluster health, alias targets, document

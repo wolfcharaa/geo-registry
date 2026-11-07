@@ -45,6 +45,7 @@ final class CliRuntimeModuleTest
         Assert::true(str_contains($console, 'migrate:history'));
         Assert::true(str_contains($console, 'migrate:mark'));
         Assert::true(str_contains($console, 'gar:import'));
+        Assert::true(str_contains($console, 'gar:status'));
         Assert::true(str_contains($console, 'gar:address-search:rebuild'));
         Assert::true(str_contains($console, 'datamos:address-registry:import'));
         Assert::true(str_contains($console, 'datamos:address-registry:enrich'));

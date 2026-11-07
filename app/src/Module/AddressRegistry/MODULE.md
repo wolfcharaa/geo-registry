@@ -197,6 +197,26 @@ scanned/written rows, итоговый physical row count, elapsed milliseconds 
 - Перед запуском применяются migrations и загружаются canonical GAR tables.
   PostgreSQL runtime обязан предоставлять `pg_trgm` и `ext-pgsql`.
 
+## Операционный Статус GAR
+
+`bin/app gar:status` читает последний import manifest, file checkpoints,
+последнюю shadow rebuild operation и региональные checkpoints. По умолчанию
+используются регионы `50,77`; другой ограниченный набор задаётся через
+`--regions=50,77`.
+
+Быстрый режим не сканирует многомиллионную `address_search`: актуальные
+projection/Data.Mos/alias/geocode counters выводятся как `not-scanned`, а
+последний зафиксированный rebuild count остаётся в `checkpoint_rows`. Для
+release-сверки `--exact` выполняет точные региональные агрегаты:
+
+```shell
+bin/app gar:status --regions=50,77 --exact
+```
+
+Команда read-only. Неизвестная строка `gar_versions` отображается как
+`gar_version=unknown`: import manifest hash при этом остаётся доступен и не
+подменяется вымышленной версией релиза.
+
 ## Поиск И Идентификация Адреса
 
 ### Поиск адреса по устойчивому идентификатору — `Capability/FindAddressById`
