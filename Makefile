@@ -2,6 +2,7 @@ SHELL := /bin/sh
 
 COMPOSE := docker/compose/dev.sh
 INTEGRATION_COMPOSE := docker/compose/integration.sh
+PRODUCTION_COMPOSE := docker/compose/prod.sh
 POSTGRES_TUNING_CHECK := docker/scripts/postgres-tuning-check.sh
 WORKER_CLI := $(COMPOSE) run --rm --no-deps app bin/app
 
@@ -29,6 +30,11 @@ config: ## Create local configuration when it is missing
 build: ## Build the PHP development image
 	$(COMPOSE) build app
 .PHONY: build
+
+build-production: guard-user ## Build the self-contained production image from the three-repository workspace
+	DOCKER_IMAGE_PREFIX="$(DOCKER_IMAGE_PREFIX)" RELEASE_VERSION="$(RELEASE_VERSION)" \
+		DOCKER_PLATFORM="$(DOCKER_PLATFORM)" docker/scripts/build-production-image.sh
+.PHONY: build-production
 
 install: guard-user ## Install Composer dependencies
 	$(COMPOSE) run --rm --no-deps app composer install
@@ -120,7 +126,26 @@ doctor: ## Validate the resolved Compose configuration
 		SERVER_MIN_FREE_GB= SERVER_MIN_MEMORY_GB= $(POSTGRES_TUNING_CHECK)
 	$(COMPOSE) config --quiet
 	$(INTEGRATION_COMPOSE) config --quiet
+	COMPOSE_ENV_FILE=config/prod.env.example \
+		RELEASE_ENV_FILE=docker/compose/prod/release.env.example \
+		$(PRODUCTION_COMPOSE) config --quiet
 .PHONY: doctor
+
+prod-config: guard-user ## Render and validate production Compose with explicit operator/release files
+	$(PRODUCTION_COMPOSE) config
+.PHONY: prod-config
+
+prod-up: guard-user ## Start the immutable production application processes only
+	$(PRODUCTION_COMPOSE) up --detach --remove-orphans
+.PHONY: prod-up
+
+prod-down: guard-user ## Stop production application processes without deleting data
+	$(PRODUCTION_COMPOSE) down --remove-orphans
+.PHONY: prod-down
+
+prod-ps: guard-user ## Show production application process status
+	$(PRODUCTION_COMPOSE) ps
+.PHONY: prod-ps
 
 postgres-doctor: guard-user ## Validate the selected PostgreSQL profile and host capacity
 	$(POSTGRES_TUNING_CHECK)

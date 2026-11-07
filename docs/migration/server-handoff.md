@@ -31,8 +31,10 @@ Git bundles, этого документа и manifest с branch, полными
 - локальные runtime artifacts и старые BoltDB queues.
 
 Это перенос исходного workspace, а не production image release и не offline
-release bundle. Текущий Compose остаётся development topology до отдельного
-production deployment slice с pinned images, backup и rollback mechanics.
+release bundle. Отдельный application-only production Compose уже описывает
+self-contained HTTP/worker image, resource/health policy и точный namespace
+prefix, но offline archive, checksum manifest, release switch, backup и rollback
+остаются отдельным delivery slice.
 
 ## Сборка На Текущей Машине
 

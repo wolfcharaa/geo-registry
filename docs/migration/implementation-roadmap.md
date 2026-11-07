@@ -1696,8 +1696,13 @@ nationwide import; региональный 50/77 path завершился бе
 
 #### E2.5 — Production Delivery И Decommission
 
-- [ ] Добавить production Compose/image topology отдельно от data-migration dev
+- [x] Добавить production Compose/image topology отдельно от data-migration dev
   topology, включая resource limits, health policy и immutable image refs.
+  Application-only Compose использует self-contained image из трёхрепозиторной
+  workspace, immutable OCI manifest digest, `pull_policy: never`, read-only
+  filesystem, bounded resources и readiness healthcheck. Полный registry path
+  поступает только через обязательный `DOCKER_IMAGE_PREFIX`; lifecycle
+  PostgreSQL, OpenSearch и Nominatim не связан с application release switch.
 - [ ] Перенести либо заменить legacy offline release archive, manifest,
   release switch и rollback procedure.
 - [ ] Зафиксировать backup/restore для application PostgreSQL, target

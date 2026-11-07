@@ -81,3 +81,17 @@ model.
 новые raw source-specific поля core contracts. Старые RoadRunner/BoltDB queues
 должны быть drained либо явно списаны в release window; само наличие нового
 PostgreSQL worker не закрывает этот gate.
+
+## Delivery Boundary
+
+Production Compose управляет только HTTP process и двумя workers одной release
+revision. PostgreSQL приложения, OpenSearch и Nominatim не являются дочерними
+services application release и не должны пересоздаваться при переключении
+image. Полный registry namespace передаётся как `DOCKER_IMAGE_PREFIX`; Compose
+не содержит deployment-specific владельца registry. Runtime configuration и
+release image metadata разделены.
+
+Точный contract сборки, resource/health policy и команды запуска описаны в
+[production-compose.md](../deployment/production-compose.md). Offline archive,
+checksum manifest, release switch и rollback пока остаются незакрытым E2.5
+gate и не подразумеваются самим наличием production Compose.

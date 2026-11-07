@@ -1,0 +1,84 @@
+name: "${COMPOSE_PROJECT_NAME:-geo-registry}"
+
+x-app-image: &app-image "${DOCKER_IMAGE_PREFIX:?Set the full registry namespace prefix}/app@${APP_IMAGE_DIGEST:?Set the immutable application image digest}"
+
+x-app-service: &app-service
+  image: *app-image
+  pull_policy: never
+  init: true
+  user: "10001:10001"
+  working_dir: /app
+  env_file:
+    - "${APP_ENV_FILE:?Set the absolute application environment file path}"
+  environment:
+    APP_NAME: "${APP_NAME:-geo-registry}"
+    APP_VERSION: "${RELEASE_VERSION:?Set the frozen release version}"
+    LOG_FORMAT: "${LOG_FORMAT:-json}"
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /app/var:rw,nosuid,size=64m,uid=10001,gid=10001,mode=0750
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-file: "${LOG_MAX_FILES:-5}"
+      max-size: "${LOG_MAX_SIZE:-20m}"
+  restart: unless-stopped
+
+services:
+  app:
+    <<: *app-service
+    command: ["bin/app"]
+    environment:
+      APP_LISTEN: "0.0.0.0:8080"
+      APP_NAME: "${APP_NAME:-geo-registry}"
+      APP_VERSION: "${RELEASE_VERSION:?Set the frozen release version}"
+      LOG_FORMAT: "${LOG_FORMAT:-json}"
+    ports:
+      - "${APP_BIND_HOST:-127.0.0.1}:${APP_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health/ready"]
+      interval: "${APP_HEALTH_INTERVAL:-10s}"
+      timeout: "${APP_HEALTH_TIMEOUT:-3s}"
+      retries: "${APP_HEALTH_RETRIES:-12}"
+      start_period: "${APP_HEALTH_START_PERIOD:-30s}"
+    mem_limit: "${APP_MEMORY_LIMIT:-1g}"
+    cpus: "${APP_CPUS:-2}"
+    pids_limit: "${APP_PIDS_LIMIT:-256}"
+    stop_grace_period: "${APP_STOP_GRACE_PERIOD:-30s}"
+
+  worker-address:
+    <<: *app-service
+    command:
+      - bin/app
+      - worker:run
+      - --transport=postgres
+      - --queue=address
+      - --flow=address_async
+      - --worker-id=geo-registry-address
+      - --worker-name=geo-registry-address
+      - --worker-group=geo-registry
+    mem_limit: "${WORKER_ADDRESS_MEMORY_LIMIT:-1g}"
+    cpus: "${WORKER_ADDRESS_CPUS:-2}"
+    pids_limit: "${WORKER_ADDRESS_PIDS_LIMIT:-256}"
+    stop_grace_period: "${WORKER_STOP_GRACE_PERIOD:-60s}"
+
+  worker-runtime:
+    <<: *app-service
+    command:
+      - bin/app
+      - worker:run
+      - --transport=postgres
+      - --queue=runtime
+      - --flow=runtime_async
+      - --worker-id=geo-registry-runtime
+      - --worker-name=geo-registry-runtime
+      - --worker-group=geo-registry
+    mem_limit: "${WORKER_RUNTIME_MEMORY_LIMIT:-1g}"
+    cpus: "${WORKER_RUNTIME_CPUS:-2}"
+    pids_limit: "${WORKER_RUNTIME_PIDS_LIMIT:-256}"
+    stop_grace_period: "${WORKER_STOP_GRACE_PERIOD:-60s}"

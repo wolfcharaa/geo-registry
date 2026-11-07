@@ -41,6 +41,7 @@ app/src/UserInterface/Http/            routes and JSON responses
 config/                                локальные настройки окружения
 docker/                                образы, Compose и smoke scripts
 docker/compose/dev/compose.yaml        development services
+docker/compose/prod/compose.yaml       immutable HTTP/worker runtime
 app/tests/Fixture/Database/             versioned synthetic parity data
 Makefile                               стабильный интерфейс команд
 ```
@@ -182,6 +183,11 @@ make smoke    # проверить запущенный HTTP service
 make smoke-release POSTMAN_ENVIRONMENT=config/release.postman_environment.json # strict Postman parity
 make server-source-bundle # собрать проверяемый source workspace для data server
 make server-preflight GAR_SOURCE=/data/gar SERVER_STORAGE_PATH=/data # read-only server gate
+make build-production DOCKER_IMAGE_PREFIX=registry.example/namespace/geo-registry RELEASE_VERSION=v0.1.0 # self-contained image
+make prod-config       # проверить production HTTP/worker topology
+make prod-up           # запустить exact prebuilt application image без pull/build
+make prod-ps            # показать production processes
+make prod-down          # остановить application processes без удаления данных
 make down     # остановить без удаления volumes
 ```
 
@@ -204,7 +210,12 @@ repositories. Он фиксирует exact revisions и не включает �
 Docker images или volumes. Сборка архива, восстановление соседней workspace
 структуры и fail-closed server preflight описаны в
 [server-handoff.md](docs/migration/server-handoff.md). Текущий Compose остаётся
-development topology и сам по себе не является production release artifact.
+data-migration development topology и сам по себе не является production
+release artifact. Отдельный production Compose запускает self-contained HTTP и
+worker image, не владеет lifecycle PostgreSQL/OpenSearch/Nominatim и получает
+полный image prefix только из deployment namespace. Его image/runtime contract,
+resource limits и безопасный wrapper описаны в
+[production-compose.md](docs/deployment/production-compose.md).
 
 Команды `migrate:*` входят только в `CliRuntime` и используют `DATABASE_DSN`.
 Они работают через blocking PDO и не включаются в HTTP/worker DIC graphs. База

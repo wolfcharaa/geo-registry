@@ -1,5 +1,6 @@
 /.env
 /config/.env
+/config/prod.env
 /config/release.postman_environment.json
 /app/.env
 /app/vendor/
@@ -8,6 +9,7 @@
 /.agents/
 /.idea/
 /compose.override.yaml
+/docker/compose/prod/release.env
 /docker/data/*
 !/docker/data/nominatim/
 /docker/data/nominatim/*
