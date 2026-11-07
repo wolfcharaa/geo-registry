@@ -6,6 +6,11 @@ PRODUCTION_COMPOSE := docker/compose/prod.sh
 POSTGRES_TUNING_CHECK := docker/scripts/postgres-tuning-check.sh
 WORKER_CLI := $(COMPOSE) run --rm --no-deps app bin/app
 DATA_HOST_PATH ?= $(CURDIR)/docker/data
+LOAD_CHECK_URL ?= http://127.0.0.1:8080/health/live
+LOAD_CHECK_REQUESTS ?= 1000
+LOAD_CHECK_CONCURRENCY ?= 32
+LOAD_CHECK_MAX_FAILURES ?= 0
+LOAD_CHECK_MAX_P95_MS ?= 250
 
 export HOST_UID ?= $(shell id -u)
 export HOST_GID ?= $(shell id -g)
@@ -253,6 +258,14 @@ server-preflight: guard-user ## Validate a data server without starting or chang
 smoke: ## Probe the running HTTP service and its integrations
 	APP_BASE_URL=$${APP_BASE_URL:-http://127.0.0.1:$${APP_PORT:-8080}} docker/scripts/smoke-check.sh
 .PHONY: smoke
+
+load-check: guard-user ## Run the bounded HTTP load gate inside the running app container
+	$(COMPOSE) exec app bin/app server:load-check "$(LOAD_CHECK_URL)" \
+		--requests="$(LOAD_CHECK_REQUESTS)" \
+		--concurrency="$(LOAD_CHECK_CONCURRENCY)" \
+		--max-failures="$(LOAD_CHECK_MAX_FAILURES)" \
+		--max-p95-ms="$(LOAD_CHECK_MAX_P95_MS)" $(LOAD_CHECK_FLAGS)
+.PHONY: load-check
 
 smoke-release: registry-check ## Run strict executable Postman parity against prepared release data
 	POSTMAN_COLLECTION="$(POSTMAN_COLLECTION)" \

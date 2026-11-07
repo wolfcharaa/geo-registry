@@ -122,6 +122,9 @@ Application commands выполняются из той же revision:
 ```shell
 docker/compose/prod.sh run --rm --no-deps app bin/app migrate:history
 docker/compose/prod.sh run --rm --no-deps app bin/app gar:integrity --regions=50,77
+docker/compose/prod.sh exec app bin/app server:load-check \
+  http://127.0.0.1:8080/health/live \
+  --requests=10000 --concurrency=64 --max-failures=0 --max-p95-ms=250 --json
 ```
 
 Миграции, import/rebuild и worker cutover выполняются только по соответствующим

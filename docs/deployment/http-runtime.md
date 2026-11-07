@@ -97,3 +97,48 @@ docker/compose/dev.sh logs app
 Development допускает `APP_HTTP_WORKERS=1`. Fallback на `StreamSelectDriver`
 допустим только для запуска кода вне project image; production image и release
 preflight требуют `EvDriver`, `ext-pq` и остальные runtime extensions.
+
+## Воспроизводимый Load/Fault Gate
+
+`server:load-check` создаёт bounded число concurrent GET requests штатным
+`amphp/http-client`, полностью читает каждый response body и возвращает non-zero
+exit code при превышении error budget или p95 threshold. Автоматические retries
+и redirects отключены: один attempt в отчёте означает один отправленный request.
+Response body ограничен 1 MiB по умолчанию, чтобы ошибочный endpoint не превратил
+нагрузочную проверку в неограниченное потребление памяти.
+
+Для development stack базовый gate запускается из отдельного CLI process в том
+же container/network namespace:
+
+```shell
+make load-check
+
+# Явный профиль и JSON для сохранения evidence:
+docker/compose/dev.sh exec app bin/app server:load-check \
+  http://127.0.0.1:8080/health/live \
+  --requests=10000 \
+  --concurrency=64 \
+  --max-failures=0 \
+  --max-p95-ms=250 \
+  --json
+```
+
+Команда измеряет клиентскую end-to-end latency с полным чтением body. Это
+release gate и инструмент сравнения конфигураций, но не замена внешнему тесту
+через production ingress: запуск внутри app container делит CPU с server.
+Сравнивать результаты можно только на одном host, dataset, endpoint, revision и
+профиле concurrency; cold и warm прогоны сохраняются отдельно.
+
+Автоматический fault gate входит в `make test-integration`: два worker-а делят
+socket, один завершает request budget, supervisor поднимает замену, после чего
+cluster штатно принимает `SIGTERM`. На работающем окружении controlled restart
+проверяется отдельно и не меняет container identity:
+
+```shell
+docker/compose/dev.sh kill --signal SIGUSR1 app
+make smoke
+docker/compose/dev.sh logs --tail=100 app
+```
+
+В логах ожидаются `http.cluster.restarting`, новые `http.server.started` с
+новыми `worker_id` и последующий успешный health/load gate.

@@ -47,6 +47,7 @@ final class HttpClusterRuntimeIntegrationTest
 
         try {
             $this->awaitLiveness($port);
+            [$loadExitCode, $loadOutput, $loadErrors] = $this->runLoadCheck($root, $port);
             $process->signal(SIGTERM);
             $exitCode = $process->join(new TimeoutCancellation(10));
         } finally {
@@ -60,6 +61,11 @@ final class HttpClusterRuntimeIntegrationTest
         Assert::same(substr_count($logs, '"message":"HTTP server started"'), 2, $logs);
         Assert::same(substr_count($logs, 'terminated cleanly'), 2, $logs);
         Assert::true(str_contains($logs, '"event":"http.cluster.stopped"'), $logs);
+        Assert::same($loadExitCode, 0, $loadErrors);
+        $loadReport = json_decode($loadOutput, true, flags: JSON_THROW_ON_ERROR);
+        Assert::true(is_array($loadReport));
+        Assert::same($loadReport['status'] ?? null, 'ok');
+        Assert::same($loadReport['attempts'] ?? null, 20);
     }
 
     public function testWorkerIsReplacedAfterItsRequestBudgetIsExhausted(): void
@@ -148,6 +154,40 @@ final class HttpClusterRuntimeIntegrationTest
         } finally {
             fclose($server);
         }
+    }
+
+    /** @return array{int, string, string} */
+    private function runLoadCheck(string $root, int $port): array
+    {
+        $process = Process::start(
+            [
+                PHP_BINARY,
+                $root . '/bin/app',
+                'server:load-check',
+                sprintf('http://127.0.0.1:%d/health/live', $port),
+                '--requests=20',
+                '--concurrency=4',
+                '--max-failures=0',
+                '--max-p95-ms=5000',
+                '--json',
+            ],
+            $root,
+            [
+                'NOMINATIM_ENABLED' => '0',
+                'OPENSEARCH_ENABLED' => '0',
+                'REVOLT_DRIVER' => 'Revolt\\EventLoop\\Driver\\StreamSelectDriver',
+            ],
+        );
+        $stdout = $this->capture($process->getStdout());
+        $stderr = $this->capture($process->getStderr());
+
+        try {
+            $exitCode = $process->join(new TimeoutCancellation(10));
+        } finally {
+            $process->kill();
+        }
+
+        return [$exitCode, $stdout->await(), $stderr->await()];
     }
 
     /** @return Future<string> */

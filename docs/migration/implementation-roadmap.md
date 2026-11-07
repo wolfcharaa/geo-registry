@@ -1,7 +1,7 @@
 # Roadmap реализации Geo Registry на AMPHP
 
 - Статус: `Active; production-like runtime hardening`
-- Версия документа: `0.66.0`
+- Версия документа: `0.67.0`
 - Обновлено: `2026-11-07`
 - Архитектурный план: [spiral-to-amphp.md](spiral-to-amphp.md)
 - Dependency baseline: [application-libraries.md](application-libraries.md)
@@ -1910,6 +1910,18 @@ dependency baseline поведения. G0 разрешает 21 migration и п
 contract artifacts, но не implementation code.
 
 ## История Документа
+
+### 0.67.0 — 2026-11-07
+
+- HTTP workers получили управляемую ротацию по request budget и RSS с
+  graceful завершением текущего response и автоматической заменой supervisor-ом;
+- production defaults ограничивают worker 10 000 requests или 256 MiB RSS,
+  development оставляет оба лимита отключёнными;
+- единый `bin/app` получил self-contained `server:load-check` с bounded
+  concurrency, полным чтением body, latency percentiles и fail-closed
+  error/p95 thresholds без retries и redirects;
+- integration gate доказывает общий socket, штатную замену worker-а, выполнение
+  load-команды против cluster runtime и graceful остановку.
 
 ### 0.66.0 — 2026-11-07
 

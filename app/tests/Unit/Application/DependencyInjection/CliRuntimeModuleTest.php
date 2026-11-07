@@ -57,6 +57,7 @@ final class CliRuntimeModuleTest
         Assert::true(str_contains($console, 'opensearch:reindex'));
         Assert::true(str_contains($console, 'opensearch:index:cleanup'));
         Assert::true(str_contains($console, 'opensearch:status'));
+        Assert::true(str_contains($console, 'server:load-check'));
         Assert::true(str_contains($console, 'server:run'));
         Assert::true(str_contains($console, 'worker:run'));
         Assert::true(str_contains($console, 'worker:status'));

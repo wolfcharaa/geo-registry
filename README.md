@@ -49,6 +49,7 @@ make install
 make up
 make migrate
 make smoke
+make load-check
 ```
 
 После migrations база содержит только schema. Пустой результат поиска на этом

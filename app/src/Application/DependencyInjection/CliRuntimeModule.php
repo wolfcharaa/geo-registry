@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Application\DependencyInjection;
 
+use Amp\Http\Client\HttpClient;
+use Amp\Http\Client\HttpClientBuilder;
 use Amp\Postgres\PostgresConnectionPool;
+use App\Application\Console\Command\HttpLoadCheckCommand;
+use App\Application\Console\Command\HttpLoadCheckRunner;
 use App\Application\Console\Command\MessageBusRegistryCheckCommand;
 use App\Application\Console\Command\RunHttpServerCommand;
 use App\Application\MessageBus\ApplicationRegistryCompiler;
@@ -104,6 +108,26 @@ final readonly class CliRuntimeModule implements Module
                 'clusterRuntimeProvider' => $dic->provider($clusterRuntime),
             ])
             ->tag(new CommandTag('server:run', 'Run the AMPHP HTTP server.'));
+        $loadHttpClient = $dic->object(
+            HttpClient::class,
+            static fn(): HttpClient => (new HttpClientBuilder())
+                ->retry(0)
+                ->followRedirects(0)
+                ->build(),
+        );
+        $loadRunner = $dic
+            ->object(HttpLoadCheckRunner::class)
+            ->args([
+                'httpClient' => $loadHttpClient,
+                'userAgent' => $dic->value($httpConfig->userAgent),
+            ]);
+        $dic
+            ->object(HttpLoadCheckCommand::class)
+            ->arg('runner', $loadRunner)
+            ->tag(new LegacyCommandTag(
+                'server:load-check',
+                'Run a bounded concurrent HTTP load gate without retries.',
+            ));
 
         $dic->import(new MigrationCliModule($postgresConfig));
         $dic->import(new GarImportCliModule($postgresConfig));
