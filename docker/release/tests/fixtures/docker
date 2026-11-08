@@ -56,13 +56,19 @@ case "${command_name}" in
     inspect)
         if [ "${1:-}" = --format ]; then
             case "${2:-}" in
-                '{{.State.Running}}') printf '%s\n' true ;;
+                '{{.State.Running}}') printf '%s\n' "${FAKE_DOCKER_CONTAINER_RUNNING:-true}" ;;
                 '{{.Config.Image}}') printf '%s\n' 'postgis:17-test' ;;
                 '{{.Id}}') printf '%s\n' 'sha256:postgres-test' ;;
                 '{{.Name}}') printf '/%s\n' "${FAKE_DOCKER_POSTGRES_CONTAINER:-geo-registry-postgres-test}" ;;
                 *) exit 65 ;;
             esac
         fi
+        ;;
+    port)
+        printf '%s\n' "${FAKE_DOCKER_PORT_BINDINGS:-}"
+        ;;
+    ps)
+        printf '%s\n' "${FAKE_DOCKER_PORT_OWNERS:-}"
         ;;
     exec)
         case " $* " in
@@ -118,14 +124,26 @@ case "${command_name}" in
         ;;
     compose)
         compose_command=
+        compose_service=
         for argument in "$@"; do
             case "${argument}" in
                 config|ps|run|stop|up) compose_command=${argument} ;;
+                app|postgres) compose_service=${argument} ;;
             esac
         done
-        if [ "${compose_command}" = ps ]; then
-            printf '%s\n' "${FAKE_DOCKER_POSTGRES_CONTAINER:-geo-registry-postgres-test}"
-        fi
+        case "${compose_command}" in
+            config)
+                if [ -n "${FAKE_DOCKER_COMPOSE_CONFIG_FILE:-}" ]; then
+                    cat "${FAKE_DOCKER_COMPOSE_CONFIG_FILE}"
+                fi
+                ;;
+            ps)
+                case "${compose_service}" in
+                    app) printf '%s\n' "${FAKE_DOCKER_APP_CONTAINER:-}" ;;
+                    *) printf '%s\n' "${FAKE_DOCKER_POSTGRES_CONTAINER:-geo-registry-postgres-test}" ;;
+                esac
+                ;;
+        esac
         ;;
     run)
         ;;

@@ -37,6 +37,23 @@ x-app-environment: &app-environment
 services: {}
 EOF
 
+cat >"${temporary_root}/compose.json" <<'EOF'
+{
+  "services": {
+    "app": {
+      "ports": [
+        {
+          "host_ip": "127.0.0.1",
+          "target": 8080,
+          "published": "8080",
+          "protocol": "tcp"
+        }
+      ]
+    }
+  }
+}
+EOF
+
 run_update() {
     PATH="${fixture_dir}:${PATH}" \
     FAKE_DOCKER_STATE="${state_file}" \
@@ -44,6 +61,7 @@ run_update() {
     FAKE_DOCKER_EXACT_LOADED=1 \
     FAKE_DOCKER_EXACT_IMAGE="${exact_image}" \
     FAKE_DOCKER_VERSION=v0.2.0 \
+    FAKE_DOCKER_COMPOSE_CONFIG_FILE="${temporary_root}/compose.json" \
     COMPOSE_ENV_FILE="${temporary_root}/prod.secrets.env" \
     RELEASE_ENV_FILE="${temporary_root}/release.env" \
     PRODUCTION_COMPOSE_MODEL="${temporary_root}/compose.yaml" \

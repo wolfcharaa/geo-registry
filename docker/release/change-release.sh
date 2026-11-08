@@ -89,6 +89,11 @@ if [ "${RELEASE_DRY_RUN:-0}" = 1 ]; then
     exit 0
 fi
 
+echo "Checking the configured HTTP host port immediately before activation."
+COMPOSE_ENV_FILE="${secrets_file}" \
+    RELEASE_ENV_FILE="${release_env_file}" \
+    "${script_dir}/deployment-port-preflight.sh"
+
 COMPOSE_ENV_FILE="${secrets_file}" \
     RELEASE_ENV_FILE="${release_env_file}" \
     "${project_root}/docker/compose/prod.sh" run --rm --no-deps app \

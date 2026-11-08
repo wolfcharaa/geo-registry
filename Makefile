@@ -85,6 +85,9 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/release/initialize-deployment-data.sh \
 		docker/release/create-deployment-backup.sh \
 		docker/release/deployment-data-status.sh \
+		docker/release/deployment-http-binding.sh \
+		docker/release/deployment-port-preflight.sh \
+		docker/release/deployment-smoke.sh \
 		docker/release/prepare-deployment-image.sh \
 		docker/release/restore-deployment-data.sh \
 		docker/release/update-deployment.sh \
@@ -101,18 +104,23 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/release/tests/change-release-offline-test.sh \
 		docker/release/tests/deployment-data-status-test.sh \
 		docker/release/tests/deployment-backup-test.sh \
+		docker/release/tests/deployment-port-preflight-test.sh \
 		docker/release/tests/update-deployment-test.sh \
 		docker/release/tests/init-deployment-test.sh \
 		docker/release/tests/restore-progress-test.sh \
-		docker/release/tests/fixtures/docker
+		docker/release/tests/fixtures/docker \
+		docker/release/tests/fixtures/ss
 	docker/release/tests/backup-progress-test.sh
 	docker/release/tests/change-release-offline-test.sh
 	docker/release/tests/deployment-data-status-test.sh
 	docker/release/tests/deployment-backup-test.sh
+	docker/release/tests/deployment-port-preflight-test.sh
 	docker/release/tests/init-deployment-test.sh
 	docker/release/tests/restore-progress-test.sh
 	docker/release/tests/update-deployment-test.sh
 	test -f docs/deployment/offline-release.md
+	test -f docs/deployment/deploy-from-sources.md
+	test -f docs/deployment/deploy-with-backup.md
 	test -f docs/deployment/release-deploy.md
 	test -f docs/deployment/troubleshooting.md
 .PHONY: release-check
@@ -141,6 +149,14 @@ deploy-image: guard-user ## Pull or load and verify the frozen application image
 	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" DOCKER_PLATFORM="$(DOCKER_PLATFORM)" \
 		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" docker/release/prepare-deployment-image.sh
 .PHONY: deploy-image
+
+deploy-port-preflight: guard-user ## Fail early when the configured production HTTP host port is unavailable
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" docker/release/deployment-port-preflight.sh
+.PHONY: deploy-port-preflight
+
+deploy-smoke: guard-user ## Probe the production HTTP binding resolved from Compose YAML
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" docker/release/deployment-smoke.sh
+.PHONY: deploy-smoke
 
 deploy-restore: guard-user ## Discover, verify and restore release PostgreSQL data through production Compose
 	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" docker/release/restore-deployment-data.sh $(DEPLOY_RESTORE_FLAGS)
@@ -234,21 +250,23 @@ data-status: guard-user ## Show live GAR import/rebuild checkpoints and active P
 .PHONY: data-status
 
 deploy-start: guard-user ## Verify restored data, activate the immutable application and run health smoke
-	@echo "==> [1/7] Checking that PostgreSQL restore is inactive and physically valid"
+	@echo "==> [1/8] Checking the configured HTTP host port before expensive data gates"
+	$(MAKE) deploy-port-preflight
+	@echo "==> [2/8] Checking that PostgreSQL restore is inactive and physically valid"
 	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" DEPLOY_DATA_REQUIRE_READY=1 \
 		docker/release/deployment-data-status.sh
-	@echo "==> [2/7] Verifying the frozen application image"
+	@echo "==> [3/8] Verifying the frozen application image"
 	$(MAKE) verify-release DOCKER_PLATFORM="$${DOCKER_PLATFORM:-linux/amd64}"
-	@echo "==> [3/7] Reading migration history from the restored database"
+	@echo "==> [4/8] Reading migration history from the restored database"
 	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance bin/app migrate:history
-	@echo "==> [4/7] Running deep GAR integrity gates for regions 50 and 77"
+	@echo "==> [5/8] Running deep GAR integrity gates for regions 50 and 77"
 	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance bin/app gar:integrity --regions=50,77 --deep --only-failed
-	@echo "==> [5/7] Checking exact regional status and projection parity"
+	@echo "==> [6/8] Checking exact regional status and projection parity"
 	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance bin/app gar:status --regions=50,77 --exact
-	@echo "==> [6/7] Activating application and worker processes"
+	@echo "==> [7/8] Activating application and worker processes"
 	$(MAKE) change-release DOCKER_PLATFORM="$${DOCKER_PLATFORM:-linux/amd64}"
-	@echo "==> [7/7] Running HTTP smoke checks"
-	$(MAKE) smoke
+	@echo "==> [8/8] Running HTTP smoke checks against the Compose host binding"
+	$(MAKE) deploy-smoke
 	@echo "==> Deployment start completed"
 .PHONY: deploy-start
 
@@ -262,7 +280,7 @@ deploy-update: guard-user ## Quiesce and update an existing managed deployment i
 	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" DOCKER_PLATFORM="$(DOCKER_PLATFORM)" \
 		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
 		docker/release/update-deployment.sh $(DEPLOY_UPDATE_FLAGS)
-	$(MAKE) smoke
+	$(MAKE) deploy-smoke
 .PHONY: deploy-update
 
 change-release: guard-user ## Verify/load the frozen image and recreate application processes only

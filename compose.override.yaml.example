@@ -3,6 +3,7 @@
 # Never override image or APP_VERSION: they are frozen release identity.
 services:
   app:
+    # make deploy-port-preflight and make deploy-smoke resolve this YAML binding.
     ports: !override
       - 0.0.0.0:8080:8080
     environment:

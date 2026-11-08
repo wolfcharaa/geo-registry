@@ -13,6 +13,11 @@
   фазы и отдельный `make data-status` для checkpoint/activity diagnostics.
 - Повторный `data-restore` больше не повышает роль владельца уже существующей
   БД и направляет оператора к проверке сохранившегося результата.
+- Activation получил ранний и повторный preflight фактического Compose HTTP
+  binding с диагностикой listener/container; production smoke использует тот
+  же YAML port.
+- Сценарии нового сервера разделены на самостоятельные линейные runbooks для
+  готового PostgreSQL backup и полного наполнения из официальных источников.
 
 ## [0.2.2] - 2026-11-08
 

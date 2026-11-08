@@ -110,6 +110,34 @@ restore не добавляйте `--remove-orphans`: старый container и�
 быть нужен для rollback. Сначала завершите `deploy-start`, проверьте сервис и
 закройте rollback window; cleanup выполняется отдельным осознанным действием.
 
+## Ошибка `bind: address already in use` Возникла В Конце Запуска
+
+В актуальном deployment-контракте этот конфликт проверяется до migration/GAR
+gates и повторно непосредственно перед activation:
+
+```shell
+make deploy-port-preflight
+```
+
+Команда читает итоговый `services.app.ports`, показывает host binding,
+listeners и Docker containers, публикующие тот же port. Контейнер текущего
+managed приложения распознаётся как допустимый владелец; посторонний listener
+останавливает запуск.
+
+Если владельца порта нельзя остановить, задайте другой несекретный binding в
+ignored YAML:
+
+```yaml
+services:
+  app:
+    ports: !override
+      - 127.0.0.1:18080:8080
+```
+
+Повторите `make deploy-port-preflight`, затем `make deploy-start`. Финальный
+`make deploy-smoke` автоматически использует `18080`; передавать `APP_PORT` в
+shell session не требуется.
+
 ## `make release-download`: Нет Такого Target
 
 Команды являются частью конкретного Git tag. Не переносите отдельный Makefile
@@ -201,3 +229,8 @@ make deploy-start
 
 Альтернатива без готового backup — `data-init`, официальный GAR download/import,
 `data-address-rebuild`, optional `data-opensearch`, затем `deploy-start`.
+
+Эти пути вынесены в два самостоятельных документа:
+
+- [развёртывание с готовым PostgreSQL backup](deploy-with-backup.md);
+- [наполнение нового сервера из официальных источников](deploy-from-sources.md).

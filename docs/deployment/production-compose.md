@@ -107,4 +107,13 @@ make data-opensearch
 Так повторный `docker compose up -d` остаётся идемпотентным и никогда не
 перезаписывает БД или индекс.
 
-Полный линейный runbook: [release-deploy.md](release-deploy.md).
+Перед первой активацией `make deploy-port-preflight` читает фактический HTTP
+binding из объединённого Compose YAML, включая ignored override. Production
+smoke использует тот же binding, поэтому изменение host port не требует
+session env.
+
+Отдельные линейные runbooks:
+
+- [сервер с готовым PostgreSQL backup](deploy-with-backup.md);
+- [сервер с наполнением из официальных источников](deploy-from-sources.md);
+- [обновление и общий release contract](release-deploy.md).

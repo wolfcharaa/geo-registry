@@ -5,21 +5,26 @@ Production-контракт использует обычный Docker Compose. 
 `compose.override.yaml`, а `config/prod.secrets.env` содержит только пароли и
 API keys.
 
-Требуются Linux, Git, Make, Docker Engine и Docker Compose `2.24.4+`. Команды
-выполняются non-root deployment user с доступом к Docker.
+Требуются Linux, Git, Make, Docker Engine, Docker Compose `2.24.4+` и `ss` из
+пакета `iproute2`. Команды выполняются non-root deployment user с доступом к
+Docker.
 
 ## Выберите Сценарий
 
 | Сценарий | Путь |
 | --- | --- |
-| Новый сервер с готовым PostgreSQL backup | `deploy-init` → `deploy-image` → `data-restore` → `deploy-start` |
-| Новый сервер с официальными источниками | `deploy-init` → `deploy-image` → `data-init` → import/rebuild → `deploy-start` |
+| Новый сервер с готовым PostgreSQL backup | [Отдельный линейный runbook](deploy-with-backup.md): `deploy-init` → `deploy-image` → `data-restore` → `deploy-start` |
+| Новый сервер с официальными источниками | [Отдельный линейный runbook](deploy-from-sources.md): `deploy-init` → `deploy-image` → `data-init` → import/rebuild → `deploy-start` |
 | Обновление уже managed Compose deployment | `deploy-image` → `deploy-update-preflight` → `deploy-update` |
 | Переход с `v0.2.1` или вручную восстановленной БД | сохранить старый контур → создать/проверить backup → восстановить его в новый managed volume → `deploy-start` |
 
 Не смешивайте эти пути. `data-restore` создаёт отсутствующую БД и отказывается
 перезаписывать существующую. `deploy-update` требует уже существующую managed
 БД `geo_registry` и никогда не используется для первого запуска.
+
+Перед обоими сценариями `make deploy-port-preflight` проверяет фактический
+`services.app.ports` из итогового Compose YAML. `deploy-start` выполняет эту
+проверку до дорогих data gates и повторяет непосредственно перед activation.
 
 ## Получить Exact Tag
 
@@ -65,6 +70,11 @@ registry.
 
 ## Новый Сервер: Восстановить Готовые Данные
 
+Полный самостоятельный сценарий с передачей каталога, host paths, port
+preflight, restore recovery и OpenSearch находится в
+[runbook развёртывания с готовым backup](deploy-with-backup.md). Ниже оставлен
+краткий контракт команд.
+
 Положите проверенный backup-каталог в `docker/data/backups/`. Он содержит:
 
 ```text
@@ -104,6 +114,11 @@ make data-restore-status
 ```
 
 ## Новый Сервер: Наполнить БД Из Источников
+
+Полный самостоятельный сценарий с расположением GAR/Data.Mos, внешним `/data`
+bind, checkpoints, backup результата и optional OpenSearch находится в
+[runbook наполнения из официальных источников](deploy-from-sources.md). Ниже
+оставлен краткий контракт команд.
 
 Вместо restore выберите fresh path:
 
@@ -163,11 +178,13 @@ services:
 После restore/import и optional OpenSearch:
 
 ```shell
+make deploy-port-preflight
 make deploy-start
 ```
 
-Команда повторно проверяет frozen image, migration history, GAR integrity и
-exact status регионов `50,77`, активирует только application processes через
+Первая команда заранее проверяет host binding из Compose YAML. `deploy-start`
+повторно проверяет port, frozen image, migration history, GAR integrity и exact
+status регионов `50,77`, активирует только application processes через
 `change-release` и завершает путь HTTP smoke. Она не восстанавливает и не
 перезаписывает данные.
 
@@ -274,6 +291,8 @@ secret contract соответственно.
 
 ## Recovery И Диагностика
 
+- `make deploy-port-preflight` — до data gates показать resolved HTTP binding и
+  остановиться, если порт занят посторонним listener/container;
 - `make data-restore-status` — определить, продолжается ли restore, завершён ли
   он и какой шаг безопасен дальше;
 - `make data-status` — показать GAR checkpoints, активные statements и COPY

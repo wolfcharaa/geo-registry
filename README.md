@@ -32,6 +32,9 @@ geocoding.
 8. [Разобрать проблему развёртывания](docs/deployment/troubleshooting.md) —
    понять, работает ли restore/import, безопасно пережить потерю SSH и выбрать
    следующий шаг без ручных SQL-команд.
+9. [Развернуть готовый PostgreSQL backup](docs/deployment/deploy-with-backup.md)
+   или [наполнить новый сервер из источников](docs/deployment/deploy-from-sources.md)
+   — использовать отдельный линейный runbook без смешивания сценариев.
 
 ## Production Быстрый Запуск
 
@@ -40,6 +43,7 @@ geocoding.
 ```shell
 make deploy-init
 make deploy-image DOCKER_PLATFORM=linux/amd64
+make deploy-port-preflight
 make data-restore
 make deploy-start
 ```
@@ -185,6 +189,8 @@ make worker-logs
 - [Source release](docs/deployment/source-release.md)
 - [Offline release](docs/deployment/offline-release.md)
 - [Развёртывание релиза с готовыми данными](docs/deployment/release-deploy.md)
+- [Новый сервер с готовым PostgreSQL backup](docs/deployment/deploy-with-backup.md)
+- [Новый сервер с наполнением из источников](docs/deployment/deploy-from-sources.md)
 - [Диагностика развёртывания](docs/deployment/troubleshooting.md)
 
 Исторические сравнения, benchmark и migration evidence находятся в
