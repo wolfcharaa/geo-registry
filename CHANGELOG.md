@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-08
+
 - Длительные PostgreSQL backup и restore теперь печатают периодический
   heartbeat с elapsed time, размером результата и текущим состоянием PostgreSQL.
 - Добавлена read-only команда `make data-restore-status`, которая распознаёт
@@ -81,5 +83,6 @@
 [0.1.0]: https://github.com/wolfcharaa/geo-registry/releases/tag/v0.1.0
 [0.2.0]: https://github.com/wolfcharaa/geo-registry/compare/v0.1.0...v0.2.0
 [0.2.2]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.1...v0.2.2
+[0.2.3]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.2...v0.2.3
 [0.2.1]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.0...v0.2.1
-[Unreleased]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.3...HEAD
