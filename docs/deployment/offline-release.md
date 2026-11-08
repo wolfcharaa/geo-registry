@@ -57,26 +57,27 @@ make build-production \
   DOCKER_PLATFORM=linux/amd64
 ```
 
-Команда печатает `APP_IMAGE_DIGEST`. Этот digest фиксируется отдельно:
+Команда печатает `APP_IMAGE_DIGEST`. Этот digest и registry prefix фиксируются
+в tracked release identity:
 
 ```shell
-cp config/prod.env.example config/prod.env
-# Указать в config/prod.env тот же полный DOCKER_IMAGE_PREFIX.
 make freeze-release \
+  DOCKER_IMAGE_PREFIX=registry.example/namespace/geo-registry \
   RELEASE_VERSION=v1.0.0 \
   APP_IMAGE_DIGEST=sha256:<digest> \
   DOCKER_PLATFORM=linux/amd64
 ```
 
 Freeze проверяет exact local image, platform, runtime extensions, autoload и
-совпадение image source revision с текущим HEAD. Он меняет только tracked
+совпадение image source revision с текущим HEAD. Он атомарно фиксирует exact
+image/version в production Compose и дублирует проверяемую identity в tracked
 `docker/compose/prod/release.env`. После review создаётся отдельный release
 commit и новый annotated tag:
 
 ```shell
 git status --short
-git diff -- docker/compose/prod/release.env
-git add docker/compose/prod/release.env
+git diff -- docker/compose/prod/compose.yaml docker/compose/prod/release.env
+git add docker/compose/prod/compose.yaml docker/compose/prod/release.env
 git commit -m "CHORE(release): Зафиксирован релиз v1.0.0"
 git tag -a v1.0.0 -m "Release v1.0.0"
 ```
@@ -188,16 +189,18 @@ make extract-release-data \
 с обычными `verify-data-backup` и `restore-data-shadow`. Restore не выполняется
 автоматически и не может затронуть действующую БД.
 
-Перед изменением runtime создать ignored `config/prod.env`, проверить schema
+Перед изменением runtime создать ignored secret-файл, проверить schema
 compatibility и выполнить read-only release gate:
 
 ```shell
-make verify-release
+make deploy-init
+make deploy-image
 ```
 
 Если tag уже связан с frozen registry digest, archive не требуется. В offline
-сценарии команда fail-closed проверяет manifest и SHA-256 до `docker load`, а
-затем проверяет загруженный version tag, platform, OCI version label и runtime.
+сценарии `deploy-image` fail-closed проверяет manifest и SHA-256 до
+`docker load`, а затем проверяет загруженный version tag, platform, OCI version
+label и runtime.
 `docker load` не обязан восстанавливать registry `RepoDigest`, поэтому offline
 проверка не пытается использовать `repository@digest` как локальное имя.
 Фактическое переключение:
@@ -233,7 +236,7 @@ Rollback использует тот же механизм, а не отдель
 3. распаковать предыдущий offline archive в отдельный каталог;
 4. получить предыдущий annotated tag из его bundle и checkout tag;
 5. положить предыдущие payload/manifest в его versioned ignored directory;
-6. выполнить `make verify-release`, затем `make change-release`;
+6. выполнить `make deploy-image`, затем `make change-release`;
 7. повторить health, worker и release parity smoke.
 
 Code rollback никогда не удаляет PostgreSQL, Nominatim или OpenSearch volumes.

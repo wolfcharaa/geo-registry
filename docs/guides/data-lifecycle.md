@@ -12,6 +12,30 @@ OSM aliases, Nominatim и OpenSearch подключаются после баз�
 import: используйте [development bootstrap из готового backup](development-data-bootstrap.md),
 а затем заново постройте OpenSearch из восстановленного `address_search`.
 
+## Линейный Production-Путь
+
+Production Compose предоставляет одноразовый maintenance service. После
+`make deploy-init` и `make deploy-image` полный fresh-data путь не требует
+session exports:
+
+```shell
+make data-init
+make data-gar-releases
+make data-gar-download GAR_URL='<full_xml_url>'
+make data-gar-import
+make data-address-rebuild
+make data-datamos-download   # optional, key берётся из secret-файла
+make data-datamos-import     # optional
+make data-address-rebuild    # после enrichment
+make data-opensearch         # optional projection
+make deploy-start
+```
+
+Несекретные параметры и resource limits меняются в Compose YAML/ignored
+`compose.override.yaml`; `config/prod.secrets.env` содержит только passwords и
+API keys. Разделы ниже объясняют происхождение данных, checkpoints и отдельные
+низкоуровневые команды development runtime.
+
 ## Какие Данные Нужны
 
 | Слой | Источник | Для чего |

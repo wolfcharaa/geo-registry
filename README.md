@@ -30,18 +30,36 @@ geocoding.
 7. [Перейти с legacy](docs/migration/from-legacy.md) — сопоставить старые и
    новые команды, данные и ограничения.
 
-## Быстрый Запуск
+## Production Быстрый Запуск
 
-Приложение `v0.1.x` получает обе MessageBus-библиотеки из Packagist. Достаточно
+Новый сервер с готовым backup:
+
+```shell
+make deploy-init
+make deploy-image DOCKER_PLATFORM=linux/amd64
+make data-restore
+make deploy-start
+```
+
+`compose.yaml` содержит production defaults, `compose.override.yaml` —
+необязательные host-specific несекретные изменения, а
+`config/prod.secrets.env` содержит только пароли и API keys. Подробный линейный
+сценарий, отдельный путь обновления существующего deployment и импорт из
+официальных источников находятся в
+[руководстве развёртывания](docs/deployment/release-deploy.md).
+
+## Development Быстрый Запуск
+
+Приложение получает обе MessageBus-библиотеки из Packagist. Достаточно
 клонировать один repository:
 
 ```shell
-git clone --branch v0.1.0 \
+git clone --branch v0.2.2 \
   https://github.com/wolfcharaa/geo-registry.git
 cd geo-registry
 ```
 
-`app/composer.lock` фиксирует опубликованные `v0.1.0`; `make install` загружает
+`app/composer.lock` фиксирует опубликованные версии; `make install` загружает
 их как обычные Composer dist packages. Все требования описаны в
 [руководстве первого запуска](docs/guides/getting-started.md):
 

@@ -1,157 +1,110 @@
 # Production Compose
 
-Production-контур запускает только immutable application processes: HTTP и два
-PostgreSQL workers. Application PostgreSQL, OpenSearch и Nominatim живут
-отдельно и не входят в release switch приложения. Поэтому обычное обновление
-кода не пересоздаёт их containers, volumes или данные.
+Production runtime запускается нативной командой:
+
+```shell
+docker compose --env-file config/prod.secrets.env up -d
+```
+
+Корневой `compose.yaml` подключает production model и frozen `release.env`.
+Оператор передаёт только ignored secret-файл; обычные настройки не дублируются
+в shell session или env-файле.
+
+## Состав
+
+По умолчанию Compose управляет:
+
+- PostgreSQL 17/PostGIS с persistent `geo-registry-postgres-data`;
+- immutable HTTP application;
+- двумя PostgreSQL workers.
+
+Профиль `opensearch` добавляет OpenSearch с отдельным persistent volume, а
+профиль `maintenance` предоставляет одноразовый CLI container с read/write
+bind на `docker/data`. Maintenance не является long-running service.
+
+```shell
+docker compose --env-file config/prod.secrets.env \
+  --profile opensearch up -d opensearch
+docker compose --env-file config/prod.secrets.env \
+  run --rm maintenance bin/app list
+```
+
+## Где Находятся Настройки
+
+`docker/compose/prod/compose.yaml` хранит non-secret defaults: endpoints,
+feature flags, resource budgets, PostgreSQL tuning, ports, healthchecks и
+volumes. `docker/compose/prod/release.env` содержит только frozen image prefix,
+tag, digest и release version и изменяется release tooling.
+
+Секреты создаются один раз:
+
+```shell
+make deploy-init
+```
+
+Файл `config/prod.secrets.env` содержит только:
+
+- application PostgreSQL password;
+- PostgreSQL admin password;
+- optional Data.Mos/OpenSearch credentials.
+
+Host-specific несекретные изменения выполняются YAML override:
+
+```shell
+cp compose.override.yaml.example compose.override.yaml
+```
+
+Файл ignored и автоматически подхватывается Docker Compose. Например, в нём
+можно изменить bind address, число HTTP workers, `/data` path или OpenSearch
+heap. Secrets в override не записываются; `image` и `APP_VERSION` также нельзя
+переопределять, потому что это frozen release identity.
 
 ## Image Contract
 
-Production image собирается из одного application repository. Build stage
-выполняет `composer install --prefer-dist` по `app/composer.lock` и получает
-зафиксированные MessageBus packages из Packagist:
+Application reference и `APP_VERSION` зафиксированы непосредственно в tracked
+Compose YAML и сверяются с `release.env`; secret-файл и shell environment не
+могут выбрать другой tag. Image имеет `pull_policy: never`.
 
-```text
-geo-registry/
-├── app/composer.json
-├── app/composer.lock
-└── docker/php/production.Dockerfile
-```
-
-`docker/php/production.Dockerfile` встраивает готовый `vendor` в image.
-Итоговый runtime не зависит от исходного checkout, host bind mounts или
-Composer network во время запуска. Для самой сборки нужен доступ к Packagist и
-GitHub dist archives. PHP и Composer build images закреплены
-multi-architecture digest-ами, а OCI labels сохраняют source references обеих
-библиотек из lock.
-
-Префикс image задаётся только целиком через `DOCKER_IMAGE_PREFIX`. Он уже должен
-содержать registry host и полный namespace проекта; Compose не добавляет к нему
-владельца или организацию:
-
-```dotenv
-DOCKER_IMAGE_PREFIX=registry.example/namespace/geo-registry
-```
-
-Префикс хранится в ignored `config/prod.env`. Tracked
-`docker/compose/prod/release.env` содержит только frozen identity релиза:
-
-```dotenv
-APP_IMAGE_TAG=v0.1.0-linux-amd64
-APP_IMAGE_DIGEST=sha256:<64-hex-characters>
-RELEASE_VERSION=v0.1.0
-COMPOSE_PROJECT_NAME=geo-registry
-```
-
-Один tracked release-файл указывает на один frozen version tag и его OCI
-manifest digest. Connected release gate проверяет соответствие tag registry
-digest-у. Offline gate проверяет SHA-256 Docker archive, загружает из него тот
-же tag и проверяет platform, version label и runtime. Compose запускает только
-этот локально проверенный tag с `pull_policy: never`: отсутствующий image
-является ошибкой, а не причиной неявно скачать другой build. Это разделение
-необходимо, потому что `docker save`/`docker load` переносит repository tag, но
-не обязано восстанавливать registry `RepoDigest` на другом image store.
-Checksum manifest и offline archive создаются отдельным release workflow,
-описанным в [offline-release.md](offline-release.md).
-
-Сборка требует clean application repository и отклоняет оставшиеся Composer
-path packages:
+Оператор использует одну команду:
 
 ```shell
-make build-production \
-  DOCKER_IMAGE_PREFIX=registry.example/namespace/geo-registry \
-  RELEASE_VERSION=v0.1.0 \
-  DOCKER_PLATFORM=linux/amd64
+make deploy-image
 ```
 
-Поддерживаются `linux/amd64` и `linux/arm64`. Tag получает platform suffix,
-например `v0.1.0-linux-amd64`.
+При полном offline payload она проверяет archive checksum до `docker load`, а
+при его отсутствии выполняет explicit registry pull. Обычный
+`docker compose up` не заменяет application image непроверенным pull.
 
-## Runtime Configuration
+PostgreSQL и OpenSearch images закреплены digest-ами. Persistent volumes не
+удаляются командами release switch. `docker/compose/prod.sh` остаётся защитной
+обёрткой для release tooling и запрещает `--build` и удаление volumes, но для
+обычного запуска не обязателен.
 
-Runtime endpoints, credentials, feature flags и resource overrides находятся в
-отдельном ignored `config/prod.env`:
+## Data Lifecycle
+
+Long-running runtime не восстанавливает и не импортирует данные автоматически.
+На новом сервере оператор выбирает один явный путь:
 
 ```shell
-cp config/prod.env.example config/prod.env
+make data-restore
 ```
 
-Placeholder credentials и endpoints нужно заменить до запуска. Runtime env
-намеренно не может содержать `APP_IMAGE_TAG`, `APP_IMAGE_DIGEST` или
-`RELEASE_VERSION`: secrets/configuration не выбирают revision приложения.
-`DOCKER_IMAGE_PREFIX` является только полным deployment namespace и сам по себе
-не выбирает release.
-
-Если Nominatim или OpenSearch отсутствуют на конкретном deployment, нужно явно
-задать `NOMINATIM_ENABLED=0` или `OPENSEARCH_ENABLED=0`. Тогда HTTP graph и
-readiness не выполняют сетевые запросы к отключённому service.
-
-HTTP process является supervisor-ом с двумя worker processes по умолчанию.
-Workers разделяют listening socket, но каждый собирает собственный Thesis DIC
-graph и PostgreSQL pool; supervisor application graph и pool не создаёт.
-Production image использует `ext-uv + ext-pgsql`, а process/socket/resource budgets
-задаются через `APP_HTTP_*`, `HTTP_DATABASE_POOL_SIZE` и
-`WORKER_DATABASE_POOL_SIZE`. Полный контракт и формула PostgreSQL capacity
-описаны в [production-like HTTP runtime](http-runtime.md).
-
-## Проверка И Запуск
-
-На connected target exact image загружается отдельной явной командой; Compose
-никогда не выполняет implicit pull:
+или:
 
 ```shell
-make release-pull DOCKER_PLATFORM=linux/amd64
-make verify-release DOCKER_PLATFORM=linux/amd64
+make data-init
+make data-gar-releases
+make data-gar-download GAR_URL='<full_xml_url>'
+make data-gar-import
+make data-address-rebuild
+make data-opensearch
 ```
 
-Для offline target `make verify-release` проверяет manifest/checksum и загружает
-image из `docker/data/release/<tag>/`, если registry digest отсутствует
-локально. После `docker load` проверяется frozen tag; наличие `RepoDigest` для
-offline image не требуется.
+`data-restore` и `data-init` сами запускают managed PostgreSQL. Для уже
+инициализированного deployment используется отдельный `make deploy-update`,
+который отказывается работать без существующей `geo_registry`.
 
-```shell
-make prod-config
-make prod-up
-make prod-ps
-make prod-down
-```
+Так повторный `docker compose up -d` остаётся идемпотентным и никогда не
+перезаписывает БД или индекс.
 
-Wrapper требует non-root deployment user, автоматически добавляет `--no-build`
-и `--pull never`, отклоняет `--build`, а также запрещает `down -v` и `rm -v`.
-Прямой Compose остаётся доступен:
-
-```shell
-APP_ENV_FILE="$(pwd)/config/prod.env" docker compose \
-  --env-file config/prod.env \
-  --env-file docker/compose/prod/release.env \
-  -f docker/compose/prod/compose.yaml \
-  config
-```
-
-HTTP публикуется на loopback по умолчанию и считается healthy только после
-успешного `/health/ready`. Для HTTP и workers заданы отдельные CPU, memory,
-process и shutdown budgets. Filesystem image read-only; writable временные
-каталоги ограничены tmpfs. Все capabilities удалены, включён
-`no-new-privileges`, JSON logs имеют rotation limits.
-
-Application commands выполняются из той же revision:
-
-```shell
-docker/compose/prod.sh run --rm --no-deps app bin/app migrate:history
-docker/compose/prod.sh run --rm --no-deps app bin/app gar:integrity --regions=50,77
-docker/compose/prod.sh exec app bin/app server:load-check \
-  http://127.0.0.1:8080/health/live \
-  --requests=10000 --concurrency=64 --max-failures=0 --max-p95-ms=250 --json
-```
-
-Миграции, import/rebuild и worker cutover выполняются только по соответствующим
-runbooks. Production Compose не является backup PostgreSQL, Nominatim или
-OpenSearch и не удаляет их данные. Offline release может по явному флагу нести
-application PostgreSQL dump, но Compose никогда не восстанавливает его
-автоматически. Проверяемый порядок создания logical dumps, shadow restore и
-rebuild OpenSearch описан в
-[data-backup-restore.md](data-backup-restore.md).
-
-Сквозной новый deployment с checkout tag, shadow restore, OpenSearch rebuild и
-финальным smoke описан в [release-deploy.md](release-deploy.md). Это основной
-operator runbook; текущий документ описывает только application Compose.
+Полный линейный runbook: [release-deploy.md](release-deploy.md).

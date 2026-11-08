@@ -71,6 +71,18 @@ manifest до публикации обычного backup-каталога.
 
 ## Read-only Preflight
 
+Для managed production Compose используйте короткий контракт. Он сам выбирает
+service `postgres`, БД `geo_registry` и owner `geo_registry`:
+
+```shell
+make data-backup-preflight BACKUP_ROOT=/srv/backups/geo-registry
+make data-backup BACKUP_ROOT=/srv/backups/geo-registry
+```
+
+Без `BACKUP_ROOT` каталог создаётся в `docker/data/backups/`. Следующие
+низкоуровневые команды нужны для development, Nominatim или явно выбранного
+legacy PostgreSQL.
+
 Пример защищённого каталога; фактический путь утверждает оператор:
 
 ```shell
@@ -161,12 +173,12 @@ cluster/volume остаётся инфраструктурной операци�
 
 ## Проверка Application Restore
 
-До изменения production DSN восстановленная БД подключается только к
-одноразовому application container той же immutable revision. Credentials
-передаются через ignored runtime env/secret store, не через tracked файлы.
-Сначала укажите shadow-БД в ignored `config/prod.env` и загрузите frozen image
-через `make release-pull` либо `make verify-release` с offline payload.
-Постоянные application processes на этом шаге ещё не запускаются.
+До запуска постоянных application processes восстановленная БД проверяется
+одноразовым maintenance container той же immutable revision. Credentials
+передаются только через ignored `config/prod.secrets.env`; DSN и остальные
+несекретные параметры определены production Compose. Загрузите frozen image
+  через единый `make deploy-image`, который выбирает registry или offline
+  payload и в обоих случаях проверяет frozen release identity.
 
 Обязательные команды с host checkout:
 

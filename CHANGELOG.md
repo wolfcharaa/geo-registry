@@ -4,6 +4,20 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-08
+
+- Production deployment переведён на native `docker compose up -d`: tracked
+  YAML хранит non-secret runtime config, ignored env содержит только secrets,
+  а PostgreSQL 17/PostGIS входит в основной Compose stack.
+- Добавлен линейный restore готового backup одной командой с автоматическими
+  extraction, checksum, preflight, role lifecycle и shadow restore.
+- Добавлен production maintenance lifecycle для fresh GAR download/import,
+  partitioned `address_search`, Data.Mos и rebuild OpenSearch projection.
+- Добавлен отдельный update lifecycle существующего managed deployment с
+  read-only preflight, worker quiescence, migrations, data gates и smoke.
+- Application image подготавливается одной командой `make deploy-image`,
+  автоматически выбирающей verified offline payload либо exact registry image.
+
 ## [0.2.1] - 2026-11-08
 
 - Исправлен offline release на чистом Docker Engine: checksummed `docker load`
@@ -51,5 +65,6 @@
 
 [0.1.0]: https://github.com/wolfcharaa/geo-registry/releases/tag/v0.1.0
 [0.2.0]: https://github.com/wolfcharaa/geo-registry/compare/v0.1.0...v0.2.0
+[0.2.2]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.0...v0.2.1
-[Unreleased]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.2...HEAD

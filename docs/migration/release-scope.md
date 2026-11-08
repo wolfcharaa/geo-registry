@@ -111,13 +111,13 @@ RoadRunner/BoltDB queues должны быть drained либо явно спи�
 
 ## Delivery Boundary
 
-Production Compose управляет HTTP supervisor-ом с настраиваемым числом HTTP
-workers и двумя queue workers одной release revision. PostgreSQL приложения,
-OpenSearch и Nominatim не являются дочерними
-services application release и не должны пересоздаваться при переключении
-image. Полный registry namespace передаётся как `DOCKER_IMAGE_PREFIX`; Compose
-не содержит deployment-specific владельца registry. Runtime configuration и
-release image metadata разделены.
+Production Compose управляет PostgreSQL приложения, HTTP supervisor-ом и двумя
+queue workers одной release revision; optional profile добавляет OpenSearch.
+Release switch пересоздаёт только application processes и не удаляет data
+volumes. Nominatim остаётся отдельным lifecycle. Полный registry namespace
+фиксируется вместе с tag/digest в tracked `release.env`, а operator secret-файл
+содержит только passwords/API keys. Несекретная runtime configuration живёт в
+Compose YAML и его ignored override.
 
 Точный contract сборки, resource/health policy и команды запуска описаны в
 [production-compose.md](../deployment/production-compose.md). Application

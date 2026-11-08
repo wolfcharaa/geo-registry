@@ -100,12 +100,9 @@ git status --short
 [release parity](../migration/release-parity.md), worker lifecycle и открытые
 operator approvals.
 
-Создать ignored production environment и собрать image из текущего source
-commit:
+Собрать image из текущего source commit:
 
 ```shell
-cp config/prod.env.example config/prod.env
-# Заменить DOCKER_IMAGE_PREFIX и все deployment placeholders.
 make build-production \
   DOCKER_IMAGE_PREFIX=registry.example/namespace/geo-registry \
   RELEASE_VERSION="${RELEASE_VERSION}" \
@@ -116,23 +113,25 @@ make build-production \
 
 ```shell
 make freeze-release \
+  DOCKER_IMAGE_PREFIX=registry.example/namespace/geo-registry \
   RELEASE_VERSION="${RELEASE_VERSION}" \
   APP_IMAGE_DIGEST=sha256:<64-hex-digest> \
   DOCKER_PLATFORM="${RELEASE_PLATFORM}"
 ```
 
-После freeze единственным tracked изменением обязан быть release identity:
+После freeze единственными tracked изменениями обязаны быть exact Compose
+image/version и его release identity:
 
 ```shell
 git status --short
-git diff -- docker/compose/prod/release.env
+git diff -- docker/compose/prod/compose.yaml docker/compose/prod/release.env
 git diff --check
 ```
 
 Создать отдельный release-коммит и annotated tag:
 
 ```shell
-git add docker/compose/prod/release.env
+git add docker/compose/prod/compose.yaml docker/compose/prod/release.env
 git commit -m "CHORE(release): Зафиксирован релиз ${RELEASE_VERSION}"
 git tag -a "${RELEASE_VERSION}" -m "Release ${RELEASE_VERSION}"
 test "$(git cat-file -t "refs/tags/${RELEASE_VERSION}")" = tag
@@ -141,8 +140,9 @@ test "$(git rev-parse HEAD)" = \
 ```
 
 Image label указывает на родительский source commit, а tag — на следующий
-release-коммит, меняющий только `release.env`. Release tooling проверяет эту
-границу и отклоняет любые дополнительные файлы между двумя commits.
+release-коммит, меняющий только exact image/version в production Compose и
+согласованный `release.env`. Release tooling проверяет эту границу и отклоняет
+любые дополнительные файлы между двумя commits.
 
 Push branch, tag и image являются отдельными явно подтверждаемыми действиями.
 Для connected delivery после registry login:
