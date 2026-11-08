@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+- Описаны отдельные сетевые режимы для host-only, соседнего Compose, private
+  physical server и защищённого public edge с явными trust boundaries.
+- Port preflight допускает смену host IP у binding, которым владеет текущий
+  managed application container, и по-прежнему отклоняет чужой listener.
+
 ## [0.2.3] - 2026-11-08
 
 - Длительные PostgreSQL backup и restore теперь печатают периодический

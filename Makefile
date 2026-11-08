@@ -121,6 +121,7 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 	test -f docs/deployment/offline-release.md
 	test -f docs/deployment/deploy-from-sources.md
 	test -f docs/deployment/deploy-with-backup.md
+	test -f docs/deployment/network-access.md
 	test -f docs/deployment/release-deploy.md
 	test -f docs/deployment/troubleshooting.md
 .PHONY: release-check

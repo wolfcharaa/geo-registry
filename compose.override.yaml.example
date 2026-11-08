@@ -3,9 +3,13 @@
 # Never override image or APP_VERSION: they are frozen release identity.
 services:
   app:
+    # Host-only default for a local reverse proxy or smoke.
+    # For a remote server in a closed contour, replace 127.0.0.1 with the exact
+    # private/LAN IP and enforce a firewall allow-list.
+    # See docs/deployment/network-access.md.
     # make deploy-port-preflight and make deploy-smoke resolve this YAML binding.
     ports: !override
-      - 0.0.0.0:8080:8080
+      - 127.0.0.1:18080:8080
     environment:
       APP_HTTP_WORKERS: "4"
 

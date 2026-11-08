@@ -121,8 +121,11 @@ make deploy-port-preflight
 
 Команда читает итоговый `services.app.ports`, показывает host binding,
 listeners и Docker containers, публикующие тот же port. Контейнер текущего
-managed приложения распознаётся как допустимый владелец; посторонний listener
-останавливает запуск.
+managed приложения распознаётся как допустимый владелец. Смена его binding,
+например с `127.0.0.1:18080` на `10.20.30.40:18080`, печатает
+`occupied-by-managed-app-pending-rebind` и не требует ручной остановки.
+Посторонний listener печатает `State: conflict`, его владельца и точный
+`Next action`, после чего останавливает запуск.
 
 Если владельца порта нельзя остановить, задайте другой несекретный binding в
 ignored YAML:
@@ -137,6 +140,22 @@ services:
 Повторите `make deploy-port-preflight`, затем `make deploy-start`. Финальный
 `make deploy-smoke` автоматически использует `18080`; передавать `APP_PORT` в
 shell session не требуется.
+
+Если вы меняете binding в уже опубликованном `v0.2.3`, в котором автоматическое
+распознавание rebind ещё отсутствовало, остановите только managed HTTP app и
+сразу продолжите обычный workflow:
+
+```shell
+docker compose --env-file config/prod.secrets.env stop app
+make deploy-start DOCKER_PLATFORM=linux/amd64
+```
+
+PostgreSQL, workers и volumes эта команда не удаляет. Не используйте для этого
+`docker compose down`, `down -v` или остановку всего project.
+
+Если клиент находится на другом физическом сервере, loopback binding ему
+недоступен. Используйте точный private/LAN IP и firewall allow-list из
+[руководства сетевого доступа](network-access.md).
 
 ## `make release-download`: Нет Такого Target
 

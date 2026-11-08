@@ -55,6 +55,11 @@ Port проверяется до многочасовой подготовки �
 `127.0.0.1:8080` занят, измените `services.app.ports` через `!override`, как
 описано в [runbook с готовым backup](deploy-with-backup.md).
 
+Публикация для consumer на отдельном физическом сервере настраивается через
+точный private/LAN IP и firewall allow-list по
+[сетевому runbook](network-access.md); `0.0.0.0` не является безопасным
+production default.
+
 До скачивания проверьте место на filesystem выбранного `/data`: ZIP, полная
 распаковка, canonical PostgreSQL, WAL и будущий backup существуют одновременно.
 

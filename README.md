@@ -35,6 +35,9 @@ geocoding.
 9. [Развернуть готовый PostgreSQL backup](docs/deployment/deploy-with-backup.md)
    или [наполнить новый сервер из источников](docs/deployment/deploy-from-sources.md)
    — использовать отдельный линейный runbook без смешивания сценариев.
+10. [Открыть доступ другому сервису](docs/deployment/network-access.md) —
+    выбрать loopback, общую Docker network, private/LAN interface или
+    защищённый reverse proxy согласно trust boundary.
 
 ## Production Быстрый Запуск
 
@@ -191,6 +194,7 @@ make worker-logs
 - [Развёртывание релиза с готовыми данными](docs/deployment/release-deploy.md)
 - [Новый сервер с готовым PostgreSQL backup](docs/deployment/deploy-with-backup.md)
 - [Новый сервер с наполнением из источников](docs/deployment/deploy-from-sources.md)
+- [Сетевой доступ для других приложений](docs/deployment/network-access.md)
 - [Диагностика развёртывания](docs/deployment/troubleshooting.md)
 
 Исторические сравнения, benchmark и migration evidence находятся в

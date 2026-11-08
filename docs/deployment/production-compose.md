@@ -112,8 +112,14 @@ binding из объединённого Compose YAML, включая ignored ove
 smoke использует тот же binding, поэтому изменение host port не требует
 session env.
 
+Выбор между loopback, общей Docker network, точным private/LAN IP для другого
+физического сервера и reverse proxy описан в
+[сетевом контракте](network-access.md). HTTP API не имеет встроенной
+аутентификации и не публикуется напрямую в недоверенную сеть.
+
 Отдельные линейные runbooks:
 
 - [сервер с готовым PostgreSQL backup](deploy-with-backup.md);
 - [сервер с наполнением из официальных источников](deploy-from-sources.md);
+- [сетевой доступ для других приложений](network-access.md);
 - [обновление и общий release contract](release-deploy.md).

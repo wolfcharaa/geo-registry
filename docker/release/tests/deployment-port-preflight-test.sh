@@ -51,6 +51,46 @@ cat >"${temporary_root}/compose.json" <<'EOF'
 }
 EOF
 
+cat >"${temporary_root}/compose-lan.json" <<'EOF'
+{
+  "name": "geo-registry",
+  "services": {
+    "app": {
+      "image": "example/app",
+      "ports": [
+        {
+          "mode": "ingress",
+          "host_ip": "10.20.30.40",
+          "target": 8080,
+          "published": "18080",
+          "protocol": "tcp"
+        }
+      ]
+    }
+  }
+}
+EOF
+
+cat >"${temporary_root}/compose-all-interfaces.json" <<'EOF'
+{
+  "name": "geo-registry",
+  "services": {
+    "app": {
+      "image": "example/app",
+      "ports": [
+        {
+          "mode": "ingress",
+          "host_ip": "0.0.0.0",
+          "target": 8080,
+          "published": "18080",
+          "protocol": "tcp"
+        }
+      ]
+    }
+  }
+}
+EOF
+
 binding_output=$(
     PATH="${fixture_dir}:${PATH}" \
     FAKE_DOCKER_STATE="${temporary_root}/docker.state" \
@@ -76,6 +116,20 @@ free_output=$(
 )
 printf '%s\n' "${free_output}" | grep -Fq 'Configured binding: 127.0.0.1:18080 -> app:8080/tcp'
 printf '%s\n' "${free_output}" | grep -Fq 'State: free'
+printf '%s\n' "${free_output}" | grep -Fq 'Next action: no port action is required'
+printf '%s\n' "${free_output}" | grep -Fq 'Standalone preflight: run make deploy-start DOCKER_PLATFORM=linux/amd64.'
+
+all_interfaces_output=$(
+    PATH="${fixture_dir}:${PATH}" \
+    FAKE_DOCKER_STATE="${temporary_root}/docker.state" \
+    FAKE_DOCKER_COMPOSE_CONFIG_FILE="${temporary_root}/compose-all-interfaces.json" \
+    COMPOSE_ENV_FILE="${temporary_root}/prod.secrets.env" \
+    RELEASE_ENV_FILE="${temporary_root}/release.env" \
+    PRODUCTION_COMPOSE_MODEL="${temporary_root}/compose-model.yaml" \
+        "${project_root}/docker/release/deployment-port-preflight.sh"
+)
+printf '%s\n' "${all_interfaces_output}" | grep -Fq 'Warning: this binding publishes Geo Registry on every host interface.'
+printf '%s\n' "${all_interfaces_output}" | grep -Fq 'Prefer an exact private/LAN IP'
 
 if conflict_output=$(
     PATH="${fixture_dir}:${PATH}" \
@@ -94,6 +148,7 @@ fi
 printf '%s\n' "${conflict_output}" | grep -Fq 'State: conflict'
 printf '%s\n' "${conflict_output}" | grep -Fq 'container=other-http'
 printf '%s\n' "${conflict_output}" | grep -Fq 'compose.override.yaml'
+printf '%s\n' "${conflict_output}" | grep -Fq 'Rerun: make deploy-port-preflight'
 
 managed_output=$(
     PATH="${fixture_dir}:${PATH}" \
@@ -108,6 +163,43 @@ managed_output=$(
         "${project_root}/docker/release/deployment-port-preflight.sh"
 )
 printf '%s\n' "${managed_output}" | grep -Fq 'State: occupied-by-managed-app'
+printf '%s\n' "${managed_output}" | grep -Fq 'Next action: do not stop it manually'
+printf '%s\n' "${managed_output}" | grep -Fq 'Standalone preflight: run make deploy-start DOCKER_PLATFORM=linux/amd64.'
+
+rebind_output=$(
+    PATH="${fixture_dir}:${PATH}" \
+    FAKE_DOCKER_STATE="${temporary_root}/docker.state" \
+    FAKE_DOCKER_COMPOSE_CONFIG_FILE="${temporary_root}/compose-lan.json" \
+    FAKE_DOCKER_APP_CONTAINER=geo-registry-app-test \
+    FAKE_DOCKER_PORT_BINDINGS='127.0.0.1:18080' \
+    FAKE_SS_LISTENERS='LISTEN 0 4096 127.0.0.1:18080 0.0.0.0:*' \
+    COMPOSE_ENV_FILE="${temporary_root}/prod.secrets.env" \
+    RELEASE_ENV_FILE="${temporary_root}/release.env" \
+    PRODUCTION_COMPOSE_MODEL="${temporary_root}/compose-model.yaml" \
+        "${project_root}/docker/release/deployment-port-preflight.sh"
+)
+printf '%s\n' "${rebind_output}" | grep -Fq 'State: occupied-by-managed-app-pending-rebind'
+printf '%s\n' "${rebind_output}" | grep -Fq 'Configured binding: 10.20.30.40:18080 -> app:8080/tcp'
+printf '%s\n' "${rebind_output}" | grep -Fq 'Current binding: 127.0.0.1:18080'
+printf '%s\n' "${rebind_output}" | grep -Fq 'Next action: do not stop it manually'
+printf '%s\n' "${rebind_output}" | grep -Fq 'Standalone preflight: run make deploy-start DOCKER_PLATFORM=linux/amd64.'
+
+if unsafe_rebind_output=$(
+    PATH="${fixture_dir}:${PATH}" \
+    FAKE_DOCKER_STATE="${temporary_root}/docker.state" \
+    FAKE_DOCKER_COMPOSE_CONFIG_FILE="${temporary_root}/compose.json" \
+    FAKE_DOCKER_APP_CONTAINER=geo-registry-app-test \
+    FAKE_DOCKER_PORT_BINDINGS='10.20.30.40:18080' \
+    FAKE_SS_LISTENERS='LISTEN 0 4096 127.0.0.1:18080 0.0.0.0:*' \
+    COMPOSE_ENV_FILE="${temporary_root}/prod.secrets.env" \
+    RELEASE_ENV_FILE="${temporary_root}/release.env" \
+    PRODUCTION_COMPOSE_MODEL="${temporary_root}/compose-model.yaml" \
+        "${project_root}/docker/release/deployment-port-preflight.sh" 2>&1
+); then
+    echo 'Deployment port preflight test failed: foreign listener passed managed rebind.' >&2
+    exit 1
+fi
+printf '%s\n' "${unsafe_rebind_output}" | grep -Fq 'State: conflict'
 
 smoke_output=$(
     PATH="${fixture_dir}:${PATH}" \

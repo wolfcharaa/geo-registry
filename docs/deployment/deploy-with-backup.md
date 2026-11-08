@@ -79,6 +79,11 @@ services:
 Повторите `make deploy-port-preflight`. Production smoke автоматически читает
 тот же YAML binding; session `APP_PORT` или ручной URL не нужен.
 
+Если consumer работает на другом физическом сервере закрытого контура,
+публикуйте порт на точном private IP вместо loopback и ограничьте source
+addresses firewall allow-list. Готовые варианты находятся в
+[руководстве сетевого доступа](network-access.md).
+
 ## 4. Восстановить PostgreSQL
 
 Если найден ровно один backup:
