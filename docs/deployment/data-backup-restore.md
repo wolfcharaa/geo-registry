@@ -46,7 +46,9 @@ control и retention policy.
 Backup создаётся во временном каталоге на том же filesystem, проверяется через
 `pg_restore --list` и checksum, а затем атомарно переименовывается. Незавершённый
 временный каталог удаляется; уже опубликованный backup никогда не
-перезаписывается.
+перезаписывается. Во время `pg_dump` каждые 30 секунд печатаются elapsed time,
+размер уже записанного сжатого архива и видимая PostgreSQL activity. После
+streaming отдельно обозначаются TOC и checksum phases.
 
 Для переносимого full-data release backup дополнительно оборачивается в
 `application-postgres-backup.tar` с двумя файлами и связывается checksum-ами с
@@ -141,6 +143,19 @@ make verify-data-backup \
 restore target с достаточным местом, нужными extensions и уже созданной ролью.
 Имя shadow-БД обязано отсутствовать. Скрипт отклоняет in-place restore и не
 удаляет БД автоматически даже после ошибки.
+
+Во время restore heartbeat показывает elapsed time, размер БД, relations и
+текущую activity. Процент не показывается, потому что compressed archive,
+табличные данные, indexes и WAL несопоставимы по объёму. Для managed production
+deployment состояние можно независимо прочитать из второй сессии:
+
+```shell
+make data-restore-status
+```
+
+Если управляющая SSH-сессия исчезла, эту команду запускают до любой повторной
+попытки. Активный `pg_restore` продолжают ждать; существующую БД без активного
+restore сначала проводят через `make deploy-start`.
 
 Сначала read-only проверка:
 
@@ -247,4 +262,6 @@ dump-каталог и tmpfs integration container удалены. Это док
 
 Полная последовательность для нового сервера — checkout tag, image load/pull,
 restore, DSN, GAR/OpenSearch gates, `change-release` и smoke — находится в
-[сквозном руководстве развёртывания](release-deploy.md).
+[сквозном руководстве развёртывания](release-deploy.md). Ответы на вопросы
+«процесс завис?», «можно повторить restore?» и «почему CPU низкий?» находятся в
+[диагностике развёртывания](troubleshooting.md).

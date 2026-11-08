@@ -111,6 +111,27 @@ container=$(COMPOSE_ENV_FILE="${secrets_file}" \
     "${project_root}/docker/compose/prod.sh" ps --quiet postgres)
 backup_validate_container "${container}"
 
+database_exists=$(docker exec "${container}" \
+    psql --no-psqlrc --tuples-only --no-align --set=ON_ERROR_STOP=1 \
+    --username "${admin_user}" --dbname postgres \
+    --command "SELECT count(*) FROM pg_database WHERE datname = '${database_name}';" \
+    | tr -d '[:space:]')
+case "${database_exists}" in
+    0) ;;
+    1)
+        active_restore_sessions=$(docker exec "${container}" \
+            psql --no-psqlrc --tuples-only --no-align --set=ON_ERROR_STOP=1 \
+            --username "${admin_user}" --dbname postgres \
+            --command "SELECT count(*) FROM pg_stat_activity WHERE datname = '${database_name}' AND application_name = 'pg_restore';" \
+            | tr -d '[:space:]')
+        if [ "${active_restore_sessions}" -gt 0 ]; then
+            release_fail "restore is already active for ${database_name}; run make data-restore-status and wait instead of retrying"
+        fi
+        release_fail "database ${database_name} already exists; run make data-restore-status and validate it with make deploy-start instead of retrying in place"
+        ;;
+    *) release_fail "cannot determine target database state" ;;
+esac
+
 role_exists=$(docker exec "${container}" \
     psql --no-psqlrc --tuples-only --no-align --set=ON_ERROR_STOP=1 \
     --username "${admin_user}" --dbname postgres \

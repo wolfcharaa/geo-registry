@@ -7,7 +7,7 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
 # shellcheck disable=SC1091
 . "${script_dir}/backup-lib.sh"
 
-for command_name in awk date df docker git grep mktemp mv tr wc; do
+for command_name in awk date df docker git grep mktemp mv sleep tr wc; do
     backup_require_command "${command_name}"
 done
 
@@ -24,6 +24,8 @@ backup_require_directory BACKUP_ROOT "${backup_root}"
 
 reserve_gb=${BACKUP_RESERVE_GB:-10}
 backup_validate_positive_integer BACKUP_RESERVE_GB "${reserve_gb}"
+progress_interval=${BACKUP_PROGRESS_INTERVAL_SECONDS:-30}
+backup_validate_positive_integer BACKUP_PROGRESS_INTERVAL_SECONDS "${progress_interval}"
 
 case "${component}" in
     application-postgres)
@@ -156,19 +158,67 @@ final_directory="${backup_root}/${component}-${timestamp}"
 [ ! -e "${final_directory}" ] || backup_fail "backup destination already exists: ${final_directory}"
 
 staging_directory=$(mktemp -d "${backup_root}/.geo-registry-${component}.XXXXXX")
+backup_monitor_pid=
+stop_backup_monitor() {
+    [ -n "${backup_monitor_pid}" ] || return 0
+    kill "${backup_monitor_pid}" >/dev/null 2>&1 || true
+    wait "${backup_monitor_pid}" >/dev/null 2>&1 || true
+    backup_monitor_pid=
+}
 cleanup() {
+    stop_backup_monitor
     case "${staging_directory}" in
         "${backup_root}"/.geo-registry-*) rm -rf -- "${staging_directory}" ;;
     esac
 }
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 chmod 0700 "${staging_directory}"
 
 dump_file="${component}.dump"
 dump_path="${staging_directory}/${dump_file}"
+monitor_backup() {
+    monitor_parent_pid=$1
+    monitor_started_at=$2
+
+    while kill -0 "${monitor_parent_pid}" >/dev/null 2>&1; do
+        sleep "${progress_interval}"
+        kill -0 "${monitor_parent_pid}" >/dev/null 2>&1 || break
+
+        monitor_now=$(date +%s)
+        monitor_elapsed=$((monitor_now - monitor_started_at))
+        monitor_bytes=$(wc -c <"${dump_path}" 2>/dev/null | tr -d ' ' || true)
+        [ -n "${monitor_bytes}" ] || monitor_bytes=0
+        monitor_activity=$(database_query "
+SELECT 'state=' || state
+    || ' wait=' || COALESCE(wait_event_type || '/' || wait_event, 'cpu')
+    || ' current_seconds=' || EXTRACT(epoch FROM (clock_timestamp() - query_start))::bigint
+FROM pg_stat_activity
+WHERE datname = '${database_name}'
+  AND application_name = 'pg_dump'
+ORDER BY query_start
+LIMIT 1;
+" 2>/dev/null || true)
+        [ -n "${monitor_activity}" ] || monitor_activity='state=streaming-or-finishing'
+        printf 'Backup progress: elapsed_seconds=%s archive_bytes=%s %s\n' \
+            "${monitor_elapsed}" "${monitor_bytes}" "${monitor_activity}"
+    done
+}
+
 echo "Creating transaction-consistent ${component} dump..."
-database_dump "${dump_path}"
+echo "Progress heartbeat interval: ${progress_interval} seconds. Exact percentage is unavailable because the archive is compressed."
+backup_started_at=$(date +%s)
+monitor_backup "$$" "${backup_started_at}" &
+backup_monitor_pid=$!
+dump_status=0
+database_dump "${dump_path}" || dump_status=$?
+stop_backup_monitor
+[ "${dump_status}" -eq 0 ] \
+    || backup_fail "pg_dump failed with exit code ${dump_status}; no incomplete backup will be published"
 chmod 0600 "${dump_path}"
+echo "Dump stream completed; verifying pg_restore table of contents and calculating SHA-256."
 database_restore_list "${dump_path}"
 
 dump_bytes=$(backup_file_bytes "${dump_path}")

@@ -59,17 +59,60 @@ case "${command_name}" in
                 '{{.State.Running}}') printf '%s\n' true ;;
                 '{{.Config.Image}}') printf '%s\n' 'postgis:17-test' ;;
                 '{{.Id}}') printf '%s\n' 'sha256:postgres-test' ;;
+                '{{.Name}}') printf '/%s\n' "${FAKE_DOCKER_POSTGRES_CONTAINER:-geo-registry-postgres-test}" ;;
                 *) exit 65 ;;
             esac
         fi
         ;;
     exec)
         case " $* " in
+            *' pg_restore --list '*) ;;
+            *' pg_restore --no-password '*)
+                sleep "${FAKE_DOCKER_RESTORE_SLEEP_SECONDS:-0}"
+                ;;
+            *' createdb --no-password '*)
+                if [ -n "${FAKE_DOCKER_DATABASE_STATE:-}" ]; then
+                    : >"${FAKE_DOCKER_DATABASE_STATE}"
+                fi
+                ;;
+            *' pg_dump --version '*) printf '%s\n' 'pg_dump (PostgreSQL) 17.6' ;;
+            *' pg_dump --no-password '*)
+                sleep "${FAKE_DOCKER_DUMP_SLEEP_SECONDS:-0}"
+                printf '%s\n' 'fake-pgdump-archive'
+                ;;
+            *'pg_size_pretty(pg_database_size(d.oid))'*)
+                printf '%s|%s|%s\n' \
+                    "${FAKE_DOCKER_DATABASE_SIZE:-77 GB}" \
+                    "${FAKE_DOCKER_DATABASE_OWNER:-geo_registry}" \
+                    "${FAKE_DOCKER_ACTIVE_RESTORES:-0}"
+                ;;
+            *application_name*pg_restore*)
+                case " $* " in
+                    *'SELECT count(*)'*) printf '%s\n' "${FAKE_DOCKER_ACTIVE_RESTORES:-0}" ;;
+                    *) printf '%s\n' 'state=active wait=IO/DataFileRead current_seconds=1 sql=CREATE INDEX' ;;
+                esac
+                ;;
+            *application_name*pg_dump*)
+                printf '%s\n' 'state=active wait=Client/ClientWrite current_seconds=1'
+                ;;
+            *'NOT indisvalid OR NOT indisready'*)
+                printf '%s\n' "${FAKE_DOCKER_INTEGRITY_SUMMARY:-83|0|0}"
+                ;;
+            *'pg_size_pretty(pg_database_size(current_database()))'*)
+                printf '%s\n' "${FAKE_DOCKER_RESTORE_DATABASE_SUMMARY:-1 MB relations=4}"
+                ;;
+            *'rolsuper::int'*) printf '%s\n' "${FAKE_DOCKER_ROLE_SUMMARY:-0|0|0|0}" ;;
+            *' SELECT current_database(); '*) printf '%s\n' "${FAKE_DOCKER_DATABASE_NAME:-geo_registry}" ;;
             *' SELECT pg_database_size(current_database()); '*) printf '%s\n' 1048576 ;;
             *' SHOW server_version; '*) printf '%s\n' 17.6 ;;
             *' SHOW server_version_num; '*) printf '%s\n' 170006 ;;
-            *' pg_dump --version '*) printf '%s\n' 'pg_dump (PostgreSQL) 17.6' ;;
-            *' FROM pg_database '*) printf '%s\n' 1 ;;
+            *'SELECT count(*) FROM pg_database'*)
+                if [ -n "${FAKE_DOCKER_DATABASE_STATE:-}" ] && [ -f "${FAKE_DOCKER_DATABASE_STATE}" ]; then
+                    printf '%s\n' 1
+                else
+                    printf '%s\n' "${FAKE_DOCKER_DATABASE_EXISTS:-1}"
+                fi
+                ;;
             *' FROM pg_roles '*) printf '%s\n' 1 ;;
         esac
         ;;

@@ -84,6 +84,7 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/release/init-deployment.sh \
 		docker/release/initialize-deployment-data.sh \
 		docker/release/create-deployment-backup.sh \
+		docker/release/deployment-data-status.sh \
 		docker/release/prepare-deployment-image.sh \
 		docker/release/restore-deployment-data.sh \
 		docker/release/update-deployment.sh \
@@ -96,17 +97,24 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/scripts/run-release-smoke.sh \
 		docker/compose/prod.sh
 	sh -n \
+		docker/release/tests/backup-progress-test.sh \
 		docker/release/tests/change-release-offline-test.sh \
+		docker/release/tests/deployment-data-status-test.sh \
 		docker/release/tests/deployment-backup-test.sh \
 		docker/release/tests/update-deployment-test.sh \
 		docker/release/tests/init-deployment-test.sh \
+		docker/release/tests/restore-progress-test.sh \
 		docker/release/tests/fixtures/docker
+	docker/release/tests/backup-progress-test.sh
 	docker/release/tests/change-release-offline-test.sh
+	docker/release/tests/deployment-data-status-test.sh
 	docker/release/tests/deployment-backup-test.sh
 	docker/release/tests/init-deployment-test.sh
+	docker/release/tests/restore-progress-test.sh
 	docker/release/tests/update-deployment-test.sh
 	test -f docs/deployment/offline-release.md
 	test -f docs/deployment/release-deploy.md
+	test -f docs/deployment/troubleshooting.md
 .PHONY: release-check
 
 release-offline: release-payload ## Assemble the flat tagged offline transport archive
@@ -141,7 +149,12 @@ deploy-restore: guard-user ## Discover, verify and restore release PostgreSQL da
 data-restore: deploy-restore ## Restore the canonical PostgreSQL backup through the linear production workflow
 .PHONY: data-restore
 
+data-restore-status: guard-user ## Show managed PostgreSQL restore state and the safe next action
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" docker/release/deployment-data-status.sh
+.PHONY: data-restore-status
+
 data-init: guard-user ## Create a fresh managed PostgreSQL database and apply migrations
+	@echo "==> Initializing an empty managed PostgreSQL database"
 	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" docker/release/initialize-deployment-data.sh
 .PHONY: data-init
 
@@ -151,6 +164,7 @@ data-backup-preflight: guard-user ## Verify capacity and source of the managed p
 .PHONY: data-backup-preflight
 
 data-backup: guard-user ## Create a verified backup of the managed production database
+	@echo "==> Creating a verified PostgreSQL backup; periodic progress follows"
 	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" BACKUP_ROOT="$(BACKUP_ROOT)" \
 		docker/release/create-deployment-backup.sh
 .PHONY: data-backup
@@ -161,51 +175,81 @@ data-gar-releases: guard-user ## Show official GAR releases and full XML URLs
 
 data-gar-download: guard-user ## Download and atomically extract one official GAR full XML archive
 	@test -n "$(GAR_URL)" || { echo "Set GAR_URL to the full_xml_url returned by make data-gar-releases." >&2; exit 1; }
+	@echo "==> Downloading and verifying the selected official GAR release"
 	$(PRODUCTION_COMPOSE) run --rm --no-deps \
 		--env GAR_URL="$(GAR_URL)" --env GAR_SHA256="$(GAR_SHA256)" \
 		maintenance /usr/local/bin/download-gar
 .PHONY: data-gar-download
 
 data-gar-import: guard-user ## Import GAR regions 50/77 through COPY workers
+	@echo "==> Importing GAR regions 50 and 77 with four COPY workers"
+	@echo "==> For a live checkpoint snapshot, run 'make data-status' in a second terminal"
 	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance \
 		bin/app gar:import /data/gar/full --regions=50,77 --batch-size=50000 --workers=4
 .PHONY: data-gar-import
 
 data-address-rebuild: guard-user ## Build and validate the partitioned PostgreSQL address search model
+	@echo "==> [1/3] Building the partitioned PostgreSQL address search projection"
+	@echo "==> For a live checkpoint snapshot, run 'make data-status' in a second terminal"
 	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance \
 		bin/app gar:address-search:rebuild --batch-size=50000
+	@echo "==> [2/3] Running deep integrity checks for regions 50 and 77"
 	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance \
 		bin/app gar:integrity --regions=50,77 --deep --only-failed
+	@echo "==> [3/3] Checking exact regional projection parity"
 	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance \
 		bin/app gar:status --regions=50,77 --exact
 .PHONY: data-address-rebuild
 
 data-datamos-download: guard-user ## Download the official Moscow address snapshot into the maintenance data directory
+	@echo "==> Downloading the official Data.Mos address snapshot"
 	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance \
 		bin/app datamos:address-registry:download /data/datamos/addressreestr.jsonl.gz
 .PHONY: data-datamos-download
 
 data-datamos-import: guard-user ## Import and enrich the address model from the downloaded Data.Mos snapshot
+	@echo "==> Importing Data.Mos rows and enriching address search"
 	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance \
 		bin/app datamos:address-registry:import /data/datamos/addressreestr.jsonl.gz \
 		--require-manifest --batch-size=5000 --truncate --enrich
 .PHONY: data-datamos-import
 
 data-opensearch: guard-user ## Start OpenSearch and rebuild its projection from PostgreSQL
+	@echo "==> [1/3] Starting OpenSearch and waiting for health"
 	$(PRODUCTION_COMPOSE) --profile opensearch up --detach --wait opensearch
+	@echo "==> [2/3] Building a new versioned OpenSearch index from PostgreSQL"
 	$(PRODUCTION_COMPOSE) run --rm --no-deps --env OPENSEARCH_ENABLED=1 maintenance \
 		bin/app opensearch:reindex --batch-size=10000 --concurrency=8
+	@echo "==> [3/3] Checking index, alias and source/target parity"
 	$(PRODUCTION_COMPOSE) run --rm --no-deps --env OPENSEARCH_ENABLED=1 \
 		maintenance bin/app opensearch:status
 .PHONY: data-opensearch
 
+data-status: guard-user ## Show live GAR import/rebuild checkpoints and active PostgreSQL work
+	@echo "==> GAR operation checkpoints for regions 50 and 77"
+	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance \
+		bin/app gar:status --regions=50,77
+	@echo "==> Active PostgreSQL statements, operations and GAR workers"
+	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance bin/app gar:activity
+.PHONY: data-status
+
 deploy-start: guard-user ## Verify restored data, activate the immutable application and run health smoke
+	@echo "==> [1/7] Checking that PostgreSQL restore is inactive and physically valid"
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" DEPLOY_DATA_REQUIRE_READY=1 \
+		docker/release/deployment-data-status.sh
+	@echo "==> [2/7] Verifying the frozen application image"
 	$(MAKE) verify-release DOCKER_PLATFORM="$${DOCKER_PLATFORM:-linux/amd64}"
+	@echo "==> [3/7] Reading migration history from the restored database"
 	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance bin/app migrate:history
+	@echo "==> [4/7] Running deep GAR integrity gates for regions 50 and 77"
 	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance bin/app gar:integrity --regions=50,77 --deep --only-failed
+	@echo "==> [5/7] Checking exact regional status and projection parity"
 	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance bin/app gar:status --regions=50,77 --exact
+	@echo "==> [6/7] Activating application and worker processes"
 	$(MAKE) change-release DOCKER_PLATFORM="$${DOCKER_PLATFORM:-linux/amd64}"
+	@echo "==> [7/7] Running HTTP smoke checks"
 	$(MAKE) smoke
+	@echo "==> Deployment start completed"
 .PHONY: deploy-start
 
 deploy-update-preflight: guard-user ## Verify an existing managed deployment without changing it

@@ -82,7 +82,9 @@ make data-restore
 Команда сама запускает закреплённый PostgreSQL 17/PostGIS, проверяет bytes,
 SHA-256, TOC и PostgreSQL major, показывает target и просит одно подтверждение.
 Она создаёт только отсутствующую `geo_registry`, временно повышает owner role и
-обязательно снимает повышение после restore.
+обязательно снимает повышение после restore. Во время `pg_restore` каждые 30
+секунд печатаются elapsed time, текущий размер БД, число relations и видимая
+PostgreSQL activity.
 
 При нескольких backups выберите один без session exports:
 
@@ -93,6 +95,13 @@ make data-restore \
 
 Не запускайте PostgreSQL отдельной командой перед `data-restore`: lifecycle уже
 принадлежит restore orchestration.
+
+Если SSH-сессия пропала или команда больше не видна, restore не повторяют.
+Состояние и безопасный следующий шаг показывает read-only команда:
+
+```shell
+make data-restore-status
+```
 
 ## Новый Сервер: Наполнить БД Из Источников
 
@@ -109,6 +118,13 @@ make data-address-rebuild
 `data-gar-download` принимает только HTTPS, проверяет ZIP, печатает SHA-256 и
 атомарно публикует extraction. Import читает регионы `50,77`, использует
 streaming XML, COPY и четыре worker processes.
+
+Во время долгого import или rebuild durable checkpoints и активную работу можно
+посмотреть из второй сессии:
+
+```shell
+make data-status
+```
 
 Опциональное обогащение Москвы:
 
@@ -258,6 +274,10 @@ secret contract соответственно.
 
 ## Recovery И Диагностика
 
+- `make data-restore-status` — определить, продолжается ли restore, завершён ли
+  он и какой шаг безопасен дальше;
+- `make data-status` — показать GAR checkpoints, активные statements и COPY
+  workers во время import/rebuild;
 - `make deploy-image` — повторно подготовить exact image без запуска services;
 - `make deploy-update-preflight` — проверить существующий managed target;
 - `docker compose --env-file config/prod.secrets.env logs -f postgres` — PostgreSQL;
@@ -270,4 +290,6 @@ secret contract соответственно.
 Низкоуровневый backup/restore contract находится в
 [data-backup-restore.md](data-backup-restore.md), source/import lifecycle — в
 [data-lifecycle.md](../guides/data-lifecycle.md), offline packaging — в
-[offline-release.md](offline-release.md).
+[offline-release.md](offline-release.md). Разбор уже встречавшихся ошибок,
+потерянной SSH-сессии, низкой CPU load и orphan containers — в
+[диагностике развёртывания](troubleshooting.md).

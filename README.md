@@ -29,6 +29,9 @@ geocoding.
    подготовить tag/image, перенести PostgreSQL и запустить новый сервер.
 7. [Перейти с legacy](docs/migration/from-legacy.md) — сопоставить старые и
    новые команды, данные и ограничения.
+8. [Разобрать проблему развёртывания](docs/deployment/troubleshooting.md) —
+   понять, работает ли restore/import, безопасно пережить потерю SSH и выбрать
+   следующий шаг без ручных SQL-команд.
 
 ## Production Быстрый Запуск
 
@@ -40,6 +43,10 @@ make deploy-image DOCKER_PLATFORM=linux/amd64
 make data-restore
 make deploy-start
 ```
+
+Во время длительного restore команда печатает heartbeat. Из второй сессии
+текущее состояние и безопасный следующий шаг показывает
+`make data-restore-status`.
 
 `compose.yaml` содержит production defaults, `compose.override.yaml` —
 необязательные host-specific несекретные изменения, а
@@ -178,6 +185,7 @@ make worker-logs
 - [Source release](docs/deployment/source-release.md)
 - [Offline release](docs/deployment/offline-release.md)
 - [Развёртывание релиза с готовыми данными](docs/deployment/release-deploy.md)
+- [Диагностика развёртывания](docs/deployment/troubleshooting.md)
 
 Исторические сравнения, benchmark и migration evidence находятся в
 `docs/migration/`; для первого запуска они не нужны.

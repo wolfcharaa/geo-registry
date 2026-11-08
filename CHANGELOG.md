@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+- Длительные PostgreSQL backup и restore теперь печатают периодический
+  heartbeat с elapsed time, размером результата и текущим состоянием PostgreSQL.
+- Добавлена read-only команда `make data-restore-status`, которая распознаёт
+  активный, завершившийся и ещё не начатый restore и показывает безопасный
+  следующий шаг без повторного запуска операции.
+- Production-команды импорта, перестроения проекций и запуска получили явные
+  фазы и отдельный `make data-status` для checkpoint/activity diagnostics.
+- Повторный `data-restore` больше не повышает роль владельца уже существующей
+  БД и направляет оператора к проверке сохранившегося результата.
+
 ## [0.2.2] - 2026-11-08
 
 - Production deployment переведён на native `docker compose up -d`: tracked
