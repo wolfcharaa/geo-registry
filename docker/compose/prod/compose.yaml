@@ -1,10 +1,10 @@
 name: geo-registry
 
-x-app-image: &app-image "ghcr.io/wolfcharaa/geo-registry/app:v0.2.2-linux-amd64"
+x-app-image: &app-image "ghcr.io/wolfcharaa/geo-registry/app:v0.2.3-linux-amd64"
 
 x-app-environment: &app-environment
   APP_NAME: geo-registry
-  APP_VERSION: v0.2.2
+  APP_VERSION: v0.2.3
   APP_USER_AGENT: geo-registry/0.2
   DATABASE_DSN: "host=postgres port=5432 user=geo_registry password=${GEO_REGISTRY_DATABASE_PASSWORD:?Pass config/prod.secrets.env with --env-file} db=geo_registry application_name=geo-registry"
   DATABASE_POOL_SIZE: "4"
