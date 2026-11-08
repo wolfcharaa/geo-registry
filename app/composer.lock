@@ -85,7 +85,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-07-19T17:59:20+00:00"
+            "time": "2026-07-19T17:59:20+00:00",
+            "published-time": "2026-07-26T14:55:09+00:00"
         },
         {
             "name": "amphp/byte-stream",
@@ -2228,7 +2229,8 @@
                 "issues": "https://github.com/php-fig/clock/issues",
                 "source": "https://github.com/php-fig/clock/tree/1.0.0"
             },
-            "time": "2022-11-25T14:36:26+00:00"
+            "time": "2022-11-25T14:36:26+00:00",
+            "published-time": "2022-11-25T14:59:22+00:00"
         },
         {
             "name": "psr/container",
@@ -2562,20 +2564,21 @@
                 "issues": "https://github.com/revoltphp/event-loop/issues",
                 "source": "https://github.com/revoltphp/event-loop/tree/v1.0.9"
             },
-            "time": "2026-05-16T17:55:38+00:00"
+            "time": "2026-05-16T17:55:38+00:00",
+            "published-time": "2026-05-16T18:04:08+00:00"
         },
         {
             "name": "romanfedorskij/message-bus-async",
-            "version": "v0.1.0",
+            "version": "v0.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/wolfcharaa/message-bus-async.git",
-                "reference": "0ea19e855fb0d1e476498e323c8dc4205652d8c3"
+                "reference": "b369dff83d666009afe4479b8cef2d67b6d7f258"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/wolfcharaa/message-bus-async/zipball/0ea19e855fb0d1e476498e323c8dc4205652d8c3",
-                "reference": "0ea19e855fb0d1e476498e323c8dc4205652d8c3",
+                "url": "https://api.github.com/repos/wolfcharaa/message-bus-async/zipball/b369dff83d666009afe4479b8cef2d67b6d7f258",
+                "reference": "b369dff83d666009afe4479b8cef2d67b6d7f258",
                 "shasum": ""
             },
             "require": {
@@ -2612,7 +2615,7 @@
                     "email": "markaryanroma@mail.ru"
                 }
             ],
-            "description": "Async-first PHP message bus with typed local dispatch and durable producer contracts",
+            "description": "Async-first PHP message bus with typed dispatch, scoped execution, and PostgreSQL producer contracts",
             "homepage": "https://github.com/wolfcharaa/message-bus-async",
             "keywords": [
                 "amphp",
@@ -2625,20 +2628,21 @@
                 "issues": "https://github.com/wolfcharaa/message-bus-async/issues",
                 "source": "https://github.com/wolfcharaa/message-bus-async"
             },
-            "time": "2026-11-07T11:28:21+00:00"
+            "time": "2026-11-08T21:39:08+00:00",
+            "published-time": "2026-11-08T21:39:59+00:00"
         },
         {
             "name": "romanfedorskij/message-bus-async-worker",
-            "version": "v0.1.0",
+            "version": "v0.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/wolfcharaa/message-bus-async-worker.git",
-                "reference": "c9369b4230333537b3193d15e3855982a25dafeb"
+                "reference": "a12eea9bc5a17755a6ac43e4f00977ed72910eff"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/wolfcharaa/message-bus-async-worker/zipball/c9369b4230333537b3193d15e3855982a25dafeb",
-                "reference": "c9369b4230333537b3193d15e3855982a25dafeb",
+                "url": "https://api.github.com/repos/wolfcharaa/message-bus-async-worker/zipball/a12eea9bc5a17755a6ac43e4f00977ed72910eff",
+                "reference": "a12eea9bc5a17755a6ac43e4f00977ed72910eff",
                 "shasum": ""
             },
             "require": {
@@ -2676,7 +2680,7 @@
                     "email": "markaryanroma@mail.ru"
                 }
             ],
-            "description": "Optional worker runtime for romanfedorskij/message-bus-async",
+            "description": "AMPHP PostgreSQL worker runtime and control CLI for romanfedorskij/message-bus-async",
             "homepage": "https://github.com/wolfcharaa/message-bus-async-worker",
             "keywords": [
                 "amphp",
@@ -2689,7 +2693,8 @@
                 "issues": "https://github.com/wolfcharaa/message-bus-async-worker/issues",
                 "source": "https://github.com/wolfcharaa/message-bus-async-worker"
             },
-            "time": "2026-11-07T11:28:21+00:00"
+            "time": "2026-11-08T21:39:08+00:00",
+            "published-time": "2026-11-08T21:40:25+00:00"
         },
         {
             "name": "seld/cli-prompt",
@@ -2915,7 +2920,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-09-16T14:15:10+00:00"
+            "time": "2026-09-16T14:15:10+00:00",
+            "published-time": "2026-11-04T11:25:34+00:00"
         },
         {
             "name": "symfony/polyfill-ctype",
@@ -3085,7 +3091,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-10-14T07:17:09+00:00"
+            "time": "2026-10-14T07:17:09+00:00",
+            "published-time": "2026-10-14T09:42:25+00:00"
         },
         {
             "name": "symfony/polyfill-intl-grapheme",
@@ -3856,7 +3863,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-10-22T14:30:01+00:00"
+            "time": "2026-10-22T14:30:01+00:00",
+            "published-time": "2026-10-28T18:24:08+00:00"
         },
         {
             "name": "thesis/dic",
