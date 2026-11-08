@@ -49,7 +49,7 @@ tagged_image="${image_prefix}/app:${image_tag}"
 exact_image="${image_prefix}/app@${image_digest}"
 
 docker pull "${tagged_image}"
-release_validate_image "${tagged_image}" "${exact_image}" "${platform}" "${release_version}"
+release_validate_registry_image "${tagged_image}" "${exact_image}" "${platform}" "${release_version}"
 application_source_commit=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "${exact_image}")
 git -C "${project_root}" cat-file -e "${application_source_commit}^{commit}" 2>/dev/null \
     || release_fail "image source revision is not available in the application repository"

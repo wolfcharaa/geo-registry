@@ -164,7 +164,7 @@ cluster/volume остаётся инфраструктурной операци�
 До изменения production DSN восстановленная БД подключается только к
 одноразовому application container той же immutable revision. Credentials
 передаются через ignored runtime env/secret store, не через tracked файлы.
-Сначала укажите shadow-БД в ignored `config/prod.env` и загрузите exact image
+Сначала укажите shadow-БД в ignored `config/prod.env` и загрузите frozen image
 через `make release-pull` либо `make verify-release` с offline payload.
 Постоянные application processes на этом шаге ещё не запускаются.
 

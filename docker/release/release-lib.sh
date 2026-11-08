@@ -100,26 +100,31 @@ release_image_has_digest() {
         | grep -Fxq "${release_expected}"
 }
 
-release_validate_image() {
+release_registry_image_is_loaded() {
     release_tagged_image=$1
     release_exact_image=$2
-    release_platform=$3
-    release_version=$4
 
     docker image inspect "${release_exact_image}" >/dev/null 2>&1 \
-        || release_fail "exact image is not loaded: ${release_exact_image}"
-    release_image_has_digest "${release_tagged_image}" "${release_exact_image}" \
-        || release_fail "tagged image does not resolve to expected digest: ${release_tagged_image}"
+        && release_image_has_digest "${release_tagged_image}" "${release_exact_image}"
+}
 
-    release_actual_platform=$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "${release_exact_image}")
+release_validate_runtime_image() {
+    release_runtime_image=$1
+    release_platform=$2
+    release_version=$3
+
+    docker image inspect "${release_runtime_image}" >/dev/null 2>&1 \
+        || release_fail "runtime image is not loaded: ${release_runtime_image}"
+
+    release_actual_platform=$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "${release_runtime_image}")
     [ "${release_actual_platform}" = "${release_platform}" ] \
         || release_fail "image platform is ${release_actual_platform}, expected ${release_platform}"
 
-    release_actual_version=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' "${release_exact_image}")
+    release_actual_version=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' "${release_runtime_image}")
     [ "${release_actual_version}" = "${release_version}" ] \
         || release_fail "image version label is ${release_actual_version}, expected ${release_version}"
 
-    docker run --rm --entrypoint php "${release_exact_image}" -r '
+    docker run --rm --entrypoint php "${release_runtime_image}" -r '
         $errors = [];
         foreach (["pcntl", "pdo_pgsql", "pgsql", "posix", "sockets", "uv", "xmlreader"] as $extension) {
             if (!extension_loaded($extension)) {
@@ -143,4 +148,17 @@ release_validate_image() {
             exit(1);
         }
     '
+}
+
+release_validate_registry_image() {
+    release_tagged_image=$1
+    release_exact_image=$2
+    release_platform=$3
+    release_version=$4
+
+    release_registry_image_is_loaded "${release_tagged_image}" "${release_exact_image}" \
+        || release_fail "tagged image does not resolve to expected digest: ${release_tagged_image}"
+
+    release_validate_runtime_image \
+        "${release_tagged_image}" "${release_platform}" "${release_version}"
 }

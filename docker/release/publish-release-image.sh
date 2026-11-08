@@ -51,7 +51,7 @@ tag_commit=$(git -C "${project_root}" rev-parse "refs/tags/${release_version}^{c
 
 tagged_image="${image_prefix}/app:${image_tag}"
 exact_image="${image_prefix}/app@${image_digest}"
-release_validate_image "${tagged_image}" "${exact_image}" "${platform}" "${release_version}"
+release_validate_registry_image "${tagged_image}" "${exact_image}" "${platform}" "${release_version}"
 application_source_commit=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "${exact_image}")
 git -C "${project_root}" cat-file -e "${application_source_commit}^{commit}" 2>/dev/null \
     || release_fail "image source revision is not available in the application repository"
@@ -62,6 +62,6 @@ if [ "${application_source_commit}" != "${release_commit}" ]; then
 fi
 
 docker push "${tagged_image}"
-release_validate_image "${tagged_image}" "${exact_image}" "${platform}" "${release_version}"
+release_validate_registry_image "${tagged_image}" "${exact_image}" "${platform}" "${release_version}"
 
 echo "Frozen release image published: ${exact_image}"

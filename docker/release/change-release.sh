@@ -43,8 +43,10 @@ archive_name="source-${platform_slug}.tar"
 archive_path="${artifact_dir}/${archive_name}"
 manifest_path="${artifact_dir}/source-manifest.txt"
 
-if docker image inspect "${exact_image}" >/dev/null 2>&1; then
-    echo "Exact image is already loaded; archive verification and docker load are skipped."
+if release_registry_image_is_loaded "${tagged_image}" "${exact_image}"; then
+    echo "Frozen registry digest is already loaded; archive verification and docker load are skipped."
+    release_validate_registry_image \
+        "${tagged_image}" "${exact_image}" "${platform}" "${release_version}"
 else
     release_require_file "${archive_path}"
     release_require_file "${manifest_path}"
@@ -72,9 +74,11 @@ else
 
     echo "Loading verified image archive: ${archive_path}"
     docker load --input "${archive_path}"
-fi
 
-release_validate_image "${tagged_image}" "${exact_image}" "${platform}" "${release_version}"
+    release_validate_runtime_image \
+        "${tagged_image}" "${platform}" "${release_version}"
+    echo "Offline image tag is bound to the verified archive checksum; a registry digest association is not required."
+fi
 
 COMPOSE_ENV_FILE="${app_env_file}" \
     RELEASE_ENV_FILE="${release_env_file}" \

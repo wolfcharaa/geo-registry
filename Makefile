@@ -88,6 +88,10 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/scripts/build-production-image.sh \
 		docker/scripts/run-release-smoke.sh \
 		docker/compose/prod.sh
+	sh -n \
+		docker/release/tests/change-release-offline-test.sh \
+		docker/release/tests/fixtures/docker
+	docker/release/tests/change-release-offline-test.sh
 	test -f docs/deployment/offline-release.md
 	test -f docs/deployment/release-deploy.md
 .PHONY: release-check

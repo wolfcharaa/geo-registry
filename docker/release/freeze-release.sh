@@ -43,7 +43,7 @@ image_tag="${release_version}-${platform_slug}"
 tagged_image="${image_prefix}/app:${image_tag}"
 exact_image="${image_prefix}/app@${image_digest}"
 
-release_validate_image "${tagged_image}" "${exact_image}" "${platform}" "${release_version}"
+release_validate_registry_image "${tagged_image}" "${exact_image}" "${platform}" "${release_version}"
 current_commit=$(git -C "${project_root}" rev-parse HEAD)
 image_source_commit=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "${exact_image}")
 [ "${image_source_commit}" = "${current_commit}" ] \

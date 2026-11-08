@@ -43,10 +43,14 @@ RELEASE_VERSION=v0.1.0
 COMPOSE_PROJECT_NAME=geo-registry
 ```
 
-Один tracked release-файл указывает на один точный tag и его OCI manifest
-digest. Compose запускает image только по digest и использует
-`pull_policy: never`: отсутствующий локальный image является ошибкой, а не
-причиной неявно скачать другой build.
+Один tracked release-файл указывает на один frozen version tag и его OCI
+manifest digest. Connected release gate проверяет соответствие tag registry
+digest-у. Offline gate проверяет SHA-256 Docker archive, загружает из него тот
+же tag и проверяет platform, version label и runtime. Compose запускает только
+этот локально проверенный tag с `pull_policy: never`: отсутствующий image
+является ошибкой, а не причиной неявно скачать другой build. Это разделение
+необходимо, потому что `docker save`/`docker load` переносит repository tag, но
+не обязано восстанавливать registry `RepoDigest` на другом image store.
 Checksum manifest и offline archive создаются отдельным release workflow,
 описанным в [offline-release.md](offline-release.md).
 
@@ -101,7 +105,9 @@ make verify-release DOCKER_PLATFORM=linux/amd64
 ```
 
 Для offline target `make verify-release` проверяет manifest/checksum и загружает
-image из `docker/data/release/<tag>/`, если digest ещё отсутствует локально.
+image из `docker/data/release/<tag>/`, если registry digest отсутствует
+локально. После `docker load` проверяется frozen tag; наличие `RepoDigest` для
+offline image не требуется.
 
 ```shell
 make prod-config

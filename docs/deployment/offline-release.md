@@ -193,9 +193,12 @@ compatibility и выполнить read-only release gate:
 make verify-release
 ```
 
-Если exact digest уже загружен, archive не требуется. Если image отсутствует,
-команда fail-closed проверяет manifest и SHA-256 до `docker load`. Фактическое
-переключение:
+Если tag уже связан с frozen registry digest, archive не требуется. В offline
+сценарии команда fail-closed проверяет manifest и SHA-256 до `docker load`, а
+затем проверяет загруженный version tag, platform, OCI version label и runtime.
+`docker load` не обязан восстанавливать registry `RepoDigest`, поэтому offline
+проверка не пытается использовать `repository@digest` как локальное имя.
+Фактическое переключение:
 
 ```shell
 make change-release

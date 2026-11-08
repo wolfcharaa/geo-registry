@@ -161,9 +161,11 @@ transport archive по [offline release](offline-release.md).
 GitHub tag содержит исходники и документацию, но не содержит Docker image,
 PostgreSQL/Nominatim dumps, OpenSearch index, GAR XML или secrets.
 
-Deployable production release требует exact application image, digest, frozen
-`docker/compose/prod/release.env`, data backup/restore gate и, если сервер
-изолирован, offline transport archive. Сборка transport описана в
+Deployable production release требует frozen application tag, его registry
+digest, frozen `docker/compose/prod/release.env`, data backup/restore gate и,
+если сервер изолирован, checksummed offline transport archive. Connected gate
+проверяет registry digest, а offline gate связывает tag с SHA-256 archive.
+Сборка transport описана в
 [offline release](offline-release.md), а новый target — в
 [сквозном руководстве развёртывания](release-deploy.md). Нельзя записывать
 случайный digest только ради tag и нельзя перепривязывать уже опубликованный

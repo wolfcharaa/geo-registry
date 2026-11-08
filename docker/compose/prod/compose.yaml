@@ -1,6 +1,6 @@
 name: "${COMPOSE_PROJECT_NAME:-geo-registry}"
 
-x-app-image: &app-image "${DOCKER_IMAGE_PREFIX:?Set the full registry namespace prefix}/app@${APP_IMAGE_DIGEST:?Set the immutable application image digest}"
+x-app-image: &app-image "${DOCKER_IMAGE_PREFIX:?Set the full registry namespace prefix}/app:${APP_IMAGE_TAG:?Set the frozen application image tag}"
 
 x-app-service: &app-service
   image: *app-image

@@ -156,8 +156,10 @@ cp "${RELEASE_MEDIA}/source-manifest.txt" \
 make verify-release DOCKER_PLATFORM="${RELEASE_PLATFORM}"
 ```
 
-`verify-release` проверяет tag/digest/platform/runtime и при отсутствии exact
-image проверяет checksum payload до `docker load`. Containers не меняются.
+`verify-release` проверяет frozen tag/digest/platform/runtime. Если registry
+digest локально недоступен, команда проверяет checksum payload до
+`docker load`, затем валидирует загруженный tag. Registry `RepoDigest` после
+offline load не требуется. Containers не меняются.
 
 ## 5. Извлечь И Проверить PostgreSQL Backup
 
@@ -281,7 +283,7 @@ make change-release DOCKER_PLATFORM="${RELEASE_PLATFORM}"
 make prod-ps
 ```
 
-`change-release` повторно проверяет exact image и MessageBus registry, затем
+`change-release` повторно проверяет frozen image и MessageBus registry, затем
 пересоздаёт только application HTTP и два worker processes с `--no-build` и
 `--pull never`. PostgreSQL, OpenSearch, Nominatim и их volumes не изменяются.
 
