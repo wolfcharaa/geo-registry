@@ -14,6 +14,9 @@
   manifest при импорте.
 - Offline release получил opt-in application PostgreSQL dump, проверяемое
   извлечение на новом сервере и явный restore/rebuild OpenSearch runbook.
+- Release workflow получил единый immutable tag-контракт, явные registry
+  publish/pull команды, внешний SHA-256 файл transport archive и автономный
+  runbook checkout → shadow restore → OpenSearch rebuild → запуск → smoke.
 
 ## [0.1.0] - 2026-11-07
 

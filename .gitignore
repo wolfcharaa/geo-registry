@@ -16,3 +16,4 @@
 /geo-registry-server-source-*.tar
 /release-geo-registry-*.bundle
 /release-geo-registry-*-offline.tar
+/release-geo-registry-*-offline.tar.sha256

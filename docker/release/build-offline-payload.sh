@@ -25,6 +25,7 @@ image_tag=$(release_env_value APP_IMAGE_TAG "${release_env_file}" || true)
 image_digest=$(release_env_value APP_IMAGE_DIGEST "${release_env_file}" || true)
 image_prefix=$(release_env_value DOCKER_IMAGE_PREFIX "${app_env_file}" || true)
 platform=${DOCKER_PLATFORM:-linux/amd64}
+release_branch=${RELEASE_BRANCH:-main}
 
 release_validate_version "${release_version}"
 release_validate_digest "${image_digest}"
@@ -38,6 +39,9 @@ expected_tag="${release_version}-${platform_slug}"
 
 [ -z "$(git -C "${project_root}" status --porcelain)" ] \
     || release_fail "repository must be clean before building release artifacts"
+current_branch=$(git -C "${project_root}" branch --show-current)
+[ "${current_branch}" = "${release_branch}" ] \
+    || release_fail "release payload must be built from ${release_branch}, current branch is ${current_branch:-detached}"
 
 tagged_image="${image_prefix}/app:${image_tag}"
 exact_image="${image_prefix}/app@${image_digest}"

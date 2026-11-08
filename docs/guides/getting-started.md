@@ -103,6 +103,7 @@ Nominatim database и OpenSearch index не наполняют друг друг
 - [Проверить HTTP API](../api/openapi.yaml).
 - [Настроить PostgreSQL](../postgresql-tuning.md).
 - [Подготовить production runtime](../deployment/production-compose.md).
+- [Развернуть tag и готовый PostgreSQL backup](../deployment/release-deploy.md).
 
 Остановить development runtime без удаления volumes:
 

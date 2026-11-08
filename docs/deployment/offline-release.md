@@ -18,6 +18,10 @@ RELEASE.md
 DEPLOY.md
 ```
 
+Рядом создаётся отдельный checksum-файл
+`release-geo-registry-vX.Y.Z-offline.tar.sha256`. Он не вкладывается внутрь
+проверяемого tar и передаётся по согласованному каналу вместе с ним.
+
 Full-data вариант содержит шестой файл:
 
 ```text
@@ -40,8 +44,9 @@ release commit. Архив содержит production data без пароля:
 
 ## Подготовка Релиза
 
-Release version использует формат `vMAJOR.MINOR.PATCH`. Начинать нужно с clean
-application repository и актуального `app/composer.lock`:
+Release version использует формат `vMAJOR.MINOR.PATCH`. Это должна быть новая,
+ещё не существующая версия. Начинать нужно с clean `main` и актуального
+`app/composer.lock`:
 
 ```shell
 make build-production \
@@ -63,10 +68,22 @@ make freeze-release \
 
 Freeze проверяет exact local image, platform, runtime extensions, autoload и
 совпадение image source revision с текущим HEAD. Он меняет только tracked
-`docker/compose/prod/release.env`. После review нужно создать отдельный release
-commit и annotated tag по Git conventions. Release commit не должен содержать
-никаких других изменений: image уже построен из его родительского source
-commit, а manifest проверяет эту границу.
+`docker/compose/prod/release.env`. После review создаётся отдельный release
+commit и новый annotated tag:
+
+```shell
+git status --short
+git diff -- docker/compose/prod/release.env
+git add docker/compose/prod/release.env
+git commit -m "CHORE(release): Зафиксирован релиз v1.0.0"
+git tag -a v1.0.0 -m "Release v1.0.0"
+```
+
+Release commit не должен содержать никаких других изменений: image уже
+построен из его родительского source commit, а manifest проверяет эту границу.
+Существующий tag, включая source-only tag с `RELEASE_VERSION=unreleased`,
+перемещать или переиспользовать запрещено. Полный tag gate находится в
+`docs/deployment/source-release.md` в repository checkout.
 
 После commit/tag:
 
@@ -77,8 +94,9 @@ make release-offline DOCKER_PLATFORM=linux/amd64
 Команда повторно проверяет image, создаёт atomic Docker archive и manifest,
 проверяет Git bundle в пустом bare repository и собирает flat transport tar в
 корне проекта. Все промежуточные payloads находятся в ignored
-`docker/data/release/<tag>/`. Напечатанный SHA-256 внешнего tar нужно хранить и
-передавать отдельно от самого файла.
+`docker/data/release/<tag>/`. Готовые `.tar` и `.tar.sha256` не
+перезаписываются: существующий artifact нужно сначала перенести в versioned
+protected storage.
 
 Чтобы сразу снять transaction-consistent dump из запущенного application
 PostgreSQL и включить его в тот же transport archive, сначала остановите новые
@@ -110,25 +128,34 @@ archive не создаётся и не включается.
 
 ```shell
 tar -tf release-geo-registry-v1.0.0-offline.tar
+sha256sum --check release-geo-registry-v1.0.0-offline.tar.sha256
 ```
 
 ## Установка С Носителя
 
-Каждый release распаковывается в свой каталог:
+Перенесите `.tar` и `.tar.sha256` в один каталог. Каждый release
+распаковывается в свой versioned directory:
 
 ```shell
+cd /srv/releases/geo-registry
+sha256sum --check release-geo-registry-v1.0.0-offline.tar.sha256
 mkdir -p /srv/releases/geo-registry/v1.0.0
-tar -xf /media/release-geo-registry-v1.0.0-offline.tar \
+tar -xf release-geo-registry-v1.0.0-offline.tar \
   -C /srv/releases/geo-registry/v1.0.0
 ```
 
-Сначала сверяется внешний SHA-256. Затем source checkout получает tag из
-bundle, а payload копируется в ignored release directory:
+Создать новый checkout из bundle можно без заранее клонированного repository:
 
 ```shell
+mkdir -p /srv/apps/geo-registry
+cd /srv/apps/geo-registry
+git init
 git fetch /srv/releases/geo-registry/v1.0.0/release-geo-registry-v1.0.0.bundle \
+  refs/heads/main:refs/remotes/release/main \
   refs/tags/v1.0.0:refs/tags/v1.0.0
 git switch --detach v1.0.0
+test "$(git cat-file -t refs/tags/v1.0.0)" = tag
+test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/v1.0.0^{commit}')"
 
 mkdir -p docker/data/release/v1.0.0
 cp /srv/releases/geo-registry/v1.0.0/source-linux-amd64.tar \
@@ -159,8 +186,7 @@ make extract-release-data \
 с обычными `verify-data-backup` и `restore-data-shadow`. Restore не выполняется
 автоматически и не может затронуть действующую БД.
 
-Перед изменением runtime создать ignored `config/prod.env`, выполнить
-[data backup/restore gate](data-backup-restore.md), проверить schema
+Перед изменением runtime создать ignored `config/prod.env`, проверить schema
 compatibility и выполнить read-only release gate:
 
 ```shell
@@ -187,6 +213,11 @@ services и их volumes не затрагиваются. Migrations/import/rebu
 3. `gar:integrity --regions=50,77 --deep --only-failed` на восстановленной БД;
 4. `opensearch:reindex`, затем `opensearch:status` и search smoke;
 5. только после этих gates — переключение DSN/application runtime.
+
+Точные copy-paste команды, включая требования к target PostgreSQL, DSN,
+одноразовые application containers, OpenSearch rebuild и финальный smoke,
+находятся в `DEPLOY.md` рядом с этим файлом. В repository это
+`docs/deployment/release-deploy.md`.
 
 ## Rollback
 

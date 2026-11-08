@@ -1730,7 +1730,11 @@ nationwide import; региональный 50/77 path завершился бе
   standalone docs. Изолированный `v0.0.0-e2e` rehearsal подтвердил оба пути
   `verify-release`: reuse загруженного digest и checksum + `docker load` после
   удаления test image. Switch пересоздаёт только HTTP и два worker services;
-  rollback использует тот же механизм с предыдущим tag/payload.
+  rollback использует тот же механизм с предыдущим tag/payload. Следующая
+  итерация закрепила один новый annotated tag после image freeze, запретила
+  reuse/move существующего tag, добавила явные registry `release-publish` /
+  `release-pull`, внешний `.sha256` transport artifact и автономный
+  [new-server runbook](../deployment/release-deploy.md) от checkout до smoke.
 - [ ] Зафиксировать backup/restore для application PostgreSQL, target
   Nominatim и rebuildable OpenSearch отдельно. Fail-closed tooling и
   [runbook](../deployment/data-backup-restore.md) готовы: logical dumps имеют

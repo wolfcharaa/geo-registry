@@ -55,26 +55,32 @@ if [ "$(id -u)" -eq 0 ] || [ -n "${SUDO_USER:-}" ]; then
     fail "run as the build user, without sudo"
 fi
 
-for command_name in docker git php tr; do
+for command_name in docker git grep php tr; do
     require_command "${command_name}"
 done
 
 image_prefix=${DOCKER_IMAGE_PREFIX:-}
 release_version=${RELEASE_VERSION:-}
 platform=${DOCKER_PLATFORM:-linux/amd64}
+release_branch=${RELEASE_BRANCH:-main}
 
 case "${image_prefix}" in
     ''|*' '*|*@*|*/) fail "DOCKER_IMAGE_PREFIX must be a full registry namespace prefix without a tag or trailing slash" ;;
 esac
-case "${release_version}" in
-    ''|*' '*|*/*|*@*|*:* ) fail "RELEASE_VERSION must be one release identifier" ;;
-esac
+printf '%s\n' "${release_version}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$' \
+    || fail "RELEASE_VERSION must use vMAJOR.MINOR.PATCH syntax"
 case "${platform}" in
     linux/amd64|linux/arm64) ;;
     *) fail "DOCKER_PLATFORM must be linux/amd64 or linux/arm64" ;;
 esac
 
 require_clean_repository "${project_root}" geo-registry
+current_branch=$(git -C "${project_root}" branch --show-current)
+[ "${current_branch}" = "${release_branch}" ] \
+    || fail "release image must be built from ${release_branch}, current branch is ${current_branch:-detached}"
+if git -C "${project_root}" show-ref --verify --quiet "refs/tags/${release_version}"; then
+    fail "release tag already exists and must not be reused: ${release_version}"
+fi
 core_revision=$(locked_reference romanfedorskij/message-bus-async)
 worker_revision=$(locked_reference romanfedorskij/message-bus-async-worker)
 

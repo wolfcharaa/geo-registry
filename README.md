@@ -23,7 +23,9 @@ geocoding.
    suggest, find-by-id и reverse-geocode.
 4. [Перенести готовую базу](docs/deployment/data-backup-restore.md) — создать
    проверяемый backup и восстановить его в shadow database.
-5. [Перейти с legacy](docs/migration/from-legacy.md) — сопоставить старые и
+5. [Выпустить и развернуть релиз](docs/deployment/release-deploy.md) —
+   подготовить tag/image, перенести PostgreSQL и запустить новый сервер.
+6. [Перейти с legacy](docs/migration/from-legacy.md) — сопоставить старые и
    новые команды, данные и ограничения.
 
 ## Быстрый Запуск
@@ -69,12 +71,17 @@ make load-check
 Основные команды:
 
 ```shell
-bin/app gar:releases --json
-bin/app gar:import /data/gar --regions=50,77 --batch-size=50000 --workers=4
-bin/app gar:address-search:rebuild --batch-size=50000
-bin/app gar:integrity --regions=50,77 --deep --only-failed
-bin/app gar:status --regions=50,77 --exact
-bin/app datamos:address-registry:download --dry-run
+docker/compose/dev.sh run --rm --no-deps app bin/app gar:releases --json
+docker/compose/dev.sh run --rm --no-deps app \
+  bin/app gar:import /data/gar --regions=50,77 --batch-size=50000 --workers=4
+docker/compose/dev.sh run --rm --no-deps app \
+  bin/app gar:address-search:rebuild --batch-size=50000
+docker/compose/dev.sh run --rm --no-deps app \
+  bin/app gar:integrity --regions=50,77 --deep --only-failed
+docker/compose/dev.sh run --rm --no-deps app \
+  bin/app gar:status --regions=50,77 --exact
+docker/compose/dev.sh run --rm --no-deps app \
+  bin/app datamos:address-registry:download --dry-run
 ```
 
 `gar:import --regions=50,77` оставляет общие root-справочники release и читает
@@ -149,6 +156,7 @@ make worker-logs
 - [Production Compose](docs/deployment/production-compose.md)
 - [Source release](docs/deployment/source-release.md)
 - [Offline release](docs/deployment/offline-release.md)
+- [Развёртывание релиза с готовыми данными](docs/deployment/release-deploy.md)
 
 Исторические сравнения, benchmark и migration evidence находятся в
 `docs/migration/`; для первого запуска они не нужны.

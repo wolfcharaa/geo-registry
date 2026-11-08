@@ -160,12 +160,20 @@ cluster/volume остаётся инфраструктурной операци�
 До изменения production DSN восстановленная БД подключается только к
 одноразовому application container той же immutable revision. Credentials
 передаются через ignored runtime env/secret store, не через tracked файлы.
-Обязательны:
+Сначала укажите shadow-БД в ignored `config/prod.env` и загрузите exact image
+через `make release-pull` либо `make verify-release` с offline payload.
+Постоянные application processes на этом шаге ещё не запускаются.
+
+Обязательные команды с host checkout:
 
 ```shell
-bin/app migrate:history
-bin/app gar:integrity --regions=50,77 --deep --only-failed
-bin/app worker:status --group=geo-registry --children
+docker/compose/prod.sh run --rm --no-deps app bin/app migrate:history
+docker/compose/prod.sh run --rm --no-deps app \
+  bin/app gar:integrity --regions=50,77 --deep --only-failed
+docker/compose/prod.sh run --rm --no-deps app \
+  bin/app gar:status --regions=50,77 --exact
+docker/compose/prod.sh run --rm --no-deps app \
+  bin/app worker:status --group=geo-registry --children
 ```
 
 Дополнительно сверяются import manifests, row counts регионов 50/77,
@@ -178,15 +186,16 @@ processes. Исходная БД сохраняется до окончания 
 До data switch сохранить вывод:
 
 ```shell
-bin/app opensearch:status
+docker/compose/prod.sh run --rm --no-deps app bin/app opensearch:status
 ```
 
 После application PostgreSQL restore создать пустой OpenSearch target и
 выполнить из той же application revision:
 
 ```shell
-bin/app opensearch:reindex
-bin/app opensearch:status
+docker/compose/prod.sh run --rm --no-deps app \
+  bin/app opensearch:reindex --batch-size=10000 --concurrency=8
+docker/compose/prod.sh run --rm --no-deps app bin/app opensearch:status
 ```
 
 Gate требует healthy cluster, один ожидаемый read alias, parity source/target,
@@ -219,3 +228,7 @@ Tooling и read-only capacity preflight сами по себе не закрыв
 restore создал новую shadow-БД и сохранил строку. После проверки shadow-БД,
 dump-каталог и tmpfs integration container удалены. Это доказывает механику
 скриптов, но не заменяет restore полного production dataset и Nominatim.
+
+Полная последовательность для нового сервера — checkout tag, image load/pull,
+restore, DSN, GAR/OpenSearch gates, `change-release` и smoke — находится в
+[сквозном руководстве развёртывания](release-deploy.md).

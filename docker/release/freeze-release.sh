@@ -18,6 +18,7 @@ fi
 release_version=${RELEASE_VERSION:-${1:-}}
 image_digest=${APP_IMAGE_DIGEST:-${2:-}}
 platform=${DOCKER_PLATFORM:-linux/amd64}
+release_branch=${RELEASE_BRANCH:-main}
 app_env_file=$(release_resolve_path "${COMPOSE_ENV_FILE:-config/prod.env}")
 release_env_file="${project_root}/docker/compose/prod/release.env"
 
@@ -28,6 +29,12 @@ release_require_file "${app_env_file}"
 
 [ -z "$(git -C "${project_root}" status --porcelain)" ] \
     || release_fail "repository must be clean before freezing a release"
+current_branch=$(git -C "${project_root}" branch --show-current)
+[ "${current_branch}" = "${release_branch}" ] \
+    || release_fail "release identity must be frozen on ${release_branch}, current branch is ${current_branch:-detached}"
+if git -C "${project_root}" show-ref --verify --quiet "refs/tags/${release_version}"; then
+    release_fail "release tag already exists and must not be moved or reused: ${release_version}"
+fi
 
 image_prefix=$(release_env_value DOCKER_IMAGE_PREFIX "${app_env_file}" || true)
 release_validate_prefix "${image_prefix}"

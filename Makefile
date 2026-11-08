@@ -47,22 +47,55 @@ build: ## Build the PHP development image
 
 build-production: guard-user ## Build the self-contained production image from locked Composer packages
 	DOCKER_IMAGE_PREFIX="$(DOCKER_IMAGE_PREFIX)" RELEASE_VERSION="$(RELEASE_VERSION)" \
-		DOCKER_PLATFORM="$(DOCKER_PLATFORM)" docker/scripts/build-production-image.sh
+		DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_BRANCH="$(RELEASE_BRANCH)" \
+		docker/scripts/build-production-image.sh
 .PHONY: build-production
 
 freeze-release: guard-user ## Freeze the tracked production release identity for an already built image
 	RELEASE_VERSION="$(RELEASE_VERSION)" APP_IMAGE_DIGEST="$(APP_IMAGE_DIGEST)" \
-		DOCKER_PLATFORM="$(DOCKER_PLATFORM)" docker/release/freeze-release.sh
+		DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_BRANCH="$(RELEASE_BRANCH)" \
+		docker/release/freeze-release.sh
 .PHONY: freeze-release
 
 release-payload: guard-user ## Save the frozen application image and write its checksum manifest
 	DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
-		docker/release/build-offline-payload.sh
+		RELEASE_BRANCH="$(RELEASE_BRANCH)" docker/release/build-offline-payload.sh
 .PHONY: release-payload
+
+release-publish: guard-user ## Push the frozen exact application image to its configured registry
+	DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_BRANCH="$(RELEASE_BRANCH)" \
+		docker/release/publish-release-image.sh
+.PHONY: release-publish
+
+release-pull: guard-user ## Explicitly pull and verify the frozen exact application image
+	DOCKER_PLATFORM="$(DOCKER_PLATFORM)" docker/release/pull-release-image.sh
+.PHONY: release-pull
+
+release-check: guard-user ## Validate release, backup and production wrapper shell syntax
+	sh -n \
+		docker/release/release-lib.sh \
+		docker/release/freeze-release.sh \
+		docker/release/build-offline-payload.sh \
+		docker/release/build-offline-archive.sh \
+		docker/release/publish-release-image.sh \
+		docker/release/pull-release-image.sh \
+		docker/release/change-release.sh \
+		docker/release/extract-release-data.sh \
+		docker/backup/backup-lib.sh \
+		docker/backup/create-postgres-backup.sh \
+		docker/backup/verify-postgres-backup.sh \
+		docker/backup/restore-postgres-shadow.sh \
+		docker/scripts/build-production-image.sh \
+		docker/scripts/run-release-smoke.sh \
+		docker/compose/prod.sh
+	test -f docs/deployment/offline-release.md
+	test -f docs/deployment/release-deploy.md
+.PHONY: release-check
 
 release-offline: release-payload ## Assemble the flat tagged offline transport archive
 	DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
 		OFFLINE_ARCHIVE_PATH="$(OFFLINE_ARCHIVE_PATH)" \
+		RELEASE_BRANCH="$(RELEASE_BRANCH)" \
 		RELEASE_INCLUDE_APPLICATION_DATA="$(RELEASE_INCLUDE_APPLICATION_DATA)" \
 		RELEASE_DATA_BACKUP_DIR="$(RELEASE_DATA_BACKUP_DIR)" \
 		RELEASE_DATA_CONTAINER="$(RELEASE_DATA_CONTAINER)" \
@@ -295,6 +328,17 @@ smoke-release: registry-check ## Run strict executable Postman parity against pr
 		POSTMAN_BASE_URL=$${POSTMAN_BASE_URL:-http://host.docker.internal:$${APP_PORT:-8080}} \
 		docker/scripts/run-release-smoke.sh
 .PHONY: smoke-release
+
+smoke-release-prod: guard-user ## Run registry and strict Postman gates against the exact production image
+	$(PRODUCTION_COMPOSE) run --rm --no-deps app \
+		bin/app message-bus:registry:check --no-interaction
+	POSTMAN_COLLECTION="$(POSTMAN_COLLECTION)" \
+		POSTMAN_ENVIRONMENT="$(POSTMAN_ENVIRONMENT)" \
+		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
+		RELEASE_RUN_NAME="$(RELEASE_RUN_NAME)" \
+		POSTMAN_BASE_URL=$${POSTMAN_BASE_URL:-http://host.docker.internal:$${APP_PORT:-8080}} \
+		docker/scripts/run-release-smoke.sh
+.PHONY: smoke-release-prod
 
 help:
 	@awk 'BEGIN {FS=":.*?## "} /^[a-zA-Z0-9_-]+:.*## / {printf "%-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)

@@ -7,7 +7,7 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
 # shellcheck disable=SC1091
 . "${script_dir}/release-lib.sh"
 
-for command_name in awk cp docker git grep ln mkdir mktemp mv tar tr; do
+for command_name in awk basename cp docker git grep ln mkdir mktemp mv tar tr; do
     release_require_command "${command_name}"
 done
 
@@ -17,6 +17,10 @@ fi
 
 release_env_file=$(release_resolve_path "${RELEASE_ENV_FILE:-docker/compose/prod/release.env}")
 release_require_file "${release_env_file}"
+quick_guide_path="${project_root}/docs/deployment/offline-release.md"
+deploy_guide_path="${project_root}/docs/deployment/release-deploy.md"
+release_require_file "${quick_guide_path}"
+release_require_file "${deploy_guide_path}"
 release_version=$(release_env_value RELEASE_VERSION "${release_env_file}" || true)
 release_validate_version "${release_version}"
 platform=${DOCKER_PLATFORM:-linux/amd64}
@@ -34,11 +38,18 @@ tag_commit=$(git -C "${project_root}" rev-parse "refs/tags/${release_version}^{c
 
 branch=$(git -C "${project_root}" branch --show-current)
 [ -n "${branch}" ] || release_fail "offline archive must be built from a branch checkout"
+release_branch=${RELEASE_BRANCH:-main}
+[ "${branch}" = "${release_branch}" ] \
+    || release_fail "offline archive must be built from ${release_branch}, current branch is ${branch}"
 
 artifact_dir=$(release_resolve_path "${RELEASE_ARTIFACT_DIR:-docker/data/release/${release_version}}")
 archive_name="source-${platform_slug}.tar"
 archive_path="${artifact_dir}/${archive_name}"
 manifest_path="${artifact_dir}/source-manifest.txt"
+outer_path=$(release_resolve_path "${OFFLINE_ARCHIVE_PATH:-release-geo-registry-${release_version}-offline.tar}")
+checksum_path="${outer_path}.sha256"
+[ ! -e "${outer_path}" ] || release_fail "offline archive already exists: ${outer_path}"
+[ ! -e "${checksum_path}" ] || release_fail "offline checksum already exists: ${checksum_path}"
 release_require_file "${archive_path}"
 release_require_file "${manifest_path}"
 [ "$(release_manifest_value manifest_format "${manifest_path}" || true)" = 1 ] \
@@ -113,18 +124,22 @@ fi
 
 bundle_name="release-geo-registry-${release_version}.bundle"
 bundle_path="${artifact_dir}/${bundle_name}"
-outer_path=$(release_resolve_path "${OFFLINE_ARCHIVE_PATH:-release-geo-registry-${release_version}-offline.tar}")
 stage_dir=$(mktemp -d "${artifact_dir}/.offline-stage.XXXXXX")
 bundle_temporary=$(mktemp "${artifact_dir}/.${bundle_name}.tmp.XXXXXX")
 manifest_temporary=$(mktemp "${artifact_dir}/.source-manifest.bundle.tmp.XXXXXX")
 outer_temporary="${outer_path}.tmp"
+checksum_temporary="${checksum_path}.tmp"
 verifier_dir=
+outer_published=0
 cleanup() {
     rm -rf "${stage_dir}"
     if [ -n "${verifier_dir}" ]; then
         rm -rf "${verifier_dir}"
     fi
-    rm -f "${bundle_temporary}" "${manifest_temporary}" "${outer_temporary}"
+    rm -f "${bundle_temporary}" "${manifest_temporary}" "${outer_temporary}" "${checksum_temporary}"
+    if [ "${outer_published}" = 1 ]; then
+        rm -f "${outer_path}" "${checksum_path}"
+    fi
 }
 trap cleanup EXIT INT TERM
 
@@ -160,8 +175,8 @@ mv "${manifest_temporary}" "${manifest_path}"
 ln "${archive_path}" "${stage_dir}/${archive_name}"
 ln "${manifest_path}" "${stage_dir}/source-manifest.txt"
 ln "${bundle_path}" "${stage_dir}/${bundle_name}"
-cp "${project_root}/docs/deployment/offline-release.md" "${stage_dir}/RELEASE.md"
-cp "${project_root}/docs/deployment/production-compose.md" "${stage_dir}/DEPLOY.md"
+cp "${quick_guide_path}" "${stage_dir}/RELEASE.md"
+cp "${deploy_guide_path}" "${stage_dir}/DEPLOY.md"
 
 if [ "${include_application_data}" = 1 ]; then
     ln "${data_archive_path}" "${stage_dir}/${data_archive_name}"
@@ -204,9 +219,15 @@ fi
 [ "${actual_members}" = "${expected_members}" ] \
     || release_fail "offline archive contains an unexpected member list"
 
+outer_sha256=$(release_sha256 "${outer_temporary}")
+printf '%s  %s\n' "${outer_sha256}" "$(basename "${outer_path}")" > "${checksum_temporary}"
 mv "${outer_temporary}" "${outer_path}"
+outer_published=1
+mv "${checksum_temporary}" "${checksum_path}"
+outer_published=0
 trap - EXIT INT TERM
 rm -rf "${stage_dir}"
 
 echo "Offline release archive created: ${outer_path}"
-echo "SHA-256: $(release_sha256 "${outer_path}")"
+echo "SHA-256: ${outer_sha256}"
+echo "Checksum file: ${checksum_path}"

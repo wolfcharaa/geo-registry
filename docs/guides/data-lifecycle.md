@@ -270,4 +270,6 @@ make release-offline \
 а OpenSearch экспортировать как canonical data не нужно — после `pg_restore`
 он перестраивается. Полные команды находятся в
 [offline release](../deployment/offline-release.md) и
-[runbook backup/restore](../deployment/data-backup-restore.md).
+[runbook backup/restore](../deployment/data-backup-restore.md). Сквозной новый
+сервер — checkout tag, shadow restore, rebuild и запуск — описан в
+[release deploy](../deployment/release-deploy.md).

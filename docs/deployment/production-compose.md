@@ -92,6 +92,17 @@ Production image использует `ext-ev + ext-pq`, а process/socket/resou
 
 ## Проверка И Запуск
 
+На connected target exact image загружается отдельной явной командой; Compose
+никогда не выполняет implicit pull:
+
+```shell
+make release-pull DOCKER_PLATFORM=linux/amd64
+make verify-release DOCKER_PLATFORM=linux/amd64
+```
+
+Для offline target `make verify-release` проверяет manifest/checksum и загружает
+image из `docker/data/release/<tag>/`, если digest ещё отсутствует локально.
+
 ```shell
 make prod-config
 make prod-up
@@ -134,3 +145,7 @@ application PostgreSQL dump, но Compose никогда не восстанав
 автоматически. Проверяемый порядок создания logical dumps, shadow restore и
 rebuild OpenSearch описан в
 [data-backup-restore.md](data-backup-restore.md).
+
+Сквозной новый deployment с checkout tag, shadow restore, OpenSearch rebuild и
+финальным smoke описан в [release-deploy.md](release-deploy.md). Это основной
+operator runbook; текущий документ описывает только application Compose.
