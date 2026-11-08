@@ -593,6 +593,11 @@ recoverability текущей очереди.
 - Conflict check: A согласуется с Decisions 1–3, только если сохраняет sync query
   contracts, необходимые Geo Registry. Вариант с async-only API конфликтует с
   Decision 2 и потребует заново открыть выбор QueryBus.
+- Resolution `2026-11-09`: `romanfedorskij/message-bus-amphp` deprecated,
+  локальный checkout удалён, runtime-зависимостей на package в Geo Registry и
+  актуальном семействе библиотек нет. Упоминания выше сохранены как историческое
+  evidence принятого package-topology решения; отдельная поддержка или
+  migration work для package больше не планируется.
 
 ### Decision 5 — Что именно уходит в optional worker package?
 
