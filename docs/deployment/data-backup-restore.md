@@ -9,6 +9,10 @@ Production Compose переключает только процессы прил
 `RELEASE_INCLUDE_APPLICATION_DATA=1` упаковывается в full-data offline archive;
 в обоих случаях restore остаётся отдельной подтверждаемой операцией.
 
+Для локального development restore с последующим OpenSearch rebuild используйте
+[development data bootstrap](../guides/development-data-bootstrap.md); этот
+runbook остаётся production-oriented и не подменяет development config.
+
 ## Граница Ответственности
 
 | Система | Роль | Backup | Restore gate |

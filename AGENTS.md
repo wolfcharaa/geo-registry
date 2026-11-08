@@ -23,6 +23,18 @@ source namespaces under `app/tests/`.
 Development containers and smoke scripts live in `docker/`; local settings are
 copied from `config/.env.example` to the ignored `config/.env`.
 
+## Data Restore & Search Projection
+
+Before using a ready database artifact, classify it instead of copying files
+into a Docker volume: a full-data release follows
+`docs/deployment/release-deploy.md`, a verified application PostgreSQL backup
+for local development follows `docs/guides/development-data-bootstrap.md`, and
+raw GAR XML follows `docs/guides/data-lifecycle.md`. Reject a standalone dump
+without its manifest. PostgreSQL is the source of truth; after restore rebuild
+OpenSearch from `address_search`, verify `opensearch:status`, and only then
+enable OpenSearch search. Never restore over the active database or treat an
+OpenSearch volume as the canonical backup.
+
 ## Build, Test & Development Commands
 
 - `make config` creates the local environment file without overwriting it.

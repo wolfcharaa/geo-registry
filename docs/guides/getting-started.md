@@ -100,6 +100,7 @@ Nominatim database и OpenSearch index не наполняют друг друг
 ## 5. Выбрать Следующий Шаг
 
 - [Скачать GAR, выделить регионы 50/77 и построить поиск](data-lifecycle.md).
+- [Восстановить готовый PostgreSQL backup и построить OpenSearch](development-data-bootstrap.md).
 - [Проверить HTTP API](../api/openapi.yaml).
 - [Настроить PostgreSQL](../postgresql-tuning.md).
 - [Подготовить production runtime](../deployment/production-compose.md).

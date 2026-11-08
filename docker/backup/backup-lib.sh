@@ -155,6 +155,8 @@ backup_validate_bundle() {
 
     backup_component=$(backup_manifest_value component "${backup_manifest}" || true)
     backup_validate_component "${backup_component}"
+    backup_application_revision=$(backup_manifest_value application_revision "${backup_manifest}" || true)
+    backup_validate_revision application_revision "${backup_application_revision}"
     backup_dump_name=$(backup_manifest_value dump_file "${backup_manifest}" || true)
     [ "${backup_dump_name}" = "${backup_component}.dump" ] \
         || backup_fail "manifest dump file does not match its component"

@@ -23,9 +23,11 @@ geocoding.
    suggest, find-by-id и reverse-geocode.
 4. [Перенести готовую базу](docs/deployment/data-backup-restore.md) — создать
    проверяемый backup и восстановить его в shadow database.
-5. [Выпустить и развернуть релиз](docs/deployment/release-deploy.md) —
+5. [Поднять development из готового backup](docs/guides/development-data-bootstrap.md)
+   — восстановить PostgreSQL и заново построить OpenSearch.
+6. [Выпустить и развернуть релиз](docs/deployment/release-deploy.md) —
    подготовить tag/image, перенести PostgreSQL и запустить новый сервер.
-6. [Перейти с legacy](docs/migration/from-legacy.md) — сопоставить старые и
+7. [Перейти с legacy](docs/migration/from-legacy.md) — сопоставить старые и
    новые команды, данные и ограничения.
 
 ## Быстрый Запуск
@@ -149,6 +151,7 @@ make worker-logs
 
 - [Первый запуск](docs/guides/getting-started.md)
 - [Получение, импорт и нормализация данных](docs/guides/data-lifecycle.md)
+- [Development из готового PostgreSQL backup](docs/guides/development-data-bootstrap.md)
 - [Архитектурные границы](docs/architecture.md)
 - [Thesis DIC и scopes](docs/development/thesis-dic.md)
 - [PostgreSQL tuning](docs/postgresql-tuning.md)

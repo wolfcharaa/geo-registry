@@ -8,6 +8,10 @@ OSM aliases, Nominatim и OpenSearch подключаются после баз�
 может по явному флагу включить application PostgreSQL dump; исходные архивы,
 распаковки и рабочие backups всё равно хранятся вне repository.
 
+Если уже есть проверенный application PostgreSQL backup, не повторяйте GAR
+import: используйте [development bootstrap из готового backup](development-data-bootstrap.md),
+а затем заново постройте OpenSearch из восстановленного `address_search`.
+
 ## Какие Данные Нужны
 
 | Слой | Источник | Для чего |

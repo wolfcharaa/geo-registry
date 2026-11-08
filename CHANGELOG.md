@@ -17,6 +17,9 @@
 - Release workflow получил единый immutable tag-контракт, явные registry
   publish/pull команды, внешний SHA-256 файл transport archive и автономный
   runbook checkout → shadow restore → OpenSearch rebuild → запуск → smoke.
+- Добавлен fail-closed development bootstrap из PostgreSQL backup: manifest
+  проверяет application revision, restore идёт в новую БД, а OpenSearch
+  перестраивается из `address_search` до включения search.
 
 ## [0.1.0] - 2026-11-07
 
