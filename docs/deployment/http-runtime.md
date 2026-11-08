@@ -53,7 +53,7 @@ upstream GC regression и могут завершить long-lived process с
 | `APP_HTTP_WORKER_HEARTBEAT_TIMEOUT_SECONDS` | `15` | `15` | Максимальный возраст heartbeat, не меньше двух интервалов; `[2×interval..900]` |
 | `APP_HTTP_CONNECTION_LIMIT` | `512` | `1024` | Одновременные connections на worker |
 | `APP_HTTP_CONNECTIONS_PER_IP_LIMIT` | `64` | `0` | Лимит на client IP; `0` отключает его за reverse proxy |
-| `APP_HTTP_CONCURRENCY_LIMIT` | `256` | `512` | Одновременные requests на worker; `0` отключает limiter |
+| `APP_HTTP_CONCURRENCY_LIMIT` | `256` | `512` | Максимум допущенных requests на worker; только положительное значение |
 | `APP_HTTP_BACKLOG` | `512` | `1024` | TCP listen backlog |
 | `APP_HTTP_COMPRESSION_ENABLED` | `1` | `1` | Response compression при наличии zlib |
 | `HTTP_DATABASE_POOL_SIZE` | `4` | `4` | PostgreSQL connections на HTTP worker |
@@ -66,9 +66,16 @@ upstream GC regression и могут завершить long-lived process с
 | `ADDRESS_SEARCH_CACHE_NAMESPACE` | `v1` | `v1` | Версия локальной generation, безопасные `1..64` символа |
 
 Connection/concurrency limits относятся к одному HTTP worker. При двух workers
-эффективный верхний предел вдвое больше. Контейнер получает `nofile=65536`, но
-его нельзя считать разрешением бесконтрольно увеличивать application limits:
-нужно учитывать ingress, память и PostgreSQL capacity.
+эффективный верхний предел вдвое больше. Admission не создаёт очередь: когда
+`APP_HTTP_CONCURRENCY_LIMIT` исчерпан, следующий request сразу получает `503`
+с `error_code=http_capacity_exhausted` и `Retry-After: 1`, а handler и request
+scope не запускаются. Событие `http.request.admission.rejected` содержит limit,
+текущий in-flight count и монотонный счётчик отказов процесса. Значение `0`
+запрещено, потому что отключало бы обязательную границу нагрузки.
+
+Контейнер получает `nofile=65536`, но его нельзя считать разрешением
+бесконтрольно увеличивать application limits: нужно учитывать ingress, память и
+PostgreSQL capacity.
 
 Search cache также принадлежит одному worker process. При двух workers hot set
 может занимать до `2 × ADDRESS_SEARCH_CACHE_MAX_ENTRIES`, а первый одинаковый

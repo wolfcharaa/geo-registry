@@ -249,6 +249,14 @@ final class RuntimeConfigTest
     }
 
     #[ExpectException(InvalidArgumentException::class)]
+    public function testHttpConcurrencyLimitCannotBeDisabled(): void
+    {
+        HttpServerConfig::fromEnvironment(new EnvironmentSnapshot([
+            'APP_HTTP_CONCURRENCY_LIMIT' => '0',
+        ]));
+    }
+
+    #[ExpectException(InvalidArgumentException::class)]
     public function testHttpWorkerMemoryLimitMustFitIntoBytes(): void
     {
         HttpServerConfig::fromEnvironment(new EnvironmentSnapshot([

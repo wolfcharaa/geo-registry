@@ -88,8 +88,8 @@ final readonly class HttpServerConfig
         if ($this->connectionsPerIpLimit < 0) {
             throw new InvalidArgumentException('APP_HTTP_CONNECTIONS_PER_IP_LIMIT must be non-negative.');
         }
-        if ($this->concurrencyLimit < 0) {
-            throw new InvalidArgumentException('APP_HTTP_CONCURRENCY_LIMIT must be non-negative.');
+        if ($this->concurrencyLimit < 1) {
+            throw new InvalidArgumentException('APP_HTTP_CONCURRENCY_LIMIT must be greater than zero.');
         }
         if ($this->backlog < 1) {
             throw new InvalidArgumentException('APP_HTTP_BACKLOG must be greater than zero.');
@@ -126,7 +126,7 @@ final readonly class HttpServerConfig
             ),
             connectionLimit: $environment->positiveInteger('APP_HTTP_CONNECTION_LIMIT', 512),
             connectionsPerIpLimit: $environment->nonNegativeInteger('APP_HTTP_CONNECTIONS_PER_IP_LIMIT', 64),
-            concurrencyLimit: $environment->nonNegativeInteger('APP_HTTP_CONCURRENCY_LIMIT', 256),
+            concurrencyLimit: $environment->positiveInteger('APP_HTTP_CONCURRENCY_LIMIT', 256),
             backlog: $environment->positiveInteger('APP_HTTP_BACKLOG', 512),
             compressionEnabled: $environment->boolean('APP_HTTP_COMPRESSION_ENABLED', true),
         );

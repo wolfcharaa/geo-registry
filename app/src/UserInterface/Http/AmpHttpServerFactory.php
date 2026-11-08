@@ -11,7 +11,6 @@ use Amp\Http\Server\Driver\ConnectionLimitingServerSocketFactory;
 use Amp\Http\Server\Driver\SocketClientFactory;
 use Amp\Http\Server\Middleware\AllowedMethodsMiddleware;
 use Amp\Http\Server\Middleware\CompressionMiddleware;
-use Amp\Http\Server\Middleware\ConcurrencyLimitingMiddleware;
 use Amp\Http\Server\SocketHttpServer;
 use Amp\Socket\BindContext;
 use Amp\Sync\LocalSemaphore;
@@ -37,10 +36,14 @@ final readonly class AmpHttpServerFactory
         ]);
 
         $clientFactory = $this->clientFactory();
-        $middleware = [];
-        if ($this->config->concurrencyLimit > 0) {
-            $middleware[] = new ConcurrencyLimitingMiddleware($this->config->concurrencyLimit);
-        }
+        $middleware = [new HttpAdmissionMiddleware(
+            $this->config->concurrencyLimit,
+            $this->logger,
+        )];
+        $this->logger->notice('HTTP request admission limit configured', [
+            'event' => 'http.server.admission.configured',
+            'limit' => $this->config->concurrencyLimit,
+        ]);
         if ($this->config->compressionEnabled && extension_loaded('zlib')) {
             $middleware[] = new CompressionMiddleware();
         }
