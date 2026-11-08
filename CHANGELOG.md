@@ -4,6 +4,15 @@
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-11-09
+
+- MessageBus dependencies обновлены до опубликованных релизов `v0.1.1`, а
+  deprecated пакет `message-bus-amphp` исключён из migration scope.
+- HTTP admission теперь без внутренней очереди немедленно возвращает `503` и
+  `Retry-After` при исчерпании заданного concurrency limit.
+- Cluster supervisor обнаруживает worker с просроченным heartbeat, безопасно
+  завершает его через `SIGTERM`/`SIGKILL` и восстанавливает ёмкость заменой.
+
 ## [0.2.4] - 2026-11-08
 
 - Описаны отдельные сетевые режимы для host-only, соседнего Compose, private
@@ -94,5 +103,6 @@
 [0.2.2]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.1...v0.2.2
 [0.2.3]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.2...v0.2.3
 [0.2.4]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.3...v0.2.4
+[0.2.5]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.4...v0.2.5
 [0.2.1]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.0...v0.2.1
-[Unreleased]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.5...HEAD
