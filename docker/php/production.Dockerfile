@@ -7,21 +7,15 @@ FROM ${COMPOSER_IMAGE} AS composer
 
 FROM ${PHP_RUNTIME_IMAGE} AS php-runtime
 
-ARG PECL_EV_VERSION=1.2.3
-ARG PECL_PQ_VERSION=2.2.3
-ARG PECL_RAPHF_VERSION=2.0.2
+ARG PECL_UV_VERSION=0.3.1
 
-RUN apk add --no-cache curl libev libpq \
-    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS libev-dev linux-headers postgresql-dev \
+RUN apk add --no-cache curl libpq libuv \
+    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS libuv-dev linux-headers postgresql-dev \
     && docker-php-ext-install -j"$(nproc)" opcache pcntl pdo_pgsql pgsql sockets \
-    && pecl install "raphf-${PECL_RAPHF_VERSION}" \
-    && docker-php-ext-enable --ini-name 20-raphf.ini raphf \
-    && pecl install "pq-${PECL_PQ_VERSION}" \
-    && docker-php-ext-enable --ini-name 30-pq.ini pq \
-    && printf '\n' | pecl install "ev-${PECL_EV_VERSION}" \
-    && docker-php-ext-enable --ini-name 40-ev.ini ev \
+    && pecl install "uv-${PECL_UV_VERSION}" \
+    && docker-php-ext-enable --ini-name 40-uv.ini uv \
     && apk del .build-deps \
-    && php -r "foreach (['ev', 'pcntl', 'pdo_pgsql', 'pgsql', 'posix', 'pq', 'raphf', 'sockets', 'xmlreader'] as \$extension) { if (!extension_loaded(\$extension)) { fwrite(STDERR, \"Missing extension: {\$extension}\\n\"); exit(1); } }" \
+    && php -r "foreach (['pcntl', 'pdo_pgsql', 'pgsql', 'posix', 'sockets', 'uv', 'xmlreader'] as \$extension) { if (!extension_loaded(\$extension)) { fwrite(STDERR, \"Missing extension: {\$extension}\\n\"); exit(1); } }" \
     && printf '%s\n' \
         'expose_php=0' \
         'memory_limit=512M' \

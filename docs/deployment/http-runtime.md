@@ -28,12 +28,14 @@ Supervisor исключает первичный запуск worker pool из r
 каждая задержка записывается warning-событием
 `http.cluster.worker.restart.delayed`.
 
-Production image содержит закреплённые `ev 1.2.3`, `pq 2.2.3` и
-`raphf 2.0.2`, а также `pcntl`, `posix` и `sockets`. Revolt использует
-`EvDriver`; `amphp/postgres` при наличии `pq` выбирает неблокирующий pq-driver.
-Комбинация `EvDriver + ext-pgsql` запрещена fail-fast проверкой, поэтому
-`ext-pq` является обязательной частью production image. `ext-pgsql` и
-`pdo_pgsql` остаются для COPY, migrations и blocking CLI boundaries.
+Production image содержит закреплённый `uv 0.3.1`, а также
+`pcntl`, `posix`, `sockets`, `pgsql` и `pdo_pgsql`. Revolt использует
+`UvDriver`, а `amphp/postgres` — неблокирующий `ext-pgsql`: connection
+открывается с `PGSQL_CONNECT_ASYNC`, а queries отправляются через
+`pg_send_query*` и ожидают socket watchers event loop. `ext-pq` намеренно
+не входит в image: в PHP 8.4.27 его result objects попадают под
+upstream GC regression и могут завершить long-lived process с
+`zend_mm_heap corrupted`.
 
 ## Настройки
 
@@ -56,7 +58,7 @@ Production image содержит закреплённые `ev 1.2.3`, `pq 2.2.3
 | `APP_HTTP_COMPRESSION_ENABLED` | `1` | `1` | Response compression при наличии zlib |
 | `HTTP_DATABASE_POOL_SIZE` | `4` | `4` | PostgreSQL connections на HTTP worker |
 | `WORKER_DATABASE_POOL_SIZE` | `4` | `4` | PostgreSQL connections на queue worker process |
-| `REVOLT_DRIVER` | `EvDriver` | `EvDriver` | Явный production loop driver |
+| `REVOLT_DRIVER` | `UvDriver` | `UvDriver` | Явный production loop driver |
 | `ADDRESS_SEARCH_CACHE_ENABLED` | `0` | `1` | Локальный bounded cache итогов `SearchAddressPort` |
 | `ADDRESS_SEARCH_CACHE_MAX_ENTRIES` | `512` | `512` | Максимум записей на один HTTP worker, `1..100000` |
 | `ADDRESS_SEARCH_CACHE_TTL_SECONDS` | `60` | `60` | TTL непустого результата, `1..3600` |
@@ -158,7 +160,8 @@ docker/compose/dev.sh logs app
 
 Development допускает `APP_HTTP_WORKERS=1`. Fallback на `StreamSelectDriver`
 допустим только для запуска кода вне project image; production image и release
-preflight требуют `EvDriver`, `ext-pq` и остальные runtime extensions.
+preflight требуют `UvDriver`, `ext-uv`, `ext-pgsql` и остальные runtime
+extensions.
 
 ## Воспроизводимый Load/Fault Gate
 

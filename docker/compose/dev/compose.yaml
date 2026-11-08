@@ -59,7 +59,7 @@ services:
       OPENSEARCH_REFRESH_INTERVAL: "${OPENSEARCH_REFRESH_INTERVAL:-1s}"
       OPENSEARCH_BULK_REFRESH_INTERVAL: "${OPENSEARCH_BULK_REFRESH_INTERVAL:--1}"
       OPENSEARCH_REINDEX_MEMORY_LIMIT: "${OPENSEARCH_REINDEX_MEMORY_LIMIT:-512M}"
-      REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\EvDriver}'
+      REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\UvDriver}'
     ports:
       - "${APP_PORT:-8080}:8080"
     volumes:
@@ -105,7 +105,7 @@ services:
       DATABASE_DSN: "${DATABASE_DSN:-host=postgres port=5432 user=app password=local-app-only db=app application_name=geo-registry-worker-address}"
       DATABASE_POOL_SIZE: "${WORKER_DATABASE_POOL_SIZE:-4}"
       LOG_FORMAT: "${LOG_FORMAT:-console}"
-      REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\EvDriver}'
+      REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\UvDriver}'
     volumes:
       - ../../../app:/app
     depends_on:
@@ -149,7 +149,7 @@ services:
       OPENSEARCH_URL: "${OPENSEARCH_URL:-http://opensearch:9200}"
       OPENSEARCH_USERNAME: "${OPENSEARCH_USERNAME:-}"
       OPENSEARCH_TIMEOUT_SECONDS: "${OPENSEARCH_TIMEOUT_SECONDS:-60}"
-      REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\EvDriver}'
+      REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\UvDriver}'
     volumes:
       - ../../../app:/app
     depends_on:

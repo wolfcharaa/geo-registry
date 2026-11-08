@@ -15,7 +15,7 @@ x-app-service: &app-service
     APP_VERSION: "${RELEASE_VERSION:?Set the frozen release version}"
     DATABASE_POOL_SIZE: "${WORKER_DATABASE_POOL_SIZE:-4}"
     LOG_FORMAT: "${LOG_FORMAT:-json}"
-    REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\EvDriver}'
+    REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\UvDriver}'
   read_only: true
   tmpfs:
     - /tmp:rw,noexec,nosuid,size=64m
@@ -60,7 +60,7 @@ services:
       APP_HTTP_WORKERS: "${APP_HTTP_WORKERS:-2}"
       DATABASE_POOL_SIZE: "${HTTP_DATABASE_POOL_SIZE:-4}"
       LOG_FORMAT: "${LOG_FORMAT:-json}"
-      REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\EvDriver}'
+      REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\UvDriver}'
     ports:
       - "${APP_BIND_HOST:-127.0.0.1}:${APP_PORT:-8080}:8080"
     healthcheck:

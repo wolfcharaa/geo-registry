@@ -121,7 +121,7 @@ release_validate_image() {
 
     docker run --rm --entrypoint php "${release_exact_image}" -r '
         $errors = [];
-        foreach (["ev", "pcntl", "pdo_pgsql", "pgsql", "posix", "pq", "raphf", "sockets", "xmlreader"] as $extension) {
+        foreach (["pcntl", "pdo_pgsql", "pgsql", "posix", "sockets", "uv", "xmlreader"] as $extension) {
             if (!extension_loaded($extension)) {
                 $errors[] = "missing extension: " . $extension;
             }
@@ -134,7 +134,7 @@ release_validate_image() {
                 $errors[] = "application autoload is incomplete";
             }
             $driver = Revolt\EventLoop::getDriver()::class;
-            if ($driver !== Revolt\EventLoop\Driver\EvDriver::class) {
+            if ($driver !== Revolt\EventLoop\Driver\UvDriver::class) {
                 $errors[] = "unexpected production event-loop driver: " . $driver;
             }
         }

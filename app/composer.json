@@ -31,8 +31,7 @@
         "yiisoft/db-pgsql": "^2.0"
     },
     "suggest": {
-        "ext-ev": "Recommended production event-loop driver.",
-        "ext-pq": "Required with ext-ev for non-blocking PostgreSQL connections."
+        "ext-uv": "Recommended production event-loop driver for asynchronous ext-pgsql connections."
     },
     "require-dev": {
         "deptrac/deptrac": "^4.7",
