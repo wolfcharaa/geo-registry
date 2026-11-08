@@ -47,6 +47,10 @@ final readonly class HttpClusterRuntime
             initialDelaySeconds: $this->config->workerRestartBackoffInitialSeconds,
             maximumDelaySeconds: $this->config->workerRestartBackoffMaximumSeconds,
         );
+        $staleWorkerTerminator = new HttpStaleWorkerTerminator(
+            $this->config->workerStaleTerminationGraceSeconds,
+            $this->logger,
+        );
         $watcher = new ClusterWatcher(
             [$this->entrypoint, 'server:run'],
             $this->logger,
@@ -70,6 +74,7 @@ final readonly class HttpClusterRuntime
             'restart_backoff_maximum_seconds' => $this->config->workerRestartBackoffMaximumSeconds,
             'worker_heartbeat_interval_seconds' => $this->config->workerHeartbeatIntervalSeconds,
             'worker_heartbeat_timeout_seconds' => $this->config->workerHeartbeatTimeoutSeconds,
+            'worker_stale_termination_grace_seconds' => $this->config->workerStaleTerminationGraceSeconds,
         ]);
 
         $capacityMonitorWatcher = null;
@@ -77,21 +82,25 @@ final readonly class HttpClusterRuntime
             $watcher->start($this->config->workers);
             $capacityMonitorWatcher = EventLoop::repeat(
                 $this->config->workerHeartbeatIntervalSeconds,
-                function (string $watcherId) use ($workerPool, $workerStartCancellation): void {
+                function (string $watcherId) use (
+                    $workerPool,
+                    $workerStartCancellation,
+                    $staleWorkerTerminator,
+                ): void {
                     if ($workerStartCancellation->isCancelled()) {
                         EventLoop::cancel($watcherId);
 
                         return;
                     }
 
-                    $this->logWorkerPoolObservation($workerPool->inspect(now(), self::isProcessAlive(...)));
+                    $this->observeWorkerPool($workerPool, $staleWorkerTerminator, now());
                 },
             );
             EventLoop::unreference($capacityMonitorWatcher);
             foreach ($watcher->getMessageIterator() as $message) {
                 $data = $message->getData();
                 if ($data instanceof HttpWorkerSignal && !$workerStartCancellation->isCancelled()) {
-                    $this->handleWorkerSignal($workerPool, $data);
+                    $this->handleWorkerSignal($workerPool, $staleWorkerTerminator, $data);
 
                     continue;
                 }
@@ -104,6 +113,7 @@ final readonly class HttpClusterRuntime
             }
         } finally {
             $workerStartCancellation->cancel();
+            $staleWorkerTerminator->stop();
             if ($capacityMonitorWatcher !== null) {
                 EventLoop::cancel($capacityMonitorWatcher);
             }
@@ -118,8 +128,11 @@ final readonly class HttpClusterRuntime
         }
     }
 
-    private function handleWorkerSignal(HttpWorkerPoolState $workerPool, HttpWorkerSignal $signal): void
-    {
+    private function handleWorkerSignal(
+        HttpWorkerPoolState $workerPool,
+        HttpStaleWorkerTerminator $staleWorkerTerminator,
+        HttpWorkerSignal $signal,
+    ): void {
         $now = now();
         $workerPool->observe($signal, $now);
 
@@ -143,7 +156,19 @@ final readonly class HttpClusterRuntime
             return;
         }
 
-        $this->logWorkerPoolObservation($workerPool->inspect($now, self::isProcessAlive(...)));
+        $this->observeWorkerPool($workerPool, $staleWorkerTerminator, $now);
+    }
+
+    private function observeWorkerPool(
+        HttpWorkerPoolState $workerPool,
+        HttpStaleWorkerTerminator $staleWorkerTerminator,
+        float $now,
+    ): void {
+        $observation = $workerPool->inspect($now, self::isProcessAlive(...));
+        foreach ($observation->staleWorkers as $worker) {
+            $staleWorkerTerminator->terminate($worker);
+        }
+        $this->logWorkerPoolObservation($observation);
     }
 
     private function logWorkerPoolObservation(HttpWorkerPoolObservation $observation): void

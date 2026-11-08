@@ -51,6 +51,7 @@ upstream GC regression и могут завершить long-lived process с
 | `APP_HTTP_WORKER_RESTART_BACKOFF_MAX_SECONDS` | `30` | `30` | Верхняя граница задержки, не меньше initial; `(0..300]` |
 | `APP_HTTP_WORKER_HEARTBEAT_INTERVAL_SECONDS` | `5` | `5` | Интервал IPC heartbeat и проверки ёмкости; `(0..300]` |
 | `APP_HTTP_WORKER_HEARTBEAT_TIMEOUT_SECONDS` | `15` | `15` | Максимальный возраст heartbeat, не меньше двух интервалов; `[2×interval..900]` |
+| `APP_HTTP_WORKER_STALE_TERMINATION_GRACE_SECONDS` | `5` | `5` | Grace между `SIGTERM` и `SIGKILL` stale worker; `(0..30]` |
 | `APP_HTTP_CONNECTION_LIMIT` | `512` | `1024` | Одновременные connections на worker |
 | `APP_HTTP_CONNECTIONS_PER_IP_LIMIT` | `64` | `0` | Лимит на client IP; `0` отключает его за reverse proxy |
 | `APP_HTTP_CONCURRENCY_LIMIT` | `256` | `512` | Максимум допущенных requests на worker; только положительное значение |
@@ -109,6 +110,15 @@ in-memory историю, а внешний Compose restart policy остаёт�
 HTTP server. Supervisor также проверяет существование PID и исключает worker,
 если heartbeat устарел либо process исчез. Heartbeat не записывается в log на
 каждом интервале и поэтому не создаёт постоянный log traffic.
+
+Живой PID с просроченным heartbeat считается зависшим: supervisor сверяет
+identity процесса по `/proc/<pid>/stat`, отправляет `SIGTERM`, а после
+`APP_HTTP_WORKER_STALE_TERMINATION_GRACE_SECONDS` — `SIGKILL`, только если PID
+всё ещё относится к тому же process. `amphp/cluster` reap-ит child и запускает
+замену через общий restart budget. Переходы видны по событиям
+`http.cluster.worker.stale.termination_requested` и
+`http.cluster.worker.stale.force_killed`; ошибка signal delivery фиксируется
+отдельно и не маскируется восстановлением capacity.
 
 До первого достижения `APP_HTTP_WORKERS` неполный pool считается стартующим, а
 не degraded. После этого supervisor пишет только переходы состояния:

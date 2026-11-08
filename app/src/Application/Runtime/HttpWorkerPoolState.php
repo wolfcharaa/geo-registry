@@ -47,14 +47,18 @@ final class HttpWorkerPoolState
     {
         $this->assertTime($now);
         $removedWorkerIds = [];
+        $staleWorkers = [];
         foreach ($this->workers as $workerId => $worker) {
-            if (($now - $worker['last_seen']) <= $this->heartbeatTimeoutSeconds
-                && $isProcessAlive($worker['pid'])
-            ) {
+            $stale = ($now - $worker['last_seen']) > $this->heartbeatTimeoutSeconds;
+            $alive = $isProcessAlive($worker['pid']);
+            if (!$stale && $alive) {
                 continue;
             }
 
             $removedWorkerIds[] = $workerId;
+            if ($stale && $alive) {
+                $staleWorkers[] = new HttpWorkerProcess($workerId, $worker['pid']);
+            }
             unset($this->workers[$workerId]);
         }
 
@@ -78,6 +82,7 @@ final class HttpWorkerPoolState
             activeWorkers: $activeWorkers,
             expectedWorkers: $this->expectedWorkers,
             removedWorkerIds: $removedWorkerIds,
+            staleWorkers: $staleWorkers,
             transition: $transition,
         );
     }

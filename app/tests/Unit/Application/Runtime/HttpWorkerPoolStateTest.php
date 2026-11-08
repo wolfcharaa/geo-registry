@@ -45,6 +45,11 @@ final class HttpWorkerPoolStateTest
 
         Assert::same($observation->activeWorkers, 0);
         Assert::same($observation->removedWorkerIds, [1, 2]);
+        Assert::count($observation->staleWorkers, 1);
+        $staleWorker = $observation->staleWorkers[0] ?? null;
+        Assert::notNull($staleWorker);
+        Assert::same($staleWorker->workerId, 2);
+        Assert::same($staleWorker->pid, 102);
         Assert::same($observation->transition, HttpWorkerPoolTransition::Degraded);
     }
 }

@@ -168,6 +168,80 @@ final class HttpClusterRuntimeIntegrationTest
         Assert::true(str_contains($logs, '"event":"http.cluster.stopped"'), $logs);
     }
 
+    public function testStaleStoppedWorkerIsForceKilledAndReplaced(): void
+    {
+        $port = $this->freeTcpPort();
+        $root = dirname(__DIR__, 4);
+        $process = Process::start(
+            [PHP_BINARY, $root . '/bin/app', 'server:run'],
+            $root,
+            [
+                'APP_HTTP_WORKERS' => '2',
+                'APP_HTTP_WORKER_HEARTBEAT_INTERVAL_SECONDS' => '0.05',
+                'APP_HTTP_WORKER_HEARTBEAT_TIMEOUT_SECONDS' => '0.15',
+                'APP_HTTP_WORKER_STALE_TERMINATION_GRACE_SECONDS' => '0.05',
+                'APP_LISTEN' => '127.0.0.1:' . $port,
+                'DATABASE_DSN' => 'host=127.0.0.1 dbname=geo_registry_cluster_test',
+                'DATABASE_POOL_SIZE' => '1',
+                'LOG_FORMAT' => 'json',
+                'NOMINATIM_ENABLED' => '0',
+                'OPENSEARCH_ENABLED' => '0',
+                'REVOLT_DRIVER' => 'Revolt\\EventLoop\\Driver\\StreamSelectDriver',
+            ],
+        );
+        $stdout = $this->capture($process->getStdout());
+        $stderr = $this->capture($process->getStderr());
+        $stoppedWorkerPid = null;
+        $failure = null;
+        $exitCode = null;
+
+        try {
+            $this->awaitLiveness($port);
+            $workerPids = $this->awaitWorkerProcesses($process->getPid(), 2);
+            $stoppedWorkerPid = $workerPids[0]
+                ?? throw new RuntimeException('The HTTP worker fixture returned an empty process list.');
+            if (!posix_kill($stoppedWorkerPid, SIGSTOP)) {
+                throw new RuntimeException('Unable to stop an HTTP worker process for the stale-worker fixture.');
+            }
+
+            $this->awaitWorkerReplacement($process->getPid(), $stoppedWorkerPid);
+            delay(0.2);
+            $this->awaitLiveness($port);
+            $process->signal(SIGTERM);
+            $exitCode = $process->join(new TimeoutCancellation(10));
+        } catch (Throwable $exception) {
+            $failure = $exception;
+            $process->signal(SIGTERM);
+        } finally {
+            if ($stoppedWorkerPid !== null) {
+                @posix_kill($stoppedWorkerPid, SIGKILL);
+            }
+            $process->kill();
+        }
+
+        $logs = $stdout->await();
+        $errors = $stderr->await();
+
+        if ($failure !== null) {
+            throw new RuntimeException(sprintf(
+                "%s\nSupervisor logs:\n%s\nSupervisor errors:\n%s",
+                $failure->getMessage(),
+                $logs,
+                $errors,
+            ), previous: $failure);
+        }
+
+        Assert::same($exitCode, 0, $errors);
+        Assert::true(str_contains(
+            $logs,
+            '"event":"http.cluster.worker.stale.termination_requested"',
+        ), $logs);
+        Assert::true(str_contains($logs, '"event":"http.cluster.worker.stale.force_killed"'), $logs);
+        Assert::true(str_contains($logs, '"event":"http.cluster.capacity.degraded"'), $logs);
+        Assert::true(str_contains($logs, '"event":"http.cluster.capacity.restored"'), $logs);
+        Assert::true(substr_count($logs, '"message":"HTTP server started"') >= 3, $logs);
+    }
+
     private function awaitLiveness(int $port): void
     {
         $client = HttpClientBuilder::buildDefault();
@@ -214,6 +288,79 @@ final class HttpClusterRuntimeIntegrationTest
         } finally {
             fclose($server);
         }
+    }
+
+    /** @return list<positive-int> */
+    private function awaitWorkerProcesses(int $supervisorPid, int $minimumCount): array
+    {
+        for ($attempt = 0; $attempt < 100; ++$attempt) {
+            $pids = $this->workerProcesses($supervisorPid);
+            if (count($pids) >= $minimumCount) {
+                return $pids;
+            }
+
+            delay(0.05);
+        }
+
+        throw new RuntimeException(sprintf(
+            'HTTP supervisor %d did not start %d child processes within five seconds.',
+            $supervisorPid,
+            $minimumCount,
+        ));
+    }
+
+    private function awaitWorkerReplacement(int $supervisorPid, int $replacedPid): void
+    {
+        for ($attempt = 0; $attempt < 100; ++$attempt) {
+            $pids = $this->workerProcesses($supervisorPid);
+            if (count($pids) >= 2 && !in_array($replacedPid, $pids, true)) {
+                return;
+            }
+
+            delay(0.05);
+        }
+
+        throw new RuntimeException(sprintf(
+            'Stale HTTP worker %d was not replaced within five seconds.',
+            $replacedPid,
+        ));
+    }
+
+    /** @return list<positive-int> */
+    private function workerProcesses(int $supervisorPid): array
+    {
+        $descendants = [];
+        $pending = [$supervisorPid];
+        while ($pending !== []) {
+            $parentPid = array_shift($pending);
+            foreach ($this->childProcesses($parentPid) as $childPid) {
+                $descendants[] = $childPid;
+                $pending[] = $childPid;
+            }
+        }
+
+        return array_values(array_filter($descendants, static function (int $pid): bool {
+            $commandName = @file_get_contents(sprintf('/proc/%d/comm', $pid));
+
+            return is_string($commandName) && str_starts_with(trim($commandName), 'php');
+        }));
+    }
+
+    /** @return list<positive-int> */
+    private function childProcesses(int $parentPid): array
+    {
+        $children = @file_get_contents(sprintf('/proc/%d/task/%d/children', $parentPid, $parentPid));
+        if (!is_string($children) || trim($children) === '') {
+            return [];
+        }
+
+        $parts = preg_split('/\s+/', trim($children));
+        if (!is_array($parts)) {
+            return [];
+        }
+        $pids = array_map('intval', $parts);
+
+        return array_values(array_filter($pids, static fn(int $pid): bool => $pid > 0));
     }
 
     /** @return array{int, string, string} */

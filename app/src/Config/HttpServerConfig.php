@@ -24,6 +24,7 @@ final readonly class HttpServerConfig
         public float $workerRestartBackoffMaximumSeconds,
         public float $workerHeartbeatIntervalSeconds,
         public float $workerHeartbeatTimeoutSeconds,
+        public float $workerStaleTerminationGraceSeconds,
         public int $connectionLimit,
         public int $connectionsPerIpLimit,
         public int $concurrencyLimit,
@@ -82,6 +83,13 @@ final readonly class HttpServerConfig
                 'APP_HTTP_WORKER_HEARTBEAT_TIMEOUT_SECONDS must be at least two intervals and at most 900.',
             );
         }
+        if ($this->workerStaleTerminationGraceSeconds <= 0
+            || $this->workerStaleTerminationGraceSeconds > 30
+        ) {
+            throw new InvalidArgumentException(
+                'APP_HTTP_WORKER_STALE_TERMINATION_GRACE_SECONDS must be greater than zero and at most 30.',
+            );
+        }
         if ($this->connectionLimit < 1) {
             throw new InvalidArgumentException('APP_HTTP_CONNECTION_LIMIT must be greater than zero.');
         }
@@ -123,6 +131,10 @@ final readonly class HttpServerConfig
             workerHeartbeatTimeoutSeconds: $environment->positiveFloat(
                 'APP_HTTP_WORKER_HEARTBEAT_TIMEOUT_SECONDS',
                 15,
+            ),
+            workerStaleTerminationGraceSeconds: $environment->positiveFloat(
+                'APP_HTTP_WORKER_STALE_TERMINATION_GRACE_SECONDS',
+                5,
             ),
             connectionLimit: $environment->positiveInteger('APP_HTTP_CONNECTION_LIMIT', 512),
             connectionsPerIpLimit: $environment->nonNegativeInteger('APP_HTTP_CONNECTIONS_PER_IP_LIMIT', 64),
