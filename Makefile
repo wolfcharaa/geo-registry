@@ -195,11 +195,13 @@ worker-status: guard-user ## Show durable worker and child status
 .PHONY: worker-status
 
 worker-pause: guard-user ## Pause new claims for both workers
-	$(WORKER_CLI) worker:pause --group=geo-registry --reason="make worker-pause"
+	$(WORKER_CLI) worker:pause --worker-name=geo-registry-address --reason="make worker-pause"
+	$(WORKER_CLI) worker:pause --worker-name=geo-registry-runtime --reason="make worker-pause"
 .PHONY: worker-pause
 
 worker-resume: guard-user ## Resume claims for both workers
-	$(WORKER_CLI) worker:resume --group=geo-registry --reason="make worker-resume"
+	$(WORKER_CLI) worker:resume --worker-name=geo-registry-address --reason="make worker-resume"
+	$(WORKER_CLI) worker:resume --worker-name=geo-registry-runtime --reason="make worker-resume"
 .PHONY: worker-resume
 
 worker-drain: guard-user guard-worker-instance ## Drain one exact worker instance after its current job
