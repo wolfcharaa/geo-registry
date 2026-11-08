@@ -15,15 +15,13 @@ if [ "$(id -u)" -eq 0 ] || [ -n "${SUDO_USER:-}" ]; then
     release_fail "run as the release user, without sudo"
 fi
 
-app_env_file=$(release_resolve_path "${COMPOSE_ENV_FILE:-config/prod.env}")
 release_env_file=$(release_resolve_path "${RELEASE_ENV_FILE:-docker/compose/prod/release.env}")
-release_require_file "${app_env_file}"
 release_require_file "${release_env_file}"
 
 release_version=$(release_env_value RELEASE_VERSION "${release_env_file}" || true)
 image_tag=$(release_env_value APP_IMAGE_TAG "${release_env_file}" || true)
 image_digest=$(release_env_value APP_IMAGE_DIGEST "${release_env_file}" || true)
-image_prefix=$(release_env_value DOCKER_IMAGE_PREFIX "${app_env_file}" || true)
+image_prefix=$(release_env_value DOCKER_IMAGE_PREFIX "${release_env_file}" || true)
 platform=${DOCKER_PLATFORM:-linux/amd64}
 release_branch=${RELEASE_BRANCH:-main}
 
@@ -62,8 +60,11 @@ git -C "${project_root}" cat-file -e "${application_source_commit}^{commit}" 2>/
     || release_fail "image source revision is not available in the application repository"
 if [ "${application_source_commit}" != "${release_commit}" ]; then
     release_changed_files=$(git -C "${project_root}" diff --name-only "${application_source_commit}" "${release_commit}")
-    [ "${release_changed_files}" = docker/compose/prod/release.env ] \
-        || release_fail "release commit differs from image source beyond the frozen release identity"
+    expected_release_files=$(printf '%s\n' docker/compose/prod/compose.yaml docker/compose/prod/release.env)
+    case "${release_changed_files}" in
+        docker/compose/prod/release.env|"${expected_release_files}") ;;
+        *) release_fail "release commit differs from image source beyond the frozen release identity" ;;
+    esac
 fi
 
 artifact_dir=$(release_resolve_path "${RELEASE_ARTIFACT_DIR:-docker/data/release/${release_version}}")

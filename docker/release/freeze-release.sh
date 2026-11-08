@@ -19,13 +19,12 @@ release_version=${RELEASE_VERSION:-${1:-}}
 image_digest=${APP_IMAGE_DIGEST:-${2:-}}
 platform=${DOCKER_PLATFORM:-linux/amd64}
 release_branch=${RELEASE_BRANCH:-main}
-app_env_file=$(release_resolve_path "${COMPOSE_ENV_FILE:-config/prod.env}")
 release_env_file="${project_root}/docker/compose/prod/release.env"
+compose_file="${project_root}/docker/compose/prod/compose.yaml"
 
 release_validate_version "${release_version}"
 release_validate_digest "${image_digest}"
 release_validate_platform "${platform}"
-release_require_file "${app_env_file}"
 
 [ -z "$(git -C "${project_root}" status --porcelain)" ] \
     || release_fail "repository must be clean before freezing a release"
@@ -36,7 +35,7 @@ if git -C "${project_root}" show-ref --verify --quiet "refs/tags/${release_versi
     release_fail "release tag already exists and must not be moved or reused: ${release_version}"
 fi
 
-image_prefix=$(release_env_value DOCKER_IMAGE_PREFIX "${app_env_file}" || true)
+image_prefix=${DOCKER_IMAGE_PREFIX:-}
 release_validate_prefix "${image_prefix}"
 platform_slug=$(printf '%s' "${platform}" | tr / -)
 image_tag="${release_version}-${platform_slug}"
@@ -50,26 +49,41 @@ image_source_commit=$(docker image inspect --format '{{index .Config.Labels "org
     || release_fail "image source revision does not match current HEAD"
 
 temporary_file=$(mktemp "${release_env_file}.tmp.XXXXXX")
+temporary_compose=$(mktemp "${compose_file}.tmp.XXXXXX")
 cleanup() {
-    rm -f "${temporary_file}"
+    rm -f "${temporary_file}" "${temporary_compose}"
 }
 trap cleanup EXIT INT TERM
 
 {
     printf '%s\n' '# Frozen release identity. Updated by docker/release/freeze-release.sh.'
+    printf 'DOCKER_IMAGE_PREFIX=%s\n' "${image_prefix}"
     printf 'APP_IMAGE_TAG=%s\n' "${image_tag}"
     printf 'APP_IMAGE_DIGEST=%s\n' "${image_digest}"
     printf 'RELEASE_VERSION=%s\n' "${release_version}"
     printf '%s\n' 'COMPOSE_PROJECT_NAME=geo-registry'
 } > "${temporary_file}"
 
-COMPOSE_ENV_FILE="${app_env_file}" \
-    RELEASE_ENV_FILE="${temporary_file}" \
-    "${project_root}/docker/compose/prod.sh" config --quiet
+awk -v image="${tagged_image}" -v version="${release_version}" '
+    $1 == "x-app-image:" {
+        print "x-app-image: &app-image \"" image "\""
+        next
+    }
+    $1 == "APP_VERSION:" {
+        print "  APP_VERSION: " version
+        next
+    }
+    { print }
+' "${compose_file}" >"${temporary_compose}"
 
+docker compose \
+    --env-file "${project_root}/config/prod.secrets.env.example" \
+    --file "${temporary_compose}" config --quiet
+
+mv "${temporary_compose}" "${compose_file}"
 mv "${temporary_file}" "${release_env_file}"
 trap - EXIT INT TERM
 
 echo "Production release identity frozen: ${release_version}"
 echo "Image: ${exact_image}"
-echo "Review, commit and tag docker/compose/prod/release.env before building artifacts."
+echo "Review and commit docker/compose/prod/compose.yaml with docker/compose/prod/release.env before tagging."

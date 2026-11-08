@@ -9,7 +9,7 @@ FROM ${PHP_RUNTIME_IMAGE} AS php-runtime
 
 ARG PECL_UV_VERSION=0.3.1
 
-RUN apk add --no-cache curl libpq libuv \
+RUN apk add --no-cache curl libpq libuv unzip \
     && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS libuv-dev linux-headers postgresql-dev \
     && docker-php-ext-install -j"$(nproc)" opcache pcntl pdo_pgsql pgsql sockets \
     && pecl install "uv-${PECL_UV_VERSION}" \

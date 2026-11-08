@@ -1,6 +1,38 @@
-name: "${COMPOSE_PROJECT_NAME:-geo-registry}"
+name: geo-registry
 
-x-app-image: &app-image "${DOCKER_IMAGE_PREFIX:?Set the full registry namespace prefix}/app:${APP_IMAGE_TAG:?Set the frozen application image tag}"
+x-app-image: &app-image "ghcr.io/wolfcharaa/geo-registry/app:v0.2.1-linux-amd64"
+
+x-app-environment: &app-environment
+  APP_NAME: geo-registry
+  APP_VERSION: v0.2.1
+  APP_USER_AGENT: geo-registry/0.2
+  DATABASE_DSN: "host=postgres port=5432 user=geo_registry password=${GEO_REGISTRY_DATABASE_PASSWORD:?Pass config/prod.secrets.env with --env-file} db=geo_registry application_name=geo-registry"
+  DATABASE_POOL_SIZE: "4"
+  HTTP_TIMEOUT_SECONDS: "10"
+  LOG_FORMAT: json
+  REVOLT_DRIVER: 'Revolt\EventLoop\Driver\UvDriver'
+  ADDRESS_SEARCH_CACHE_ENABLED: "1"
+  ADDRESS_SEARCH_CACHE_MAX_ENTRIES: "512"
+  ADDRESS_SEARCH_CACHE_TTL_SECONDS: "60"
+  ADDRESS_SEARCH_CACHE_EMPTY_TTL_SECONDS: "5"
+  ADDRESS_SEARCH_CACHE_NAMESPACE: v1
+  NOMINATIM_ENABLED: "0"
+  NOMINATIM_URL: http://nominatim:8080
+  NOMINATIM_LANGUAGE: ru
+  OPENSEARCH_ENABLED: "0"
+  OPENSEARCH_URL: http://opensearch:9200
+  OPENSEARCH_INDEX: places
+  OPENSEARCH_SEARCH_ENABLED: "0"
+  OPENSEARCH_COORDINATE_UPDATES_ENABLED: "0"
+  OPENSEARCH_USERNAME: "${GEO_REGISTRY_OPENSEARCH_USERNAME:-}"
+  OPENSEARCH_PASSWORD: "${GEO_REGISTRY_OPENSEARCH_PASSWORD:-}"
+  OPENSEARCH_TIMEOUT_SECONDS: "60"
+  OPENSEARCH_NUMBER_OF_SHARDS: "1"
+  OPENSEARCH_NUMBER_OF_REPLICAS: "0"
+  OPENSEARCH_BULK_NUMBER_OF_REPLICAS: "0"
+  OPENSEARCH_REFRESH_INTERVAL: 1s
+  OPENSEARCH_BULK_REFRESH_INTERVAL: "-1"
+  OPENSEARCH_REINDEX_MEMORY_LIMIT: 512M
 
 x-app-service: &app-service
   image: *app-image
@@ -8,14 +40,7 @@ x-app-service: &app-service
   init: true
   user: "10001:10001"
   working_dir: /app
-  env_file:
-    - "${APP_ENV_FILE:?Set the absolute application environment file path}"
-  environment:
-    APP_NAME: "${APP_NAME:-geo-registry}"
-    APP_VERSION: "${RELEASE_VERSION:?Set the frozen release version}"
-    DATABASE_POOL_SIZE: "${WORKER_DATABASE_POOL_SIZE:-4}"
-    LOG_FORMAT: "${LOG_FORMAT:-json}"
-    REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\UvDriver}'
+  environment: *app-environment
   read_only: true
   tmpfs:
     - /tmp:rw,noexec,nosuid,size=64m
@@ -27,8 +52,8 @@ x-app-service: &app-service
   logging:
     driver: json-file
     options:
-      max-file: "${LOG_MAX_FILES:-5}"
-      max-size: "${LOG_MAX_SIZE:-20m}"
+      max-file: "5"
+      max-size: 20m
   restart: unless-stopped
   ulimits:
     nofile:
@@ -36,43 +61,130 @@ x-app-service: &app-service
       hard: 65536
 
 services:
+  postgres:
+    image: ghcr.io/cargosense/postgis:17-3.6-alpine@sha256:03374f4feb0267d755a9d81cc834f8a129f9a99734dd0a029f0bceb3f5689361
+    command:
+      - postgres
+      - -c
+      - max_connections=100
+      - -c
+      - shared_buffers=8GB
+      - -c
+      - effective_cache_size=24GB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=2GB
+      - -c
+      - autovacuum_work_mem=1GB
+      - -c
+      - autovacuum_max_workers=5
+      - -c
+      - wal_buffers=64MB
+      - -c
+      - min_wal_size=8GB
+      - -c
+      - max_wal_size=64GB
+      - -c
+      - wal_compression=on
+      - -c
+      - checkpoint_timeout=30min
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - checkpoint_warning=5min
+      - -c
+      - max_worker_processes=16
+      - -c
+      - max_parallel_workers=12
+      - -c
+      - max_parallel_workers_per_gather=4
+      - -c
+      - max_parallel_maintenance_workers=4
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - maintenance_io_concurrency=100
+      - -c
+      - huge_pages=try
+      - -c
+      - track_io_timing=on
+      - -c
+      - track_wal_io_timing=on
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "${GEO_REGISTRY_POSTGRES_ADMIN_PASSWORD:?Pass config/prod.secrets.env with --env-file}"
+    shm_size: 8gb
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+    restart: unless-stopped
+    stop_grace_period: 60s
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  opensearch:
+    profiles: [opensearch]
+    image: opensearchproject/opensearch:3.9.0@sha256:3b55f6b6249cfdb92b52ee59adc8a266203ba9ef9f5d82544fad6f1af2f3609e
+    environment:
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms4g -Xmx4g
+      discovery.type: single-node
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent 'http://localhost:9200/_cluster/health?wait_for_status=yellow' >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+    mem_limit: 6g
+    restart: unless-stopped
+
   app:
     <<: *app-service
     command: ["bin/app", "server:run"]
     environment:
-      APP_LISTEN: "0.0.0.0:8080"
-      APP_NAME: "${APP_NAME:-geo-registry}"
-      APP_VERSION: "${RELEASE_VERSION:?Set the frozen release version}"
-      APP_HTTP_BACKLOG: "${APP_HTTP_BACKLOG:-1024}"
-      APP_HTTP_COMPRESSION_ENABLED: "${APP_HTTP_COMPRESSION_ENABLED:-1}"
-      APP_HTTP_CONCURRENCY_LIMIT: "${APP_HTTP_CONCURRENCY_LIMIT:-512}"
-      APP_HTTP_CONNECTION_LIMIT: "${APP_HTTP_CONNECTION_LIMIT:-1024}"
-      APP_HTTP_CONNECTIONS_PER_IP_LIMIT: "${APP_HTTP_CONNECTIONS_PER_IP_LIMIT:-0}"
-      APP_HTTP_SHUTDOWN_TIMEOUT_SECONDS: "${APP_HTTP_SHUTDOWN_TIMEOUT_SECONDS:-30}"
-      APP_HTTP_WORKER_MAX_MEMORY_MB: "${APP_HTTP_WORKER_MAX_MEMORY_MB:-256}"
-      APP_HTTP_WORKER_MAX_REQUESTS: "${APP_HTTP_WORKER_MAX_REQUESTS:-10000}"
-      APP_HTTP_WORKER_RESTART_BACKOFF_INITIAL_SECONDS: "${APP_HTTP_WORKER_RESTART_BACKOFF_INITIAL_SECONDS:-0.5}"
-      APP_HTTP_WORKER_RESTART_BACKOFF_MAX_SECONDS: "${APP_HTTP_WORKER_RESTART_BACKOFF_MAX_SECONDS:-30}"
-      APP_HTTP_WORKER_RESTART_BURST: "${APP_HTTP_WORKER_RESTART_BURST:-5}"
-      APP_HTTP_WORKER_RESTART_WINDOW_SECONDS: "${APP_HTTP_WORKER_RESTART_WINDOW_SECONDS:-30}"
-      APP_HTTP_WORKER_HEARTBEAT_INTERVAL_SECONDS: "${APP_HTTP_WORKER_HEARTBEAT_INTERVAL_SECONDS:-5}"
-      APP_HTTP_WORKER_HEARTBEAT_TIMEOUT_SECONDS: "${APP_HTTP_WORKER_HEARTBEAT_TIMEOUT_SECONDS:-15}"
-      APP_HTTP_WORKERS: "${APP_HTTP_WORKERS:-2}"
-      DATABASE_POOL_SIZE: "${HTTP_DATABASE_POOL_SIZE:-4}"
-      LOG_FORMAT: "${LOG_FORMAT:-json}"
-      REVOLT_DRIVER: '${REVOLT_DRIVER:-Revolt\EventLoop\Driver\UvDriver}'
+      <<: *app-environment
+      APP_LISTEN: 0.0.0.0:8080
+      APP_HTTP_BACKLOG: "1024"
+      APP_HTTP_COMPRESSION_ENABLED: "1"
+      APP_HTTP_CONCURRENCY_LIMIT: "512"
+      APP_HTTP_CONNECTION_LIMIT: "1024"
+      APP_HTTP_CONNECTIONS_PER_IP_LIMIT: "0"
+      APP_HTTP_SHUTDOWN_TIMEOUT_SECONDS: "30"
+      APP_HTTP_WORKER_MAX_MEMORY_MB: "256"
+      APP_HTTP_WORKER_MAX_REQUESTS: "10000"
+      APP_HTTP_WORKER_RESTART_BACKOFF_INITIAL_SECONDS: "0.5"
+      APP_HTTP_WORKER_RESTART_BACKOFF_MAX_SECONDS: "30"
+      APP_HTTP_WORKER_RESTART_BURST: "5"
+      APP_HTTP_WORKER_RESTART_WINDOW_SECONDS: "30"
+      APP_HTTP_WORKER_HEARTBEAT_INTERVAL_SECONDS: "5"
+      APP_HTTP_WORKER_HEARTBEAT_TIMEOUT_SECONDS: "15"
+      APP_HTTP_WORKERS: "2"
+      DATABASE_POOL_SIZE: "4"
     ports:
-      - "${APP_BIND_HOST:-127.0.0.1}:${APP_PORT:-8080}:8080"
+      - 127.0.0.1:8080:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health/ready"]
-      interval: "${APP_HEALTH_INTERVAL:-10s}"
-      timeout: "${APP_HEALTH_TIMEOUT:-3s}"
-      retries: "${APP_HEALTH_RETRIES:-12}"
-      start_period: "${APP_HEALTH_START_PERIOD:-30s}"
-    mem_limit: "${APP_MEMORY_LIMIT:-1g}"
-    cpus: "${APP_CPUS:-2}"
-    pids_limit: "${APP_PIDS_LIMIT:-256}"
-    stop_grace_period: "${APP_STOP_GRACE_PERIOD:-40s}"
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 256
+    stop_grace_period: 40s
 
   worker-address:
     <<: *app-service
@@ -85,10 +197,13 @@ services:
       - --worker-id=geo-registry-address
       - --worker-name=geo-registry-address
       - --worker-group=geo-registry
-    mem_limit: "${WORKER_ADDRESS_MEMORY_LIMIT:-1g}"
-    cpus: "${WORKER_ADDRESS_CPUS:-2}"
-    pids_limit: "${WORKER_ADDRESS_PIDS_LIMIT:-256}"
-    stop_grace_period: "${WORKER_STOP_GRACE_PERIOD:-60s}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 256
+    stop_grace_period: 60s
 
   worker-runtime:
     <<: *app-service
@@ -101,7 +216,40 @@ services:
       - --worker-id=geo-registry-runtime
       - --worker-name=geo-registry-runtime
       - --worker-group=geo-registry
-    mem_limit: "${WORKER_RUNTIME_MEMORY_LIMIT:-1g}"
-    cpus: "${WORKER_RUNTIME_CPUS:-2}"
-    pids_limit: "${WORKER_RUNTIME_PIDS_LIMIT:-256}"
-    stop_grace_period: "${WORKER_STOP_GRACE_PERIOD:-60s}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 256
+    stop_grace_period: 60s
+
+  maintenance:
+    <<: *app-service
+    profiles: [maintenance]
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+      - /app/var:rw,nosuid,size=64m,uid=${HOST_UID:-1000},gid=${HOST_GID:-1000},mode=0750
+    command: ["bin/app", "list"]
+    environment:
+      <<: *app-environment
+      DATAMOS_API_KEY: "${GEO_REGISTRY_DATAMOS_API_KEY:-}"
+    volumes:
+      - type: bind
+        source: ../../../docker/data
+        target: /data
+      - type: bind
+        source: ../../scripts/download-gar.sh
+        target: /usr/local/bin/download-gar
+        read_only: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  postgres-data:
+    name: geo-registry-postgres-data
+  opensearch-data:
+    name: geo-registry-opensearch-data

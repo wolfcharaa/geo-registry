@@ -52,7 +52,7 @@ build-production: guard-user ## Build the self-contained production image from l
 .PHONY: build-production
 
 freeze-release: guard-user ## Freeze the tracked production release identity for an already built image
-	RELEASE_VERSION="$(RELEASE_VERSION)" APP_IMAGE_DIGEST="$(APP_IMAGE_DIGEST)" \
+	DOCKER_IMAGE_PREFIX="$(DOCKER_IMAGE_PREFIX)" RELEASE_VERSION="$(RELEASE_VERSION)" APP_IMAGE_DIGEST="$(APP_IMAGE_DIGEST)" \
 		DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_BRANCH="$(RELEASE_BRANCH)" \
 		docker/release/freeze-release.sh
 .PHONY: freeze-release
@@ -81,6 +81,13 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/release/pull-release-image.sh \
 		docker/release/change-release.sh \
 		docker/release/extract-release-data.sh \
+		docker/release/init-deployment.sh \
+		docker/release/initialize-deployment-data.sh \
+		docker/release/create-deployment-backup.sh \
+		docker/release/prepare-deployment-image.sh \
+		docker/release/restore-deployment-data.sh \
+		docker/release/update-deployment.sh \
+		docker/scripts/download-gar.sh \
 		docker/backup/backup-lib.sh \
 		docker/backup/create-postgres-backup.sh \
 		docker/backup/verify-postgres-backup.sh \
@@ -90,8 +97,14 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/compose/prod.sh
 	sh -n \
 		docker/release/tests/change-release-offline-test.sh \
+		docker/release/tests/deployment-backup-test.sh \
+		docker/release/tests/update-deployment-test.sh \
+		docker/release/tests/init-deployment-test.sh \
 		docker/release/tests/fixtures/docker
 	docker/release/tests/change-release-offline-test.sh
+	docker/release/tests/deployment-backup-test.sh
+	docker/release/tests/init-deployment-test.sh
+	docker/release/tests/update-deployment-test.sh
 	test -f docs/deployment/offline-release.md
 	test -f docs/deployment/release-deploy.md
 .PHONY: release-check
@@ -112,6 +125,102 @@ extract-release-data: guard-user ## Verify and extract the optional PostgreSQL b
 		RELEASE_DATA_DRY_RUN="$(RELEASE_DATA_DRY_RUN)" docker/release/extract-release-data.sh
 .PHONY: extract-release-data
 
+deploy-init: guard-user ## Create one protected production config with generated managed PostgreSQL passwords
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" docker/release/init-deployment.sh
+.PHONY: deploy-init
+
+deploy-image: guard-user ## Pull or load and verify the frozen application image automatically
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" DOCKER_PLATFORM="$(DOCKER_PLATFORM)" \
+		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" docker/release/prepare-deployment-image.sh
+.PHONY: deploy-image
+
+deploy-restore: guard-user ## Discover, verify and restore release PostgreSQL data through production Compose
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" docker/release/restore-deployment-data.sh $(DEPLOY_RESTORE_FLAGS)
+.PHONY: deploy-restore
+
+data-restore: deploy-restore ## Restore the canonical PostgreSQL backup through the linear production workflow
+.PHONY: data-restore
+
+data-init: guard-user ## Create a fresh managed PostgreSQL database and apply migrations
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" docker/release/initialize-deployment-data.sh
+.PHONY: data-init
+
+data-backup-preflight: guard-user ## Verify capacity and source of the managed production database
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" BACKUP_ROOT="$(BACKUP_ROOT)" \
+		DEPLOY_BACKUP_DRY_RUN=1 docker/release/create-deployment-backup.sh
+.PHONY: data-backup-preflight
+
+data-backup: guard-user ## Create a verified backup of the managed production database
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" BACKUP_ROOT="$(BACKUP_ROOT)" \
+		docker/release/create-deployment-backup.sh
+.PHONY: data-backup
+
+data-gar-releases: guard-user ## Show official GAR releases and full XML URLs
+	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance bin/app gar:releases --json
+.PHONY: data-gar-releases
+
+data-gar-download: guard-user ## Download and atomically extract one official GAR full XML archive
+	@test -n "$(GAR_URL)" || { echo "Set GAR_URL to the full_xml_url returned by make data-gar-releases." >&2; exit 1; }
+	$(PRODUCTION_COMPOSE) run --rm --no-deps \
+		--env GAR_URL="$(GAR_URL)" --env GAR_SHA256="$(GAR_SHA256)" \
+		maintenance /usr/local/bin/download-gar
+.PHONY: data-gar-download
+
+data-gar-import: guard-user ## Import GAR regions 50/77 through COPY workers
+	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance \
+		bin/app gar:import /data/gar/full --regions=50,77 --batch-size=50000 --workers=4
+.PHONY: data-gar-import
+
+data-address-rebuild: guard-user ## Build and validate the partitioned PostgreSQL address search model
+	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance \
+		bin/app gar:address-search:rebuild --batch-size=50000
+	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance \
+		bin/app gar:integrity --regions=50,77 --deep --only-failed
+	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance \
+		bin/app gar:status --regions=50,77 --exact
+.PHONY: data-address-rebuild
+
+data-datamos-download: guard-user ## Download the official Moscow address snapshot into the maintenance data directory
+	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance \
+		bin/app datamos:address-registry:download /data/datamos/addressreestr.jsonl.gz
+.PHONY: data-datamos-download
+
+data-datamos-import: guard-user ## Import and enrich the address model from the downloaded Data.Mos snapshot
+	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance \
+		bin/app datamos:address-registry:import /data/datamos/addressreestr.jsonl.gz \
+		--require-manifest --batch-size=5000 --truncate --enrich
+.PHONY: data-datamos-import
+
+data-opensearch: guard-user ## Start OpenSearch and rebuild its projection from PostgreSQL
+	$(PRODUCTION_COMPOSE) --profile opensearch up --detach --wait opensearch
+	$(PRODUCTION_COMPOSE) run --rm --no-deps --env OPENSEARCH_ENABLED=1 maintenance \
+		bin/app opensearch:reindex --batch-size=10000 --concurrency=8
+	$(PRODUCTION_COMPOSE) run --rm --no-deps --env OPENSEARCH_ENABLED=1 \
+		maintenance bin/app opensearch:status
+.PHONY: data-opensearch
+
+deploy-start: guard-user ## Verify restored data, activate the immutable application and run health smoke
+	$(MAKE) verify-release DOCKER_PLATFORM="$${DOCKER_PLATFORM:-linux/amd64}"
+	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance bin/app migrate:history
+	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance bin/app gar:integrity --regions=50,77 --deep --only-failed
+	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance bin/app gar:status --regions=50,77 --exact
+	$(MAKE) change-release DOCKER_PLATFORM="$${DOCKER_PLATFORM:-linux/amd64}"
+	$(MAKE) smoke
+.PHONY: deploy-start
+
+deploy-update-preflight: guard-user ## Verify an existing managed deployment without changing it
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" DEPLOY_UPDATE_DRY_RUN=1 \
+		DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
+		docker/release/update-deployment.sh
+.PHONY: deploy-update-preflight
+
+deploy-update: guard-user ## Quiesce and update an existing managed deployment in place
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" DOCKER_PLATFORM="$(DOCKER_PLATFORM)" \
+		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
+		docker/release/update-deployment.sh $(DEPLOY_UPDATE_FLAGS)
+	$(MAKE) smoke
+.PHONY: deploy-update
+
 change-release: guard-user ## Verify/load the frozen image and recreate application processes only
 	DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
 		docker/release/change-release.sh
@@ -124,6 +233,8 @@ verify-release: guard-user ## Verify the frozen release and payload without chan
 
 backup-data-preflight: guard-user ## Check PostgreSQL/Nominatim source and backup capacity without writing a dump
 	BACKUP_DRY_RUN=1 BACKUP_COMPONENT="$(BACKUP_COMPONENT)" BACKUP_ROOT="$(BACKUP_ROOT)" \
+		BACKUP_CONTAINER="$(BACKUP_CONTAINER)" BACKUP_DATABASE_NAME="$(BACKUP_DATABASE_NAME)" \
+		BACKUP_DATABASE_USER="$(BACKUP_DATABASE_USER)" BACKUP_APPLICATION_REVISION="$(BACKUP_APPLICATION_REVISION)" \
 		BACKUP_PROVENANCE_NAME="$(BACKUP_PROVENANCE_NAME)" \
 		BACKUP_PROVENANCE_SHA256="$(BACKUP_PROVENANCE_SHA256)" \
 		docker/backup/create-postgres-backup.sh
@@ -131,6 +242,8 @@ backup-data-preflight: guard-user ## Check PostgreSQL/Nominatim source and backu
 
 backup-data: guard-user ## Create a verified application PostgreSQL or Nominatim logical backup
 	BACKUP_COMPONENT="$(BACKUP_COMPONENT)" BACKUP_ROOT="$(BACKUP_ROOT)" \
+		BACKUP_CONTAINER="$(BACKUP_CONTAINER)" BACKUP_DATABASE_NAME="$(BACKUP_DATABASE_NAME)" \
+		BACKUP_DATABASE_USER="$(BACKUP_DATABASE_USER)" BACKUP_APPLICATION_REVISION="$(BACKUP_APPLICATION_REVISION)" \
 		BACKUP_PROVENANCE_NAME="$(BACKUP_PROVENANCE_NAME)" \
 		BACKUP_PROVENANCE_SHA256="$(BACKUP_PROVENANCE_SHA256)" \
 		docker/backup/create-postgres-backup.sh
@@ -253,21 +366,25 @@ doctor: ## Validate the resolved Compose configuration
 		SERVER_MIN_FREE_GB= SERVER_MIN_MEMORY_GB= $(POSTGRES_TUNING_CHECK)
 	$(COMPOSE) config --quiet
 	$(INTEGRATION_COMPOSE) config --quiet
-	COMPOSE_ENV_FILE=config/prod.env.example \
+	COMPOSE_ENV_FILE=config/prod.secrets.env.example \
 		RELEASE_ENV_FILE=docker/compose/prod/release.env \
 		$(PRODUCTION_COMPOSE) config --quiet
+	docker compose --env-file config/prod.secrets.env.example config --quiet
+	docker compose --env-file config/prod.secrets.env.example \
+		--file compose.yaml --file compose.override.yaml.example \
+		--profile maintenance --profile opensearch config --quiet
 .PHONY: doctor
 
-prod-config: guard-user ## Render and validate production Compose with explicit operator/release files
-	$(PRODUCTION_COMPOSE) config
+prod-config: guard-user ## Validate production Compose without printing interpolated secrets
+	$(PRODUCTION_COMPOSE) config --quiet
 .PHONY: prod-config
 
-prod-up: guard-user ## Start the immutable production application processes only
-	$(PRODUCTION_COMPOSE) up --detach --remove-orphans
+prod-up: guard-user ## Start the production PostgreSQL and immutable application processes
+	$(PRODUCTION_COMPOSE) up --detach
 .PHONY: prod-up
 
-prod-down: guard-user ## Stop production application processes without deleting data
-	$(PRODUCTION_COMPOSE) down --remove-orphans
+prod-down: guard-user ## Stop production application processes without stopping managed data services
+	$(PRODUCTION_COMPOSE) stop app worker-address worker-runtime
 .PHONY: prod-down
 
 prod-ps: guard-user ## Show production application process status

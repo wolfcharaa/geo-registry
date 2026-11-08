@@ -15,15 +15,15 @@ if [ "$(id -u)" -eq 0 ] || [ -n "${SUDO_USER:-}" ]; then
     release_fail "run as the deployment user, without sudo"
 fi
 
-app_env_file=$(release_resolve_path "${COMPOSE_ENV_FILE:-config/prod.env}")
+secrets_file=$(release_resolve_path "${COMPOSE_ENV_FILE:-config/prod.secrets.env}")
 release_env_file=$(release_resolve_path "${RELEASE_ENV_FILE:-docker/compose/prod/release.env}")
-release_require_file "${app_env_file}"
+release_require_file "${secrets_file}"
 release_require_file "${release_env_file}"
 
 release_version=$(release_env_value RELEASE_VERSION "${release_env_file}" || true)
 image_tag=$(release_env_value APP_IMAGE_TAG "${release_env_file}" || true)
 image_digest=$(release_env_value APP_IMAGE_DIGEST "${release_env_file}" || true)
-image_prefix=$(release_env_value DOCKER_IMAGE_PREFIX "${app_env_file}" || true)
+image_prefix=$(release_env_value DOCKER_IMAGE_PREFIX "${release_env_file}" || true)
 platform=${DOCKER_PLATFORM:-linux/amd64}
 
 release_validate_version "${release_version}"
@@ -80,7 +80,7 @@ else
     echo "Offline image tag is bound to the verified archive checksum; a registry digest association is not required."
 fi
 
-COMPOSE_ENV_FILE="${app_env_file}" \
+COMPOSE_ENV_FILE="${secrets_file}" \
     RELEASE_ENV_FILE="${release_env_file}" \
     "${project_root}/docker/compose/prod.sh" config --quiet
 
@@ -89,17 +89,16 @@ if [ "${RELEASE_DRY_RUN:-0}" = 1 ]; then
     exit 0
 fi
 
-COMPOSE_ENV_FILE="${app_env_file}" \
+COMPOSE_ENV_FILE="${secrets_file}" \
     RELEASE_ENV_FILE="${release_env_file}" \
     "${project_root}/docker/compose/prod.sh" run --rm --no-deps app \
         bin/app message-bus:registry:check --no-interaction
 
-COMPOSE_ENV_FILE="${app_env_file}" \
+COMPOSE_ENV_FILE="${secrets_file}" \
     RELEASE_ENV_FILE="${release_env_file}" \
     "${project_root}/docker/compose/prod.sh" up \
         --detach \
         --force-recreate \
-        --remove-orphans \
         --wait \
         --wait-timeout "${RELEASE_WAIT_TIMEOUT_SECONDS:-120}" \
         app worker-address worker-runtime

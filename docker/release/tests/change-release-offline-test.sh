@@ -21,15 +21,24 @@ digest=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 tagged_image=ghcr.io/wolfcharaa/geo-registry/app:v0.2.0-linux-amd64
 exact_image="ghcr.io/wolfcharaa/geo-registry/app@sha256:${digest}"
 
-cat >"${temporary_root}/prod.env" <<EOF
-DOCKER_IMAGE_PREFIX=ghcr.io/wolfcharaa/geo-registry
+cat >"${temporary_root}/prod.secrets.env" <<EOF
+GEO_REGISTRY_DATABASE_PASSWORD=test-database-password
+GEO_REGISTRY_POSTGRES_ADMIN_PASSWORD=test-admin-password
 EOF
 
 cat >"${temporary_root}/release.env" <<EOF
+DOCKER_IMAGE_PREFIX=ghcr.io/wolfcharaa/geo-registry
 APP_IMAGE_TAG=v0.2.0-linux-amd64
 APP_IMAGE_DIGEST=sha256:${digest}
 RELEASE_VERSION=v0.2.0
 COMPOSE_PROJECT_NAME=geo-registry
+EOF
+
+cat >"${temporary_root}/compose.yaml" <<EOF
+x-app-image: &app-image "${tagged_image}"
+x-app-environment: &app-environment
+  APP_VERSION: v0.2.0
+services: {}
 EOF
 
 state_file="${temporary_root}/docker-load.state"
@@ -52,8 +61,9 @@ for manifest_format in 1 2; do
     output=$(
         PATH="${fixture_dir}:${PATH}" \
         FAKE_DOCKER_STATE="${state_file}" \
-        COMPOSE_ENV_FILE="${temporary_root}/prod.env" \
+        COMPOSE_ENV_FILE="${temporary_root}/prod.secrets.env" \
         RELEASE_ENV_FILE="${temporary_root}/release.env" \
+        PRODUCTION_COMPOSE_MODEL="${temporary_root}/compose.yaml" \
         RELEASE_ARTIFACT_DIR="${artifact_dir}" \
         RELEASE_DRY_RUN=1 \
         DOCKER_PLATFORM=linux/amd64 \
@@ -68,9 +78,39 @@ for manifest_format in 1 2; do
     printf '%s\n' "${output}" | grep -Fq 'Release v0.2.0 verified; dry-run leaves containers unchanged.'
 done
 
-grep -Fq "/app:\${APP_IMAGE_TAG:" "${project_root}/docker/compose/prod/compose.yaml"
+rm -f "${state_file}"
+prepare_output=$(
+    PATH="${fixture_dir}:${PATH}" \
+    FAKE_DOCKER_STATE="${state_file}" \
+    COMPOSE_ENV_FILE="${temporary_root}/prod.secrets.env" \
+    RELEASE_ENV_FILE="${temporary_root}/release.env" \
+    PRODUCTION_COMPOSE_MODEL="${temporary_root}/compose.yaml" \
+    RELEASE_ARTIFACT_DIR="${artifact_dir}" \
+    DOCKER_PLATFORM=linux/amd64 \
+        "${project_root}/docker/release/prepare-deployment-image.sh"
+)
+printf '%s\n' "${prepare_output}" | grep -Fq 'Preparing the frozen application image from verified offline media.'
+printf '%s\n' "${prepare_output}" | grep -Fq 'Deployment image is ready: v0.2.0 (linux/amd64).'
+
+# shellcheck disable=SC2016
+if grep -Fq '${APP_IMAGE_TAG' "${project_root}/docker/compose/prod/compose.yaml"; then
+    echo 'Offline release contract test failed: production Compose image is still environment-selectable.' >&2
+    exit 1
+fi
 if grep -Fq "/app@\${APP_IMAGE_DIGEST:" "${project_root}/docker/compose/prod/compose.yaml"; then
     echo 'Offline release contract test failed: production Compose still requires a registry digest reference.' >&2
+    exit 1
+fi
+
+resolved_images=$(APP_IMAGE_TAG=untrusted \
+    docker compose --project-directory "${project_root}" \
+    --env-file "${project_root}/config/prod.secrets.env.example" \
+    --file "${project_root}/compose.yaml" config --images)
+frozen_prefix=$(awk -F= '$1 == "DOCKER_IMAGE_PREFIX" {print $2}' "${project_root}/docker/compose/prod/release.env")
+frozen_tag=$(awk -F= '$1 == "APP_IMAGE_TAG" {print $2}' "${project_root}/docker/compose/prod/release.env")
+printf '%s\n' "${resolved_images}" | grep -Fq "${frozen_prefix}/app:${frozen_tag}"
+if printf '%s\n' "${resolved_images}" | grep -Fq 'untrusted'; then
+    echo 'Offline release contract test failed: shell environment can override the frozen Compose image.' >&2
     exit 1
 fi
 

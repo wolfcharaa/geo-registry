@@ -1,0 +1,21 @@
+# Copy only when host-specific non-secret overrides are required.
+# Docker Compose merges the ignored compose.override.yaml automatically.
+# Never override image or APP_VERSION: they are frozen release identity.
+services:
+  app:
+    ports: !override
+      - 0.0.0.0:8080:8080
+    environment:
+      APP_HTTP_WORKERS: "4"
+
+  maintenance:
+    user: "1000:1000"
+    volumes:
+      - type: bind
+        source: /srv/geo-registry-data
+        target: /data
+
+  opensearch:
+    environment:
+      OPENSEARCH_JAVA_OPTS: -Xms8g -Xmx8g
+    mem_limit: 10g

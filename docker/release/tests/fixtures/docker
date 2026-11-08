@@ -5,6 +5,16 @@ state_file=${FAKE_DOCKER_STATE:?Set FAKE_DOCKER_STATE}
 command_name=${1:-}
 [ "$#" -gt 0 ] && shift
 
+if [ -n "${FAKE_DOCKER_LOG:-}" ]; then
+    {
+        printf '%s' "${command_name}"
+        for argument in "$@"; do
+            printf ' %s' "${argument}"
+        done
+        printf '\n'
+    } >>"${FAKE_DOCKER_LOG}"
+fi
+
 case "${command_name}" in
     image)
         action=${1:-}
@@ -30,8 +40,9 @@ case "${command_name}" in
         case "${format}" in
             '') ;;
             '{{range .RepoDigests}}{{println .}}{{end}}') printf '%s\n' "${FAKE_DOCKER_EXACT_IMAGE:-}" ;;
-            '{{.Os}}/{{.Architecture}}') printf '%s\n' 'linux/amd64' ;;
-            '{{index .Config.Labels "org.opencontainers.image.version"}}') printf '%s\n' 'v0.2.0' ;;
+            '{{.Os}}/{{.Architecture}}') printf '%s\n' "${FAKE_DOCKER_PLATFORM:-linux/amd64}" ;;
+            '{{index .Config.Labels "org.opencontainers.image.version"}}') printf '%s\n' "${FAKE_DOCKER_VERSION:-v0.2.0}" ;;
+            '{{index .Config.Labels "org.opencontainers.image.revision"}}') printf '%s\n' "${FAKE_DOCKER_SOURCE_REVISION:-}" ;;
             *) exit 65 ;;
         esac
         ;;
@@ -39,7 +50,41 @@ case "${command_name}" in
         : >"${state_file}"
         printf '%s\n' 'Loaded image: ghcr.io/wolfcharaa/geo-registry/app:v0.2.0-linux-amd64'
         ;;
-    run|compose)
+    pull)
+        : >"${state_file}"
+        ;;
+    inspect)
+        if [ "${1:-}" = --format ]; then
+            case "${2:-}" in
+                '{{.State.Running}}') printf '%s\n' true ;;
+                '{{.Config.Image}}') printf '%s\n' 'postgis:17-test' ;;
+                '{{.Id}}') printf '%s\n' 'sha256:postgres-test' ;;
+                *) exit 65 ;;
+            esac
+        fi
+        ;;
+    exec)
+        case " $* " in
+            *' SELECT pg_database_size(current_database()); '*) printf '%s\n' 1048576 ;;
+            *' SHOW server_version; '*) printf '%s\n' 17.6 ;;
+            *' SHOW server_version_num; '*) printf '%s\n' 170006 ;;
+            *' pg_dump --version '*) printf '%s\n' 'pg_dump (PostgreSQL) 17.6' ;;
+            *' FROM pg_database '*) printf '%s\n' 1 ;;
+            *' FROM pg_roles '*) printf '%s\n' 1 ;;
+        esac
+        ;;
+    compose)
+        compose_command=
+        for argument in "$@"; do
+            case "${argument}" in
+                config|ps|run|stop|up) compose_command=${argument} ;;
+            esac
+        done
+        if [ "${compose_command}" = ps ]; then
+            printf '%s\n' "${FAKE_DOCKER_POSTGRES_CONTAINER:-geo-registry-postgres-test}"
+        fi
+        ;;
+    run)
         ;;
     *)
         exit 64
