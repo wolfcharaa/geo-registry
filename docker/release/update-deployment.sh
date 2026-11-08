@@ -36,15 +36,22 @@ release_require_file "${secrets_file}"
 release_require_file "${release_env_file}"
 release_version=$(release_env_value RELEASE_VERSION "${release_env_file}" || true)
 release_validate_version "${release_version}"
+platform=${DOCKER_PLATFORM:-linux/amd64}
 
 database_name=geo_registry
 database_user=geo_registry
 admin_user=postgres
 
+echo "Checking the configured HTTP host port before changing the running deployment."
+COMPOSE_ENV_FILE="${secrets_file}" \
+    RELEASE_ENV_FILE="${release_env_file}" \
+    DEPLOY_PORT_NEXT_COMMAND="make deploy-update DOCKER_PLATFORM=${platform}" \
+    "${script_dir}/deployment-port-preflight.sh"
+
 COMPOSE_ENV_FILE="${secrets_file}" \
     RELEASE_ENV_FILE="${release_env_file}" \
     RELEASE_DRY_RUN=1 \
-    DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}" \
+    DOCKER_PLATFORM="${platform}" \
     RELEASE_ARTIFACT_DIR="${RELEASE_ARTIFACT_DIR:-}" \
     "${script_dir}/change-release.sh"
 
@@ -112,7 +119,8 @@ compose run --rm --no-deps maintenance \
 
 COMPOSE_ENV_FILE="${secrets_file}" \
     RELEASE_ENV_FILE="${release_env_file}" \
-    DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}" \
+    DEPLOY_PORT_NEXT_COMMAND="make deploy-update DOCKER_PLATFORM=${platform}" \
+    DOCKER_PLATFORM="${platform}" \
     RELEASE_ARTIFACT_DIR="${RELEASE_ARTIFACT_DIR:-}" \
     "${script_dir}/change-release.sh"
 

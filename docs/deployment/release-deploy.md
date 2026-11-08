@@ -22,20 +22,22 @@ Docker.
 перезаписывать существующую. `deploy-update` требует уже существующую managed
 БД `geo_registry` и никогда не используется для первого запуска.
 
-Перед обоими сценариями `make deploy-port-preflight` проверяет фактический
-`services.app.ports` из итогового Compose YAML. `deploy-start` выполняет эту
-проверку до дорогих data gates и повторяет непосредственно перед activation.
+Перед длительным restore/import можно отдельно выполнить
+`make deploy-port-preflight`: команда проверяет фактический
+`services.app.ports` из итогового Compose YAML. `deploy-start` и
+`deploy-update-preflight` также выполняют эту проверку сами, поэтому при
+активации и обновлении отдельный вызов не нужен.
 
 ## Получить Exact Tag
 
-Ниже `v0.2.2` — первый release с native managed Compose-контрактом:
+Подставьте требуемый annotated release tag:
 
 ```shell
 cd /var/www/geo-registry
 git fetch --tags origin
-git switch --detach v0.2.2
-test "$(git cat-file -t refs/tags/v0.2.2)" = tag
-test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/v0.2.2^{commit}')"
+git switch --detach <release-tag>
+test "$(git cat-file -t refs/tags/<release-tag>)" = tag
+test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/<release-tag>^{commit}')"
 git status --short
 ```
 
@@ -178,14 +180,13 @@ services:
 После restore/import и optional OpenSearch:
 
 ```shell
-make deploy-port-preflight
-make deploy-start
+make deploy-start DOCKER_PLATFORM=linux/amd64
 ```
 
-Первая команда заранее проверяет host binding из Compose YAML. `deploy-start`
-повторно проверяет port, frozen image, migration history, GAR integrity и exact
-status регионов `50,77`, активирует только application processes через
-`change-release` и завершает путь HTTP smoke. Она не восстанавливает и не
+`deploy-start` проверяет port до дорогих gates и повторно перед activation,
+затем проверяет frozen image, migration history, GAR integrity и exact status
+регионов `50,77`, активирует только application processes через
+`change-release` и завершает путь HTTP smoke. Команда не восстанавливает и не
 перезаписывает данные.
 
 Проверка состояния:
@@ -218,7 +219,13 @@ git switch --detach <new-tag>
 make deploy-image DOCKER_PLATFORM=linux/amd64
 ```
 
-Read-only preflight не останавливает процессы и не меняет БД:
+Ignored `compose.override.yaml` сохраняется при смене tag. До update проверьте,
+что в нём остался нужный host binding. Для отдельного физического consumer это
+точный private/LAN IP сервера Geo Registry, а не `127.0.0.1` и не универсальный
+`0.0.0.0`; варианты приведены в [сетевом runbook](network-access.md).
+
+Read-only preflight проверяет image, managed PostgreSQL и итоговый HTTP binding,
+но не останавливает процессы и не меняет БД:
 
 ```shell
 make deploy-update-preflight DOCKER_PLATFORM=linux/amd64
@@ -235,6 +242,21 @@ make deploy-update DOCKER_PLATFORM=linux/amd64
 graceful stop, применяет migrations, выполняет региональные gates, активирует
 exact image, снимает pause и запускает smoke. При non-interactive automation
 используйте `DEPLOY_UPDATE_FLAGS=--yes` только после успешного preflight.
+
+После update проверьте локальный binding, health endpoint и доступ с разрешённого
+consumer host:
+
+```shell
+docker compose --env-file config/prod.secrets.env ps
+make deploy-smoke
+ss -H -ltnp 'sport = :<published-port>'
+```
+
+На отдельном consumer host:
+
+```shell
+curl --fail http://<geo-registry-private-ip>:<published-port>/health/ready
+```
 
 Если update прервался после quiesce, не запускайте workers вручную. Сохраните
 вывод, проверьте `docker compose ... ps/logs` и состояние migrations; затем

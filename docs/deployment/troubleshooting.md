@@ -141,6 +141,12 @@ services:
 `make deploy-smoke` автоматически использует `18080`; передавать `APP_PORT` в
 shell session не требуется.
 
+Для обновления существующего deployment используйте
+`make deploy-update-preflight`: он выполняет тот же port gate до остановки
+producer/workers. При `State: conflict` running deployment остаётся без
+изменений; после устранения владельца повторите preflight и только затем
+`make deploy-update`.
+
 Если вы меняете binding в уже опубликованном `v0.2.3`, в котором автоматическое
 распознавание rebind ещё отсутствовало, остановите только managed HTTP app и
 сразу продолжите обычный workflow:

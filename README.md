@@ -68,8 +68,7 @@ make deploy-start
 клонировать один repository:
 
 ```shell
-git clone --branch v0.2.2 \
-  https://github.com/wolfcharaa/geo-registry.git
+git clone https://github.com/wolfcharaa/geo-registry.git
 cd geo-registry
 ```
 

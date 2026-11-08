@@ -179,3 +179,38 @@ Port preflight отличает посторонний listener от текущ�
 make deploy-start DOCKER_PLATFORM=linux/amd64
 docker compose --env-file config/prod.secrets.env ps
 ```
+
+## Обновление Release С Одновременной Сменой Binding
+
+`compose.override.yaml` ignored и остаётся на сервере при смене Git tag.
+Сначала запишите в нём новый точный private/LAN IP, затем используйте обычный
+update workflow:
+
+```shell
+cd /var/www/geo-registry
+git fetch --tags origin
+git switch --detach <new-release-tag>
+test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/<new-release-tag>^{commit}')"
+git status --short
+
+make deploy-image DOCKER_PLATFORM=linux/amd64
+make deploy-update-preflight DOCKER_PLATFORM=linux/amd64
+make deploy-update DOCKER_PLATFORM=linux/amd64
+```
+
+Preflight должен показать `occupied-by-managed-app-pending-rebind`, если старый
+managed app ещё слушает тот же port на другом host IP. Это допустимое состояние:
+update сам остановит producer/workers и пересоздаст application container.
+`State: conflict` означает постороннего владельца; до его устранения update не
+изменяет running deployment.
+
+После успешного update выполните проверки с обеих сторон:
+
+```shell
+# На Geo Registry host.
+make deploy-smoke
+ss -H -ltnp 'sport = :<published-port>'
+
+# На разрешённом consumer host.
+curl --fail http://<geo-registry-private-ip>:<published-port>/health/ready
+```

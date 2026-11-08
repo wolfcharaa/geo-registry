@@ -17,6 +17,7 @@ fi
 
 secrets_file=$(release_resolve_path "${COMPOSE_ENV_FILE:-config/prod.secrets.env}")
 release_require_file "${secrets_file}"
+next_command=${DEPLOY_PORT_NEXT_COMMAND:-make deploy-start DOCKER_PLATFORM=linux/amd64}
 binding=$(COMPOSE_ENV_FILE="${secrets_file}" "${script_dir}/deployment-http-binding.sh")
 IFS='|' read -r host_ip published_port target_port <<EOF
 ${binding}
@@ -36,7 +37,7 @@ if [ -z "${listeners}" ]; then
     echo "State: free"
     echo "The configured HTTP port can be published."
     echo "Next action: no port action is required; continue the invoking deployment command."
-    echo "Standalone preflight: run make deploy-start DOCKER_PLATFORM=linux/amd64."
+    echo "Standalone preflight: run ${next_command}."
     exit 0
 fi
 
@@ -52,7 +53,7 @@ if [ -n "${managed_app}" ] \
         echo "Container: ${managed_name}"
         echo "The release workflow may recreate this managed application container."
         echo "Next action: do not stop it manually; continue the invoking deployment command."
-        echo "Standalone preflight: run make deploy-start DOCKER_PLATFORM=linux/amd64."
+        echo "Standalone preflight: run ${next_command}."
         exit 0
     fi
     listeners_owned_by_managed=1
@@ -73,7 +74,7 @@ EOF
         echo "Current binding: ${managed_bindings}"
         echo "The release workflow may recreate this managed container with the configured host IP."
         echo "Next action: do not stop it manually; continue the invoking deployment command."
-        echo "Standalone preflight: run make deploy-start DOCKER_PLATFORM=linux/amd64."
+        echo "Standalone preflight: run ${next_command}."
         exit 0
     fi
 fi
@@ -91,5 +92,5 @@ fi
 echo "Next action:" >&2
 echo "1. If the listener belongs to another service, keep that service and choose another host IP/port in compose.override.yaml, or stop it intentionally." >&2
 echo "2. Rerun: make deploy-port-preflight" >&2
-echo "3. After State: free or occupied-by-managed-app*, rerun: make deploy-start DOCKER_PLATFORM=linux/amd64" >&2
+echo "3. After State: free or occupied-by-managed-app*, run: ${next_command}" >&2
 release_fail "configured HTTP binding is already in use: ${host_ip}:${published_port}"

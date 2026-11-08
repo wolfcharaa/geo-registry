@@ -8,6 +8,8 @@
   physical server и защищённого public edge с явными trust boundaries.
 - Port preflight допускает смену host IP у binding, которым владеет текущий
   managed application container, и по-прежнему отклоняет чужой listener.
+- Read-only `deploy-update-preflight` проверяет итоговый HTTP binding до
+  остановки producer/workers и печатает безопасный следующий шаг.
 
 ## [0.2.3] - 2026-11-08
 

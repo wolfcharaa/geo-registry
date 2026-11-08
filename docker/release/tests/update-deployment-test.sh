@@ -43,9 +43,9 @@ cat >"${temporary_root}/compose.json" <<'EOF'
     "app": {
       "ports": [
         {
-          "host_ip": "127.0.0.1",
+          "host_ip": "10.20.30.40",
           "target": 8080,
-          "published": "8080",
+          "published": "18080",
           "protocol": "tcp"
         }
       ]
@@ -62,6 +62,10 @@ run_update() {
     FAKE_DOCKER_EXACT_IMAGE="${exact_image}" \
     FAKE_DOCKER_VERSION=v0.2.0 \
     FAKE_DOCKER_COMPOSE_CONFIG_FILE="${temporary_root}/compose.json" \
+    FAKE_DOCKER_APP_CONTAINER="${FAKE_DOCKER_APP_CONTAINER-geo-registry-app-test}" \
+    FAKE_DOCKER_PORT_BINDINGS="${FAKE_DOCKER_PORT_BINDINGS-127.0.0.1:18080}" \
+    FAKE_DOCKER_PORT_OWNERS="${FAKE_DOCKER_PORT_OWNERS:-}" \
+    FAKE_SS_LISTENERS="${FAKE_SS_LISTENERS-LISTEN 0 4096 127.0.0.1:18080 0.0.0.0:*}" \
     COMPOSE_ENV_FILE="${temporary_root}/prod.secrets.env" \
     RELEASE_ENV_FILE="${temporary_root}/release.env" \
     PRODUCTION_COMPOSE_MODEL="${temporary_root}/compose.yaml" \
@@ -71,10 +75,30 @@ run_update() {
 
 : >"${log_file}"
 preflight_output=$(DEPLOY_UPDATE_DRY_RUN=1 run_update)
+printf '%s\n' "${preflight_output}" | grep -Fq 'State: occupied-by-managed-app-pending-rebind'
+printf '%s\n' "${preflight_output}" | grep -Fq 'Standalone preflight: run make deploy-update DOCKER_PLATFORM=linux/amd64.'
 printf '%s\n' "${preflight_output}" | grep -Fq 'Deployment update preflight passed.'
 printf '%s\n' "${preflight_output}" | grep -Fq 'Dry-run leaves containers, database and worker control state unchanged.'
 if grep -Eq 'worker:pause|migrate:up| stop | up ' "${log_file}"; then
     echo 'Deployment update test failed: dry-run attempted a mutating command.' >&2
+    exit 1
+fi
+
+: >"${log_file}"
+if conflict_output=$(
+    FAKE_DOCKER_APP_CONTAINER='' \
+    FAKE_DOCKER_PORT_BINDINGS='' \
+    FAKE_DOCKER_PORT_OWNERS='container=other-http image=example/http ports=10.20.30.40:18080->80/tcp' \
+    FAKE_SS_LISTENERS='LISTEN 0 4096 10.20.30.40:18080 0.0.0.0:*' \
+    DEPLOY_UPDATE_DRY_RUN=1 run_update 2>&1
+); then
+    echo 'Deployment update test failed: foreign port conflict passed preflight.' >&2
+    exit 1
+fi
+printf '%s\n' "${conflict_output}" | grep -Fq 'State: conflict'
+printf '%s\n' "${conflict_output}" | grep -Fq 'container=other-http'
+if grep -Eq 'worker:pause|migrate:up| stop | up ' "${log_file}"; then
+    echo 'Deployment update test failed: port conflict attempted a mutating command.' >&2
     exit 1
 fi
 
