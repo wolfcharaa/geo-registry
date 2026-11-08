@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-11-08
+
 - Описаны отдельные сетевые режимы для host-only, соседнего Compose, private
   physical server и защищённого public edge с явными trust boundaries.
 - Port preflight допускает смену host IP у binding, которым владеет текущий
@@ -91,5 +93,6 @@
 [0.2.0]: https://github.com/wolfcharaa/geo-registry/compare/v0.1.0...v0.2.0
 [0.2.2]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.1...v0.2.2
 [0.2.3]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.2...v0.2.3
+[0.2.4]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.3...v0.2.4
 [0.2.1]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.0...v0.2.1
-[Unreleased]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.4...HEAD
