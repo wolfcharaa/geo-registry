@@ -52,8 +52,8 @@ checksum_path="${outer_path}.sha256"
 [ ! -e "${checksum_path}" ] || release_fail "offline checksum already exists: ${checksum_path}"
 release_require_file "${archive_path}"
 release_require_file "${manifest_path}"
-[ "$(release_manifest_value manifest_format "${manifest_path}" || true)" = 1 ] \
-    || release_fail "unsupported manifest format"
+release_validate_manifest_format \
+    "$(release_manifest_value manifest_format "${manifest_path}" || true)"
 [ "$(release_manifest_value release_version "${manifest_path}" || true)" = "${release_version}" ] \
     || release_fail "manifest release version does not match"
 [ "$(release_manifest_value git_commit "${manifest_path}" || true)" = "${release_commit}" ] \

@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-08
+
+- Исправлен offline release на чистом Docker Engine: checksummed `docker load`
+  больше не требует отсутствующий registry `RepoDigest`, а production Compose
+  запускает проверенный frozen tag с `pull_policy: never`.
+- Добавлен executable release regression test для manifest v1/v2 и реального
+  сценария tag-only image после offline load.
+- PostgreSQL backup из `v0.2.0` совместим с `v0.2.1`: схема приложения и
+  формат данных в patch release не изменялись.
+
+## [0.2.0] - 2026-11-08
+
 - MessageBus dependencies переведены с соседних Composer path repositories на
   опубликованные Packagist releases `v0.1.0`; development, production build и
   source handoff больше не требуют отдельных library checkout.
@@ -38,4 +50,6 @@
   Postman parity и offline application release workflow.
 
 [0.1.0]: https://github.com/wolfcharaa/geo-registry/releases/tag/v0.1.0
-[Unreleased]: https://github.com/wolfcharaa/geo-registry/compare/v0.1.0...HEAD
+[0.2.0]: https://github.com/wolfcharaa/geo-registry/compare/v0.1.0...v0.2.0
+[0.2.1]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.0...v0.2.1
+[Unreleased]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.1...HEAD

@@ -49,6 +49,13 @@ release_manifest_value() {
     release_env_value "${release_key}" "${release_file}"
 }
 
+release_validate_manifest_format() {
+    case "$1" in
+        1|2) ;;
+        *) release_fail "unsupported manifest format" ;;
+    esac
+}
+
 release_sha256() {
     release_file=$1
 

@@ -54,7 +54,6 @@ tag_commit=$(git -C "${project_root}" rev-parse "refs/tags/${release_version}^{c
 [ "$(git -C "${project_root}" cat-file -t "refs/tags/${release_version}")" = tag ] \
     || release_fail "${release_version} must be an annotated tag"
 
-image_id=$(docker image inspect --format '{{.Id}}' "${exact_image}")
 application_source_commit=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "${exact_image}")
 core_commit=$(docker image inspect --format '{{index .Config.Labels "org.geo-registry.message-bus-core.revision"}}' "${exact_image}")
 worker_commit=$(docker image inspect --format '{{index .Config.Labels "org.geo-registry.message-bus-worker.revision"}}' "${exact_image}")
@@ -85,7 +84,7 @@ archive_sha256=$(release_sha256 "${archive_temporary}")
 mv "${archive_temporary}" "${archive_path}"
 
 {
-    printf '%s\n' 'manifest_format=1'
+    printf '%s\n' 'manifest_format=2'
     printf 'release_version=%s\n' "${release_version}"
     printf 'git_commit=%s\n' "${release_commit}"
     printf 'application_source_commit=%s\n' "${application_source_commit}"
@@ -97,7 +96,6 @@ mv "${archive_temporary}" "${archive_path}"
     printf 'archive_sha256=%s\n' "${archive_sha256}"
     printf 'image_tag=%s\n' "${tagged_image}"
     printf 'image_digest=%s\n' "${exact_image}"
-    printf 'image_id=%s\n' "${image_id}"
 } > "${manifest_temporary}"
 
 mv "${manifest_temporary}" "${manifest_path}"

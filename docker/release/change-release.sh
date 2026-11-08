@@ -51,8 +51,8 @@ else
     release_require_file "${archive_path}"
     release_require_file "${manifest_path}"
 
-    [ "$(release_manifest_value manifest_format "${manifest_path}" || true)" = 1 ] \
-        || release_fail "unsupported manifest format"
+    release_validate_manifest_format \
+        "$(release_manifest_value manifest_format "${manifest_path}" || true)"
     [ "$(release_manifest_value release_version "${manifest_path}" || true)" = "${release_version}" ] \
         || release_fail "manifest release version does not match"
     current_commit=$(git -C "${project_root}" rev-parse HEAD)

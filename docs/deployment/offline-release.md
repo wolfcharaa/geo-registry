@@ -30,8 +30,10 @@ application-postgres-backup.tar
 
 `source-linux-amd64.tar` содержит self-contained application image с HTTP и
 worker runtime. `source-manifest.txt` связывает release commit, исходный commit
-image, source references двух locked MessageBus packages, platform, image
-tag/digest/id и SHA-256 Docker archive. Git bundle содержит application release
+image, source references двух locked MessageBus packages, platform, frozen
+tag, registry digest и SHA-256 Docker archive. Локальный Docker image ID не
+фиксируется: разные image stores после `docker load` могут представлять один и
+тот же проверенный archive разными ID. Git bundle содержит application release
 branch и annotated tag. Библиотеки уже находятся в `vendor` внутри image; для
 сборки нового image нужен application repository и доступ к Composer dist
 archives, но не соседние library checkout.

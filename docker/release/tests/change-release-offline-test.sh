@@ -21,18 +21,6 @@ digest=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 tagged_image=ghcr.io/wolfcharaa/geo-registry/app:v0.2.0-linux-amd64
 exact_image="ghcr.io/wolfcharaa/geo-registry/app@sha256:${digest}"
 
-cat >"${artifact_dir}/source-manifest.txt" <<EOF
-manifest_format=1
-release_version=v0.2.0
-git_commit=${release_commit}
-platform=linux/amd64
-archive=source-linux-amd64.tar
-archive_sha256=${archive_sha256}
-image_tag=${tagged_image}
-image_digest=${exact_image}
-image_id=sha256:${digest}
-EOF
-
 cat >"${temporary_root}/prod.env" <<EOF
 DOCKER_IMAGE_PREFIX=ghcr.io/wolfcharaa/geo-registry
 EOF
@@ -45,23 +33,40 @@ COMPOSE_PROJECT_NAME=geo-registry
 EOF
 
 state_file="${temporary_root}/docker-load.state"
-output=$(
-    PATH="${fixture_dir}:${PATH}" \
-    FAKE_DOCKER_STATE="${state_file}" \
-    COMPOSE_ENV_FILE="${temporary_root}/prod.env" \
-    RELEASE_ENV_FILE="${temporary_root}/release.env" \
-    RELEASE_ARTIFACT_DIR="${artifact_dir}" \
-    RELEASE_DRY_RUN=1 \
-    DOCKER_PLATFORM=linux/amd64 \
-        "${project_root}/docker/release/change-release.sh"
-)
+for manifest_format in 1 2; do
+    {
+        printf 'manifest_format=%s\n' "${manifest_format}"
+        printf '%s\n' 'release_version=v0.2.0'
+        printf 'git_commit=%s\n' "${release_commit}"
+        printf '%s\n' 'platform=linux/amd64'
+        printf '%s\n' 'archive=source-linux-amd64.tar'
+        printf 'archive_sha256=%s\n' "${archive_sha256}"
+        printf 'image_tag=%s\n' "${tagged_image}"
+        printf 'image_digest=%s\n' "${exact_image}"
+        if [ "${manifest_format}" = 1 ]; then
+            printf 'image_id=sha256:%s\n' "${digest}"
+        fi
+    } >"${artifact_dir}/source-manifest.txt"
 
-[ -f "${state_file}" ] || {
-    echo 'Offline release contract test failed: docker load was not called.' >&2
-    exit 1
-}
-printf '%s\n' "${output}" | grep -Fq 'Offline image tag is bound to the verified archive checksum'
-printf '%s\n' "${output}" | grep -Fq 'Release v0.2.0 verified; dry-run leaves containers unchanged.'
+    rm -f "${state_file}"
+    output=$(
+        PATH="${fixture_dir}:${PATH}" \
+        FAKE_DOCKER_STATE="${state_file}" \
+        COMPOSE_ENV_FILE="${temporary_root}/prod.env" \
+        RELEASE_ENV_FILE="${temporary_root}/release.env" \
+        RELEASE_ARTIFACT_DIR="${artifact_dir}" \
+        RELEASE_DRY_RUN=1 \
+        DOCKER_PLATFORM=linux/amd64 \
+            "${project_root}/docker/release/change-release.sh"
+    )
+
+    [ -f "${state_file}" ] || {
+        echo "Offline release contract test failed for manifest v${manifest_format}: docker load was not called." >&2
+        exit 1
+    }
+    printf '%s\n' "${output}" | grep -Fq 'Offline image tag is bound to the verified archive checksum'
+    printf '%s\n' "${output}" | grep -Fq 'Release v0.2.0 verified; dry-run leaves containers unchanged.'
+done
 
 grep -Fq "/app:\${APP_IMAGE_TAG:" "${project_root}/docker/compose/prod/compose.yaml"
 if grep -Fq "/app@\${APP_IMAGE_DIGEST:" "${project_root}/docker/compose/prod/compose.yaml"; then
