@@ -29,12 +29,14 @@ run_doctor() {
     test_context=${TEST_DOCKER_CONTEXT-production}
     test_expected_context=${TEST_EXPECTED_DOCKER_CONTEXT-production}
     test_engine_available=${TEST_DOCKER_ENGINE_AVAILABLE-1}
+    test_host_platform=${TEST_DOCKER_HOST_PLATFORM-linux/amd64}
     PATH="${fixture_dir}:${PATH}" \
     FAKE_DOCKER_STATE="${state_file}" \
     FAKE_DOCKER_LOG="${log_file}" \
     FAKE_DOCKER_CONTEXT="${test_context}" \
     FAKE_DOCKER_CONTEXT_ENDPOINT=ssh://deploy@example.test \
     FAKE_DOCKER_ENGINE_AVAILABLE="${test_engine_available}" \
+    FAKE_DOCKER_HOST_PLATFORM="${test_host_platform}" \
     COMPOSE_ENV_FILE="${secrets_file}" \
     DEPLOY_TARGET="${test_target}" \
     DEPLOY_EXPECTED_DOCKER_CONTEXT="${test_expected_context}" \
@@ -46,6 +48,7 @@ run_plan() {
     test_context=${TEST_DOCKER_CONTEXT-production}
     test_expected_context=${TEST_EXPECTED_DOCKER_CONTEXT-production}
     test_engine_available=${TEST_DOCKER_ENGINE_AVAILABLE-1}
+    test_host_platform=${TEST_DOCKER_HOST_PLATFORM-linux/amd64}
     test_data_mode=${TEST_DEPLOY_DATA_MODE-inspect}
     test_service_scope=${TEST_DEPLOY_SERVICE_SCOPE-core}
     test_schema_compatibility=${TEST_SCHEMA_COMPATIBILITY-}
@@ -59,6 +62,7 @@ run_plan() {
     FAKE_DOCKER_CONTEXT="${test_context}" \
     FAKE_DOCKER_CONTEXT_ENDPOINT=ssh://deploy@example.test \
     FAKE_DOCKER_ENGINE_AVAILABLE="${test_engine_available}" \
+    FAKE_DOCKER_HOST_PLATFORM="${test_host_platform}" \
     FAKE_DOCKER_EXACT_LOADED=1 \
     FAKE_DOCKER_APP_CONTAINER=geo-registry-app-test \
     FAKE_DOCKER_CURRENT_IMAGE_REFERENCE="${test_current_image}" \
@@ -85,6 +89,22 @@ printf '%s\n' "${doctor_output}" | grep -Fq 'docker_context=production'
 printf '%s\n' "${doctor_output}" | grep -Fq 'docker_context_endpoint=ssh://example.test'
 printf '%s\n' "${doctor_output}" | grep -Fq 'host_platform=linux/amd64'
 printf '%s\n' "${doctor_output}" | grep -Fq 'external_mutations=none'
+
+x86_64_doctor_output=$(TEST_DOCKER_HOST_PLATFORM=linux/x86_64 run_doctor)
+printf '%s\n' "${x86_64_doctor_output}" | grep -Fq 'status=ready'
+printf '%s\n' "${x86_64_doctor_output}" | grep -Fq 'host_platform=linux/amd64'
+
+aarch64_doctor_output=$(TEST_DOCKER_HOST_PLATFORM=linux/aarch64 run_doctor)
+printf '%s\n' "${aarch64_doctor_output}" | grep -Fq 'status=ready'
+printf '%s\n' "${aarch64_doctor_output}" | grep -Fq 'host_platform=linux/arm64'
+
+if unsupported_platform_output=$(TEST_DOCKER_HOST_PLATFORM=linux/ppc64le run_doctor 2>&1); then
+    echo 'Deployment doctor test failed: an unsupported host platform was accepted.' >&2
+    exit 1
+fi
+printf '%s\n' "${unsupported_platform_output}" | grep -Fq 'status=blocked'
+printf '%s\n' "${unsupported_platform_output}" \
+    | grep -Fq 'docker-host-platform-unsupported'
 
 : >"${log_file}"
 plan_output=$(run_plan)

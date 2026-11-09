@@ -48,6 +48,14 @@ sanitize_endpoint() {
     esac
 }
 
+normalize_host_platform() {
+    case "$1" in
+        linux/amd64|linux/x86_64) printf '%s\n' 'linux/amd64' ;;
+        linux/arm64|linux/aarch64) printf '%s\n' 'linux/arm64' ;;
+        *) return 1 ;;
+    esac
+}
+
 target=${DEPLOY_TARGET:-}
 if [ -z "${target}" ]; then
     target_state=missing
@@ -124,18 +132,17 @@ if engine_info=$(docker info \
     --format '{{.OSType}}/{{.Architecture}}|{{.ServerVersion}}' 2>/dev/null); then
     discovered_host_platform=${engine_info%%|*}
     discovered_docker_server=${engine_info#*|}
-    case "${discovered_host_platform}" in
-        linux/amd64|linux/arm64)
-            if [ -n "${discovered_docker_server}" ]; then
-                engine_state=available
-                host_platform=${discovered_host_platform}
-                docker_server=${discovered_docker_server}
-            else
-                add_blocker docker-engine-identity-invalid
-            fi
-            ;;
-        *) add_blocker docker-host-platform-unsupported ;;
-    esac
+    if normalized_host_platform=$(normalize_host_platform "${discovered_host_platform}"); then
+        if [ -n "${discovered_docker_server}" ]; then
+            engine_state=available
+            host_platform=${normalized_host_platform}
+            docker_server=${discovered_docker_server}
+        else
+            add_blocker docker-engine-identity-invalid
+        fi
+    else
+        add_blocker docker-host-platform-unsupported
+    fi
 else
     add_blocker docker-engine-unavailable
 fi
