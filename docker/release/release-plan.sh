@@ -81,6 +81,24 @@ if [ "${source_state}" != clean ] \
     plan_status=blocked
 fi
 
+if [ "${source_state}" != clean ]; then
+    next_action=review-working-tree
+elif [ "${current_branch}" != "${release_branch}" ]; then
+    next_action=switch-release-branch
+elif [ "${source_identity_format}" = 1 ]; then
+    if [ "${tag_state}" = absent ]; then
+        next_action=prepare-release-source
+    else
+        next_action=choose-new-release-version
+    fi
+elif [ "${tag_state}" = prepared ]; then
+    next_action=build-prepared-source
+elif [ "${tag_state}" = absent ]; then
+    next_action=create-annotated-tag
+else
+    next_action=choose-new-release-version
+fi
+
 echo "Release plan (read-only)"
 printf 'status=%s\n' "${plan_status}"
 printf 'release_version=%s\n' "${release_version}"
@@ -98,11 +116,7 @@ printf 'message_bus_core_oid=%s\n' "${core_revision}"
 printf 'message_bus_worker_oid=%s\n' "${worker_revision}"
 printf 'buildx=%s\n' "${buildx_version}"
 printf '%s\n' 'external_mutations=none'
-if [ "${source_identity_format}" = 2 ]; then
-    printf '%s\n' 'next_action=build-prepared-source'
-else
-    printf '%s\n' 'next_action=prepare-release-source'
-fi
+printf 'next_action=%s\n' "${next_action}"
 printf '%s\n' 'last_safe_abort=before-build'
 
 [ "${plan_status}" = ready ] \

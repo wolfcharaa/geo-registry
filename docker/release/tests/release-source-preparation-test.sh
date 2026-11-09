@@ -144,6 +144,26 @@ printf '%s\n' "${dirty_output}" | grep -Fq 'repository must be clean'
 artifact_dir="${temporary_root}/artifacts"
 : >"${docker_log}"
 : >"${git_log}"
+if untagged_plan_output=$(
+    PATH="${fake_bin}:${PATH}" \
+    FAKE_DOCKER_STATE="${state_file}" \
+    FAKE_DOCKER_LOG="${docker_log}" \
+    FAKE_GIT_LOG="${git_log}" \
+    FAKE_GIT_TAG_EXISTS=0 \
+    RELEASE_PROJECT_ROOT="${prepared_root}" \
+    RELEASE_SOURCE_ENV_FILE="${prepared_root}/docker/compose/prod/release.env" \
+    RELEASE_COMPOSE_FILE="${prepared_root}/docker/compose/prod/compose.yaml" \
+    RELEASE_VERSION=v9.9.9 \
+    DOCKER_IMAGE_PREFIX=registry.example/geo-registry \
+    DOCKER_PLATFORM=linux/amd64 \
+        "${project_root}/docker/release/release-plan.sh" 2>&1
+); then
+    echo 'Release source preparation test failed: prepared source without a tag was ready.' >&2
+    exit 1
+fi
+printf '%s\n' "${untagged_plan_output}" | grep -Fq 'tag_state=absent'
+printf '%s\n' "${untagged_plan_output}" | grep -Fq 'next_action=create-annotated-tag'
+
 plan_output=$(
     PATH="${fake_bin}:${PATH}" \
     FAKE_DOCKER_STATE="${state_file}" \

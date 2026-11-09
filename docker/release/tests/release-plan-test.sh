@@ -91,6 +91,7 @@ printf '%s\n' "${ready_output}" | grep -Fq 'tag_state=absent'
 printf '%s\n' "${ready_output}" | grep -Fq 'offline_scope=app-update'
 printf '%s\n' "${ready_output}" | grep -Fq 'image_reference=registry.example/geo-registry/app:v9.9.9-linux-amd64'
 printf '%s\n' "${ready_output}" | grep -Fq 'external_mutations=none'
+printf '%s\n' "${ready_output}" | grep -Fq 'next_action=prepare-release-source'
 grep -Fq 'buildx version' "${log_file}"
 grep -Fq 'buildx build --help' "${log_file}"
 contract_assert_docker_log_read_only "${log_file}" 'release plan'
@@ -101,6 +102,7 @@ if dirty_output=$(FAKE_GIT_DIRTY=1 run_plan 2>&1); then
 fi
 printf '%s\n' "${dirty_output}" | grep -Fq 'status=blocked'
 printf '%s\n' "${dirty_output}" | grep -Fq 'source_state=dirty'
+printf '%s\n' "${dirty_output}" | grep -Fq 'next_action=review-working-tree'
 printf '%s\n' "${dirty_output}" | grep -Fq 'no build, tag, push or artifact mutation was attempted'
 
 if tag_output=$(FAKE_GIT_TAG_EXISTS=1 run_plan 2>&1); then
@@ -109,6 +111,7 @@ if tag_output=$(FAKE_GIT_TAG_EXISTS=1 run_plan 2>&1); then
 fi
 printf '%s\n' "${tag_output}" | grep -Fq 'tag_state=existing'
 printf '%s\n' "${tag_output}" | grep -Fq 'status=blocked'
+printf '%s\n' "${tag_output}" | grep -Fq 'next_action=choose-new-release-version'
 
 if branch_output=$(FAKE_GIT_BRANCH=feature/test run_plan 2>&1); then
     echo 'Release plan test failed: wrong branch was accepted.' >&2
@@ -116,6 +119,7 @@ if branch_output=$(FAKE_GIT_BRANCH=feature/test run_plan 2>&1); then
 fi
 printf '%s\n' "${branch_output}" | grep -Fq 'current_branch=feature/test'
 printf '%s\n' "${branch_output}" | grep -Fq 'status=blocked'
+printf '%s\n' "${branch_output}" | grep -Fq 'next_action=switch-release-branch'
 
 core_output=$(TEST_OFFLINE_SCOPE=new-host-core run_plan)
 printf '%s\n' "${core_output}" | grep -Fq 'offline_scope=new-host-core'

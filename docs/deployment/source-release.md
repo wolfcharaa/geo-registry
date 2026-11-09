@@ -154,6 +154,11 @@ test "$(git rev-parse HEAD)" = \
   "$(git rev-parse "refs/tags/${RELEASE_VERSION}^{commit}")"
 ```
 
+Между release commit и созданием tag read-only plan остаётся заблокированным и
+показывает `next_action=create-annotated-tag`; build в этом состоянии не
+запускается. Существующий неподходящий tag не перемещайте — выберите новую
+release version.
+
 Повторный `make release-plan ...` должен показать `tag_state=prepared`,
 `status=ready` и `next_action=build-prepared-source`.
 
