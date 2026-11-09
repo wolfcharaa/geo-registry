@@ -44,6 +44,8 @@ fi
 platform_slug=$(printf '%s' "${platform}" | tr / -)
 image_tag="${release_version}-${platform_slug}"
 tagged_image="${image_prefix}/app:${image_tag}"
+user_agent_version=$(printf '%s\n' "${release_version#v}" | awk -F. '{ print $1 "." $2 }')
+user_agent="geo-registry/${user_agent_version}"
 temporary_compose=$(mktemp "${compose_file}.tmp.XXXXXX")
 temporary_env=$(mktemp "${source_env_file}.tmp.XXXXXX")
 cleanup() {
@@ -51,13 +53,17 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-awk -v image="${tagged_image}" -v version="${release_version}" '
+awk -v image="${tagged_image}" -v version="${release_version}" -v user_agent="${user_agent}" '
     $1 == "x-app-image:" {
         print "x-app-image: &app-image \"" image "\""
         next
     }
     $1 == "APP_VERSION:" {
         print "  APP_VERSION: " version
+        next
+    }
+    $1 == "APP_USER_AGENT:" {
+        print "  APP_USER_AGENT: " user_agent
         next
     }
     { print }

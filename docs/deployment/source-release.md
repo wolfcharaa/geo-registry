@@ -137,7 +137,8 @@ make prepare-release-source \
   DOCKER_PLATFORM="${RELEASE_PLATFORM}"
 ```
 
-Команда атомарно меняет только production Compose image/version и
+Команда атомарно меняет только production Compose image/version,
+`APP_USER_AGENT` в формате `geo-registry/MAJOR.MINOR` и
 `docker/compose/prod/release.env`, проверяет rendered Compose, но не создаёт
 commit, tag, image или artifact. Проверьте diff и создайте единственный release
 commit и локальный annotated tag:

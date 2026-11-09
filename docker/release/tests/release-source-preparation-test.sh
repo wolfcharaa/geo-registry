@@ -124,6 +124,8 @@ fi
 grep -Fq 'x-app-image: &app-image "registry.example/geo-registry/app:v9.9.9-linux-amd64"' \
     "${prepared_root}/docker/compose/prod/compose.yaml"
 grep -Fq '  APP_VERSION: v9.9.9' "${prepared_root}/docker/compose/prod/compose.yaml"
+grep -Fq '  APP_USER_AGENT: geo-registry/9.9' \
+    "${prepared_root}/docker/compose/prod/compose.yaml"
 if grep -Eq ' (add|commit|tag|push)( |$)' "${git_log}"; then
     echo 'Release source preparation test failed: preparation mutated Git history.' >&2
     exit 1
