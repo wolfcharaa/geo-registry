@@ -29,6 +29,10 @@ output=$(
     BACKUP_ROOT="${temporary_root}/backups" \
     BACKUP_PROGRESS_INTERVAL_SECONDS=1 \
     BACKUP_APPLICATION_REVISION=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+    DEPLOY_TARGET=moscow-primary \
+    DEPLOY_EXPECTED_DOCKER_CONTEXT=production \
+    DEPLOY_CONFIRM_TARGET=moscow-primary \
+    DEPLOY_STATE_ROOT="${temporary_root}/deployment-state" \
         "${project_root}/docker/release/create-deployment-backup.sh"
 )
 

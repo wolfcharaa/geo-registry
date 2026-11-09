@@ -69,6 +69,11 @@ run_update() {
     COMPOSE_ENV_FILE="${temporary_root}/prod.secrets.env" \
     RELEASE_ENV_FILE="${temporary_root}/release.env" \
     PRODUCTION_COMPOSE_MODEL="${temporary_root}/compose.yaml" \
+    DEPLOY_TARGET=moscow-primary \
+    DEPLOY_EXPECTED_DOCKER_CONTEXT=production \
+    DEPLOY_CONFIRM_TARGET=moscow-primary \
+    DEPLOY_STATE_ROOT="${temporary_root}/deployment-state" \
+    DEPLOY_SMOKE_DRY_RUN=1 \
     DOCKER_PLATFORM=linux/amd64 \
         "${project_root}/docker/release/update-deployment.sh" "$@"
 }
@@ -105,6 +110,9 @@ fi
 : >"${log_file}"
 update_output=$(run_update --yes)
 printf '%s\n' "${update_output}" | grep -Fq 'Deployment activation completed: v0.2.0.'
+printf '%s\n' "${update_output}" \
+    | grep -Fq 'Running HTTP smoke checks while the deployment target lock is held.'
+printf '%s\n' "${update_output}" | grep -Fq 'Dry-run does not send an HTTP request.'
 grep -Fq 'worker:pause' "${log_file}"
 grep -Fq 'migrate:up' "${log_file}"
 grep -Fq 'gar:integrity' "${log_file}"

@@ -238,9 +238,18 @@ make extract-release-data \
 compatibility и выполнить read-only release gate:
 
 ```shell
+export DEPLOY_TARGET=moscow-primary
+export DEPLOY_EXPECTED_DOCKER_CONTEXT=production
+export DEPLOY_CONFIRM_TARGET=moscow-primary
+
 make deploy-init
+make deploy-doctor
 make deploy-image
 ```
+
+Offline transport не ослабляет target gate: label повторяется явно, active
+Docker context должен совпасть с ожидаемым, а endpoint печатается без userinfo
+до `docker load` или Compose mutation.
 
 Если tag уже связан с frozen registry digest, archive не требуется. В offline
 сценарии `deploy-image` fail-closed проверяет manifest и SHA-256 до

@@ -35,6 +35,18 @@ git status --short
 Последняя команда не должна выводить изменений. Runbook, Compose и scripts
 используются только из одного tag.
 
+Зафиксируйте target contract для всей deployment-сессии:
+
+```shell
+export DEPLOY_TARGET=moscow-primary
+export DEPLOY_EXPECTED_DOCKER_CONTEXT=production
+export DEPLOY_CONFIRM_TARGET=moscow-primary
+```
+
+Label и context должны быть утверждены для этого host. Production mutation
+останавливается до Docker-вызова, если target не подтверждён дважды или active
+context изменился.
+
 ## 2. Положить Backup В Ожидаемый Каталог
 
 Скопируйте весь каталог в `docker/data/backups/`. Например, на source host:
@@ -61,6 +73,7 @@ find docker/data/backups/application-postgres-<identity> \
 
 ```shell
 make deploy-init
+make deploy-doctor
 make deploy-image DOCKER_PLATFORM=linux/amd64
 make deploy-port-preflight
 ```
@@ -139,14 +152,14 @@ HTTP smoke использует binding из Compose YAML.
 Успешный результат:
 
 ```shell
-docker compose --env-file config/prod.secrets.env ps
+make prod-ps
 make deploy-smoke
 ```
 
 После первого запуска обычный идемпотентный restart возможен нативно:
 
 ```shell
-docker compose --env-file config/prod.secrets.env up -d
+make prod-up
 ```
 
 Первую активацию эта команда не заменяет, потому что не выполняет data и

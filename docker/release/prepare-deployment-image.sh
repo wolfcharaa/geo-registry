@@ -8,6 +8,8 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
 
 # shellcheck disable=SC1091
 . "${script_dir}/release-lib.sh"
+# shellcheck disable=SC1091
+. "${script_dir}/deployment-lib.sh"
 
 for command_name in awk git grep tr; do
     release_require_command "${command_name}"
@@ -21,6 +23,11 @@ release_env_file=$(release_resolve_path "${RELEASE_ENV_FILE:-docker/compose/prod
 release_require_file "${release_env_file}"
 release_version=$(release_env_value RELEASE_VERSION "${release_env_file}" || true)
 release_validate_version "${release_version}"
+
+deployment_require_confirmed_target \
+    deploy-image application-image acquire "${release_env_file}"
+deployment_acquire_target_lock \
+    deploy-image application-image acquire "${release_env_file}"
 
 platform=${DOCKER_PLATFORM:-linux/amd64}
 release_validate_platform "${platform}"

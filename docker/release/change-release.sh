@@ -7,6 +7,8 @@ project_root=${RELEASE_PROJECT_ROOT:-${default_project_root}}
 
 # shellcheck disable=SC1091
 . "${script_dir}/release-lib.sh"
+# shellcheck disable=SC1091
+. "${script_dir}/deployment-lib.sh"
 
 for command_name in awk docker git grep tr wc; do
     release_require_command "${command_name}"
@@ -58,6 +60,11 @@ fi
 release_validate_artifact_identity \
     "${identity_file}" "${release_version}" "${platform}" \
     "${current_commit}" "${source_config_revision}"
+
+deployment_require_confirmed_target \
+    change-release application "${DEPLOY_DATA_MODE:-none}" "${identity_file}"
+deployment_acquire_target_lock \
+    change-release application "${DEPLOY_DATA_MODE:-none}" "${identity_file}"
 
 if release_registry_image_is_loaded "${tagged_image}" "${exact_image}"; then
     echo "Frozen registry digest is already loaded; archive verification and docker load are skipped."

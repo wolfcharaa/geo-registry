@@ -144,14 +144,14 @@ tag OID mismatch до Docker build. Реальный tag, image, push и transpo
 - [x] Добавить `deploy-doctor` и read-only `deploy-plan`: target label, Docker
   context/endpoint, project, host platform, current/desired identity, rendered
   config checksum, service scope, data mode, backup gate и last safe abort.
-- [ ] Не допускать production mutation с неявным или неподтверждённым target.
+- [x] Не допускать production mutation с неявным или неподтверждённым target.
 - [ ] Ввести один per-target lock для init, restore, update, migrations и
   release switch; lock охватывает bounded smoke и запись результата.
 - [ ] Привязать update к проверенному backup manifest текущего deployment и
   явно классифицировать schema compatibility.
 - [ ] Сохранять current/previous/desired identity, actor, timing, checks,
   migration/backup/smoke status и final/partial state.
-- [ ] Перенести полную orchestration из Make recipes в testable scripts; Make
+- [x] Перенести полную orchestration из Make recipes в testable scripts; Make
   остаётся тонким facade.
 
 Автоматический rollback или restore после неоднозначной ошибки запрещён.
@@ -172,6 +172,27 @@ context сами и не выполняют `pull`, `load`, запуск contain
 rendered config дают `status=blocked`. Это discovery gate, а не разрешение на
 mutation: подключение plan к mutating entrypoints, per-target lock и evidence
 остаются следующими slices H3.
+
+Второй slice H3 вводит единый target gate в production Compose wrapper и в
+entrypoints, способные изменить secret file, local image store, backup либо
+data до первого Compose mutation. Оператор явно задаёт `DEPLOY_TARGET`,
+`DEPLOY_EXPECTED_DOCKER_CONTEXT` и совпадающий `DEPLOY_CONFIRM_TARGET`.
+Read-only `config`, `ps`, `logs`, doctor, plan и update/backup preflight не
+требуют confirmation; mutating commands fail-closed до обращения к Docker.
+Wrapper теперь распознаёт Compose command после global options, поэтому
+`--profile opensearch up` получает те же `--no-build --pull never` и target
+gate, что обычный `up`. `build`, `publish` и `push` через production wrapper
+запрещены и остаются отдельными release operations.
+
+Третий slice H3 добавляет ignored kernel `flock` на target и наследование его
+descriptor дочерними production-wrapper вызовами. Init, image acquisition,
+restore, fresh database initialization, backup, update и release switch
+сериализуются по `DEPLOY_TARGET`; конкурентный owner получает fail-fast и
+metadata активной операции. `deploy-start` перенесён из многострочного Make
+recipe в `deploy-start.sh`, а update smoke — внутрь `update-deployment.sh`,
+поэтому один lock теперь охватывает data gates, activation и smoke. Пункт lock
+пока не закрыт: stale metadata является диагностикой, но ещё не final/partial
+evidence и не блокирует продолжение без recovery handover.
 
 ## H4 — Offline Scopes
 

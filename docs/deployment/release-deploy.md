@@ -52,6 +52,39 @@ mutation по-прежнему запускается отдельной под�
 `status=blocked` ориентируйтесь на поле `blockers`; последняя безопасная точка
 остаётся `before-artifact-acquire`.
 
+Перед первой mutating-командой в deployment-сессии задайте target contract.
+Третья переменная должна буквально повторять label цели:
+
+```shell
+export DEPLOY_TARGET=moscow-primary
+export DEPLOY_EXPECTED_DOCKER_CONTEXT=production
+export DEPLOY_CONFIRM_TARGET=moscow-primary
+```
+
+Production wrapper перед каждым `run`, `up`, `stop`, `pull`, `exec` и другим
+изменяющим Compose-вызовом повторно сравнивает active context с ожидаемым и
+печатает target, endpoint без userinfo, project, scope и data mode. Read-only
+`config`, `ps`, `logs` и status-команды не требуют подтверждения. Пустой target,
+другая confirmation label или context mismatch останавливают операцию до
+Docker mutation. Эти переменные не являются secrets; не записывайте их в
+tracked release files и очищайте terminal session перед работой с другой
+целью.
+
+После target gate mutating entrypoint захватывает kernel `flock` на
+`docker/data/deployment/<target>/deployment.lock`. Файл ignored, имеет mode,
+ограниченный deployment user, и содержит только operation, target, context,
+project, scope, data mode, PID, actor и UTC start — без secrets. Дочерние
+вызовы production wrapper наследуют тот же descriptor, поэтому один update,
+restore или init не конфликтует сам с собой. Параллельный operator получает
+`Active deployment target lock` и metadata текущего владельца до мутации;
+lock-файл вручную не удаляйте. Kernel lock освобождается при завершении
+процесса, а оставшийся файл сохраняет последнюю диагностику.
+
+`deploy-start` и `deploy-update` удерживают один descriptor через preflight,
+data gates, activation и финальный smoke; их Make targets являются тонким
+facade над testable scripts. Соответствующий пункт H3 всё ещё открыт до записи
+final/partial evidence и явного recovery handover после неоднозначной ошибки.
+
 ## Выберите Сценарий
 
 | Сценарий | Путь |
@@ -241,7 +274,7 @@ make deploy-start DOCKER_PLATFORM=linux/amd64
 Проверка состояния:
 
 ```shell
-docker compose --env-file config/prod.secrets.env ps
+make prod-ps
 docker compose --env-file config/prod.secrets.env logs --tail=100 app
 ```
 
@@ -296,7 +329,7 @@ exact image, снимает pause и запускает smoke. При non-intera
 consumer host:
 
 ```shell
-docker compose --env-file config/prod.secrets.env ps
+make prod-ps
 make deploy-smoke
 ss -H -ltnp 'sport = :<published-port>'
 ```

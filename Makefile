@@ -22,6 +22,9 @@ ADDRESS_LOAD_MAX_P99_MS ?= 1500
 
 export HOST_UID ?= $(shell id -u)
 export HOST_GID ?= $(shell id -g)
+export DEPLOY_TARGET
+export DEPLOY_EXPECTED_DOCKER_CONTEXT
+export DEPLOY_CONFIRM_TARGET
 
 guard-user:
 	@if [ "$$(id -u)" -eq 0 ] || [ -n "$${SUDO_USER:-}" ]; then \
@@ -98,8 +101,10 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/release/publish-release-image.sh \
 		docker/release/release-candidates.sh \
 		docker/release/release-plan.sh \
+		docker/release/deployment-lib.sh \
 		docker/release/deploy-doctor.sh \
 		docker/release/deploy-plan.sh \
+		docker/release/deploy-start.sh \
 		docker/release/prepare-release-source.sh \
 		docker/release/pull-release-image.sh \
 		docker/release/change-release.sh \
@@ -127,8 +132,11 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/release/tests/change-release-offline-test.sh \
 		docker/release/tests/deployment-data-status-test.sh \
 		docker/release/tests/deployment-backup-test.sh \
+		docker/release/tests/deployment-lock-test.sh \
 		docker/release/tests/deployment-port-preflight-test.sh \
 		docker/release/tests/deploy-plan-test.sh \
+		docker/release/tests/deploy-start-test.sh \
+		docker/release/tests/production-compose-target-test.sh \
 		docker/release/tests/publish-release-image-test.sh \
 		docker/release/tests/release-output-state-test.sh \
 		docker/release/tests/release-plan-test.sh \
@@ -142,8 +150,11 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 	docker/release/tests/change-release-offline-test.sh
 	docker/release/tests/deployment-data-status-test.sh
 	docker/release/tests/deployment-backup-test.sh
+	docker/release/tests/deployment-lock-test.sh
 	docker/release/tests/deployment-port-preflight-test.sh
 	docker/release/tests/deploy-plan-test.sh
+	docker/release/tests/deploy-start-test.sh
+	docker/release/tests/production-compose-target-test.sh
 	docker/release/tests/publish-release-image-test.sh
 	docker/release/tests/release-output-state-test.sh
 	docker/release/tests/release-plan-test.sh
@@ -303,24 +314,9 @@ data-status: guard-user ## Show live GAR import/rebuild checkpoints and active P
 .PHONY: data-status
 
 deploy-start: guard-user ## Verify restored data, activate the immutable application and run health smoke
-	@echo "==> [1/8] Checking the configured HTTP host port before expensive data gates"
-	$(MAKE) deploy-port-preflight
-	@echo "==> [2/8] Checking that PostgreSQL restore is inactive and physically valid"
-	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" DEPLOY_DATA_REQUIRE_READY=1 \
-		docker/release/deployment-data-status.sh
-	@echo "==> [3/8] Verifying the frozen application image"
-	$(MAKE) verify-release DOCKER_PLATFORM="$${DOCKER_PLATFORM:-linux/amd64}"
-	@echo "==> [4/8] Reading migration history from the restored database"
-	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance bin/app migrate:history
-	@echo "==> [5/8] Running deep GAR integrity gates for regions 50 and 77"
-	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance bin/app gar:integrity --regions=50,77 --deep --only-failed
-	@echo "==> [6/8] Checking exact regional status and projection parity"
-	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance bin/app gar:status --regions=50,77 --exact
-	@echo "==> [7/8] Activating application and worker processes"
-	$(MAKE) change-release DOCKER_PLATFORM="$${DOCKER_PLATFORM:-linux/amd64}"
-	@echo "==> [8/8] Running HTTP smoke checks against the Compose host binding"
-	$(MAKE) deploy-smoke
-	@echo "==> Deployment start completed"
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" RELEASE_ENV_FILE="$(RELEASE_ENV_FILE)" \
+		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" DOCKER_PLATFORM="$(DOCKER_PLATFORM)" \
+		docker/release/deploy-start.sh
 .PHONY: deploy-start
 
 deploy-update-preflight: guard-user ## Verify an existing managed deployment without changing it
@@ -333,7 +329,6 @@ deploy-update: guard-user ## Quiesce and update an existing managed deployment i
 	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" DOCKER_PLATFORM="$(DOCKER_PLATFORM)" \
 		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
 		docker/release/update-deployment.sh $(DEPLOY_UPDATE_FLAGS)
-	$(MAKE) deploy-smoke
 .PHONY: deploy-update
 
 change-release: guard-user ## Verify/load the frozen image and recreate application processes only

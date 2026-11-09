@@ -7,6 +7,8 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
 # shellcheck disable=SC1091
 . "${script_dir}/release-lib.sh"
 # shellcheck disable=SC1091
+. "${script_dir}/deployment-lib.sh"
+# shellcheck disable=SC1091
 . "${project_root}/docker/backup/backup-lib.sh"
 
 for command_name in docker tr; do
@@ -90,6 +92,11 @@ if [ "${dry_run}" = 1 ]; then
     exit 0
 fi
 
+deployment_require_confirmed_target \
+    deploy-update application update "${identity_file}"
+deployment_acquire_target_lock \
+    deploy-update application update "${identity_file}"
+
 if [ "${assume_yes}" -ne 1 ]; then
     [ -t 0 ] || release_fail "interactive confirmation is unavailable; rerun with DEPLOY_UPDATE_FLAGS=--yes"
     expected_confirmation="update:${release_version}:${database_name}"
@@ -132,5 +139,10 @@ compose run --rm --no-deps maintenance \
     bin/app worker:resume --worker-name=geo-registry-address --reason=deployment-update
 compose run --rm --no-deps maintenance \
     bin/app worker:resume --worker-name=geo-registry-runtime --reason=deployment-update
+
+echo "Running HTTP smoke checks while the deployment target lock is held."
+COMPOSE_ENV_FILE="${secrets_file}" \
+RELEASE_ENV_FILE="${release_env_file}" \
+    "${script_dir}/deployment-smoke.sh"
 
 echo "Deployment activation completed: ${release_version}."

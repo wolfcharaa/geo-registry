@@ -8,6 +8,8 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
 
 # shellcheck disable=SC1091
 . "${script_dir}/release-lib.sh"
+# shellcheck disable=SC1091
+. "${script_dir}/deployment-lib.sh"
 
 for command_name in awk chmod mkdir mktemp mv openssl; do
     release_require_command "${command_name}"
@@ -25,6 +27,13 @@ if [ -e "${secrets_file}" ]; then
     echo "Production secrets already exist and were left unchanged: ${secrets_file}"
     exit 0
 fi
+
+release_env_file=$(release_resolve_path \
+    "${RELEASE_ENV_FILE:-docker/compose/prod/release.env}")
+deployment_require_confirmed_target \
+    deploy-init configuration none "${release_env_file}"
+deployment_acquire_target_lock \
+    deploy-init configuration none "${release_env_file}"
 
 secrets_directory=$(dirname -- "${secrets_file}")
 mkdir -p "${secrets_directory}"

@@ -6,6 +6,8 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
 
 # shellcheck disable=SC1091
 . "${project_root}/docker/release/release-lib.sh"
+# shellcheck disable=SC1091
+. "${project_root}/docker/release/deployment-lib.sh"
 
 fail() {
     echo "Production Compose error: $*" >&2
@@ -46,11 +48,47 @@ fi
 for argument in "$@"; do
     case "${argument}" in
         --build) fail "production services must use a prebuilt image" ;;
+        --pull|--pull=*) fail "production services must not override the frozen pull policy" ;;
+        --watch) fail "production services must not use Compose watch" ;;
+        --context|--context=*|-p|--project-name|--project-name=*|--project-directory|--project-directory=*|-f|--file|--file=*|--env-file|--env-file=*)
+            fail "production target, project, Compose files and env files are owned by the wrapper"
+            ;;
     esac
 done
 
-command_name=$1
+command_name=
+expect_profile_value=0
+for argument in "$@"; do
+    if [ -n "${command_name}" ]; then
+        continue
+    fi
+    if [ "${expect_profile_value}" = 1 ]; then
+        deployment_validate_label "${argument}" \
+            || fail "production Compose profile must be an explicit label"
+        expect_profile_value=0
+        continue
+    fi
+    case "${argument}" in
+        --profile) expect_profile_value=1 ;;
+        --profile=*)
+            profile_name=${argument#--profile=}
+            deployment_validate_label "${profile_name}" \
+                || fail "production Compose profile must be an explicit label"
+            ;;
+        attach|build|commit|config|cp|create|down|events|exec|export|images|kill|logs|ls|pause|port|ps|publish|pull|push|restart|rm|run|scale|start|stats|stop|top|unpause|up|version|volumes|wait|watch)
+            command_name=${argument}
+            ;;
+        -*) fail "unsupported production Compose global option: ${argument}" ;;
+        *) fail "unexpected value before the Docker Compose command: ${argument}" ;;
+    esac
+done
+[ "${expect_profile_value}" = 0 ] || fail "--profile requires a value"
+[ -n "${command_name}" ] || fail "unsupported or missing Docker Compose command"
+
 case "${command_name}" in
+    build|publish|push|watch)
+        fail "production build, publication and watch are not available through the deployment wrapper"
+        ;;
     down|rm)
         for argument in "$@"; do
             case "${argument}" in
@@ -131,6 +169,23 @@ expected_image="${image_prefix}/app:${image_tag}"
     || fail "production Compose image does not match frozen release.env"
 [ "${compose_version}" = "${release_version}" ] \
     || fail "production Compose APP_VERSION does not match frozen release.env"
+
+case "${command_name}" in
+    config|events|images|logs|ls|port|ps|stats|top|version|volumes|wait)
+        ;;
+    *)
+        deployment_require_confirmed_target \
+            "compose:${command_name}" \
+            "${DEPLOY_SERVICE_SCOPE:-compose-command}" \
+            "${DEPLOY_DATA_MODE:-unspecified}" \
+            "${release_env_file}"
+        deployment_acquire_target_lock \
+            "compose:${command_name}" \
+            "${DEPLOY_SERVICE_SCOPE:-compose-command}" \
+            "${DEPLOY_DATA_MODE:-unspecified}" \
+            "${release_env_file}"
+        ;;
+esac
 
 override_file="${project_root}/compose.override.yaml"
 if [ -f "${override_file}" ]; then

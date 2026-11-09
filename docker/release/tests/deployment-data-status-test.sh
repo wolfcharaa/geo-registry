@@ -84,6 +84,10 @@ if retry_output=$(
     FAKE_DOCKER_LOG="${log_file}" \
     FAKE_DOCKER_ACTIVE_RESTORES=1 \
     COMPOSE_ENV_FILE="${temporary_root}/prod.secrets.env" \
+    DEPLOY_TARGET=moscow-primary \
+    DEPLOY_EXPECTED_DOCKER_CONTEXT=production \
+    DEPLOY_CONFIRM_TARGET=moscow-primary \
+    DEPLOY_STATE_ROOT="${temporary_root}/deployment-state" \
         "${project_root}/docker/release/restore-deployment-data.sh" \
         --yes --backup-root="${temporary_root}/backups" 2>&1
 ); then

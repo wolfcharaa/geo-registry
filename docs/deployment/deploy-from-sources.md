@@ -46,10 +46,20 @@ git switch --detach <release-tag>
 test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/<release-tag>^{commit}')"
 git status --short
 
+export DEPLOY_TARGET=moscow-primary
+export DEPLOY_EXPECTED_DOCKER_CONTEXT=production
+export DEPLOY_CONFIRM_TARGET=moscow-primary
+
 make deploy-init
+make deploy-doctor
 make deploy-image DOCKER_PLATFORM=linux/amd64
 make deploy-port-preflight
 ```
+
+Замените example labels на утверждённые для этого host. Каждая production
+mutation повторно сверяет active Docker context; read-only status-команды можно
+выполнять без confirmation. Не переносите эти значения в tracked release
+files и не переиспользуйте terminal session для другой цели.
 
 Port проверяется до многочасовой подготовки данных. Если default
 `127.0.0.1:8080` занят, измените `services.app.ports` через `!override`, как

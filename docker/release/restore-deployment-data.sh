@@ -7,6 +7,8 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
 # shellcheck disable=SC1091
 . "${script_dir}/release-lib.sh"
 # shellcheck disable=SC1091
+. "${script_dir}/deployment-lib.sh"
+# shellcheck disable=SC1091
 . "${project_root}/docker/backup/backup-lib.sh"
 
 for command_name in awk docker mkdir tr; do
@@ -47,6 +49,13 @@ database_user=geo_registry
 admin_user=postgres
 backup_validate_identifier DATABASE_NAME "${database_name}"
 backup_validate_identifier DATABASE_USER "${database_user}"
+
+release_env_file=$(release_resolve_path \
+    "${RELEASE_ENV_FILE:-docker/compose/prod/release.env}")
+deployment_require_confirmed_target \
+    data-restore database restore "${release_env_file}"
+deployment_acquire_target_lock \
+    data-restore database restore "${release_env_file}"
 
 backup_root=$(release_resolve_path "${backup_root}")
 mkdir -p "${backup_root}"

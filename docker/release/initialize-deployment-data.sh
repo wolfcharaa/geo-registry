@@ -7,6 +7,8 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
 # shellcheck disable=SC1091
 . "${script_dir}/release-lib.sh"
 # shellcheck disable=SC1091
+. "${script_dir}/deployment-lib.sh"
+# shellcheck disable=SC1091
 . "${project_root}/docker/backup/backup-lib.sh"
 
 for command_name in docker tr; do
@@ -27,6 +29,13 @@ esac
 database_name=geo_registry
 database_user=geo_registry
 admin_user=postgres
+
+release_env_file=$(release_resolve_path \
+    "${RELEASE_ENV_FILE:-docker/compose/prod/release.env}")
+deployment_require_confirmed_target \
+    data-init database fresh "${release_env_file}"
+deployment_acquire_target_lock \
+    data-init database fresh "${release_env_file}"
 
 COMPOSE_ENV_FILE="${secrets_file}" "${project_root}/docker/compose/prod.sh" \
     stop app worker-address worker-runtime >/dev/null 2>&1 || true

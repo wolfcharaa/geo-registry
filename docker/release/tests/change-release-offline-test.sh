@@ -68,6 +68,27 @@ for manifest_format in 1 2 3; do
     } >"${artifact_dir}/source-manifest.txt"
 
     rm -f "${state_file}"
+    if [ "${manifest_format}" = 1 ]; then
+        if blocked_output=$(PATH="${fixture_dir}:${PATH}" \
+            FAKE_DOCKER_STATE="${state_file}" \
+            COMPOSE_ENV_FILE="${temporary_root}/prod.secrets.env" \
+            RELEASE_ENV_FILE="${temporary_root}/release.env" \
+            PRODUCTION_COMPOSE_MODEL="${temporary_root}/compose.yaml" \
+            RELEASE_ARTIFACT_DIR="${artifact_dir}" \
+            RELEASE_DRY_RUN=1 \
+            DEPLOY_STATE_ROOT="${temporary_root}/deployment-state" \
+            DOCKER_PLATFORM=linux/amd64 \
+            "${project_root}/docker/release/change-release.sh" 2>&1); then
+            echo 'Offline release contract test failed: image load accepted an implicit target.' >&2
+            exit 1
+        fi
+        printf '%s\n' "${blocked_output}" \
+            | grep -Fq 'DEPLOY_TARGET must be an explicit label'
+        [ ! -f "${state_file}" ] || {
+            echo 'Offline release contract test failed: blocked target loaded an image.' >&2
+            exit 1
+        }
+    fi
     output=$(
         PATH="${fixture_dir}:${PATH}" \
         FAKE_DOCKER_STATE="${state_file}" \
@@ -76,6 +97,10 @@ for manifest_format in 1 2 3; do
         PRODUCTION_COMPOSE_MODEL="${temporary_root}/compose.yaml" \
         RELEASE_ARTIFACT_DIR="${artifact_dir}" \
         RELEASE_DRY_RUN=1 \
+        DEPLOY_TARGET=moscow-primary \
+        DEPLOY_EXPECTED_DOCKER_CONTEXT=production \
+        DEPLOY_CONFIRM_TARGET=moscow-primary \
+        DEPLOY_STATE_ROOT="${temporary_root}/deployment-state" \
         DOCKER_PLATFORM=linux/amd64 \
             "${project_root}/docker/release/change-release.sh"
     )
@@ -116,6 +141,10 @@ if mismatch_output=$(
     PRODUCTION_COMPOSE_MODEL="${temporary_root}/compose.yaml" \
     RELEASE_ARTIFACT_DIR="${artifact_dir}" \
     RELEASE_DRY_RUN=1 \
+    DEPLOY_TARGET=moscow-primary \
+    DEPLOY_EXPECTED_DOCKER_CONTEXT=production \
+    DEPLOY_CONFIRM_TARGET=moscow-primary \
+    DEPLOY_STATE_ROOT="${temporary_root}/deployment-state" \
     DOCKER_PLATFORM=linux/amd64 \
         "${project_root}/docker/release/change-release.sh" 2>&1
 ); then
@@ -137,6 +166,10 @@ prepare_output=$(
     RELEASE_ENV_FILE="${temporary_root}/release.env" \
     PRODUCTION_COMPOSE_MODEL="${temporary_root}/compose.yaml" \
     RELEASE_ARTIFACT_DIR="${artifact_dir}" \
+    DEPLOY_TARGET=moscow-primary \
+    DEPLOY_EXPECTED_DOCKER_CONTEXT=production \
+    DEPLOY_CONFIRM_TARGET=moscow-primary \
+    DEPLOY_STATE_ROOT="${temporary_root}/deployment-state" \
     DOCKER_PLATFORM=linux/amd64 \
         "${project_root}/docker/release/prepare-deployment-image.sh"
 )
