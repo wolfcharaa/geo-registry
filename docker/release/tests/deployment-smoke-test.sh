@@ -6,6 +6,9 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../../.." && pwd)
 fixture_dir="${script_dir}/fixtures"
 temporary_root=$(mktemp -d)
 
+# shellcheck disable=SC1091
+. "${script_dir}/test-lib.sh"
+
 cleanup() {
     rm -rf -- "${temporary_root}"
 }
@@ -115,10 +118,8 @@ printf '%s\n' "${timeout_output}" \
 grep -Fq 'smoke_status=failed' "${timeout_evidence}"
 grep -Fq 'smoke_health_status=passed' "${timeout_evidence}"
 grep -Fq 'smoke_address_search_status=failed' "${timeout_evidence}"
-if grep -Eq ' (up|stop|run|load|pull|exec) ' "${docker_log}"; then
-    echo 'Deployment smoke test failed: timeout branch attempted production mutation.' >&2
-    exit 1
-fi
+contract_assert_docker_log_read_only \
+    "${docker_log}" 'deployment smoke timeout branch'
 
 contract_evidence="${temporary_root}/contract.env"
 reset_evidence "${contract_evidence}"

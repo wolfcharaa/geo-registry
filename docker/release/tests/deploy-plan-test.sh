@@ -6,6 +6,9 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../../.." && pwd)
 fixture_dir="${script_dir}/fixtures"
 temporary_root=$(mktemp -d)
 
+# shellcheck disable=SC1091
+. "${script_dir}/test-lib.sh"
+
 cleanup() {
     rm -rf -- "${temporary_root}"
 }
@@ -101,11 +104,7 @@ if printf '%s\n' "${plan_output}" | grep -Fq 'test-database-password'; then
     echo 'Deployment plan test failed: a secret value reached plan output.' >&2
     exit 1
 fi
-if grep -Eq '^(load|pull|push|run|exec) ' "${log_file}" \
-    || grep -Eq '^compose .* (up|stop|run|rm|down)( |$)' "${log_file}"; then
-    echo 'Deployment plan test failed: read-only inspection attempted a mutation.' >&2
-    exit 1
-fi
+contract_assert_docker_log_read_only "${log_file}" 'deployment plan'
 
 prepared_source_env="${temporary_root}/prepared-release.env"
 prepared_artifact_env="${temporary_root}/release-artifact.env"

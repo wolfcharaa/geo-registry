@@ -14,7 +14,7 @@ trap cleanup EXIT HUP INT TERM
 digest=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 state_root="${temporary_root}/deployment-state"
 ready_file="${temporary_root}/lock.ready"
-release_file="${temporary_root}/lock.release"
+lock_release_marker="${temporary_root}/lock.release"
 log_file="${temporary_root}/docker.log"
 
 cat >"${temporary_root}/prod.secrets.env" <<EOF
@@ -65,7 +65,7 @@ hold_lock() (
     deployment_acquire_target_lock \
         test-hold application update "${temporary_root}/release.env"
     : >"${ready_file}"
-    while [ ! -f "${release_file}" ]; do
+    while [ ! -f "${lock_release_marker}" ]; do
         sleep 0.1
     done
 )
@@ -85,7 +85,7 @@ done
 }
 
 if contention_output=$(hold_lock 2>&1); then
-    : >"${release_file}"
+    : >"${lock_release_marker}"
     wait "${holder_pid}"
     echo 'Deployment lock test failed: a concurrent owner acquired the same target.' >&2
     exit 1
@@ -95,7 +95,7 @@ printf '%s\n' "${contention_output}" \
     | grep -Fq 'another deployment operation owns target moscow-primary'
 printf '%s\n' "${contention_output}" | grep -Fq 'operation=test-hold'
 
-: >"${release_file}"
+: >"${lock_release_marker}"
 wait "${holder_pid}"
 
 lock_file="${state_root}/moscow-primary/deployment.lock"

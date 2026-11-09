@@ -6,6 +6,9 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../../.." && pwd)
 fixture_dir="${script_dir}/fixtures"
 temporary_root=$(mktemp -d)
 
+# shellcheck disable=SC1091
+. "${script_dir}/test-lib.sh"
+
 cleanup() {
     rm -rf -- "${temporary_root}"
 }
@@ -78,10 +81,7 @@ if blocked_output=$(TEST_DEPLOY_TARGET='' TEST_CONFIRM_TARGET='' run_start 2>&1)
     exit 1
 fi
 printf '%s\n' "${blocked_output}" | grep -Fq 'DEPLOY_TARGET must be an explicit label'
-if grep -Eq ' run | up | stop | load | pull ' "${log_file}"; then
-    echo 'Deployment start test failed: blocked target reached a mutation.' >&2
-    exit 1
-fi
+contract_assert_docker_log_read_only "${log_file}" 'blocked deployment start'
 
 : >"${log_file}"
 start_output=$(run_start)

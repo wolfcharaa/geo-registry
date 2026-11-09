@@ -94,66 +94,12 @@ release-pull: guard-user ## Explicitly pull and verify the frozen exact applicat
 	DOCKER_PLATFORM="$(DOCKER_PLATFORM)" docker/release/pull-release-image.sh
 .PHONY: release-pull
 
-release-check: guard-user ## Validate release, backup and production wrapper shell syntax
-	sh -n \
-		docker/release/release-lib.sh \
-		docker/release/freeze-release.sh \
-		docker/release/build-offline-payload.sh \
-		docker/release/build-offline-archive.sh \
-		docker/release/publish-release-image.sh \
-		docker/release/release-candidates.sh \
-		docker/release/release-plan.sh \
-		docker/release/deployment-lib.sh \
-		docker/release/deploy-doctor.sh \
-		docker/release/deploy-plan.sh \
-		docker/release/recovery-rehearsal-plan.sh \
-		docker/release/deploy-start.sh \
-		docker/release/deployment-handover.sh \
-		docker/release/prepare-release-source.sh \
-		docker/release/pull-release-image.sh \
-		docker/release/change-release.sh \
-		docker/release/extract-release-data.sh \
-		docker/release/init-deployment.sh \
-		docker/release/initialize-deployment-data.sh \
-		docker/release/create-deployment-backup.sh \
-		docker/release/deployment-data-status.sh \
-		docker/release/deployment-http-binding.sh \
-		docker/release/deployment-port-preflight.sh \
-		docker/release/deployment-smoke.sh \
-		docker/release/prepare-deployment-image.sh \
-		docker/release/restore-deployment-data.sh \
-		docker/release/update-deployment.sh \
-		docker/scripts/download-gar.sh \
-		docker/backup/backup-lib.sh \
-		docker/backup/create-postgres-backup.sh \
-		docker/backup/verify-postgres-backup.sh \
-		docker/backup/restore-postgres-shadow.sh \
-		docker/scripts/build-production-image.sh \
-		docker/scripts/run-release-smoke.sh \
-		docker/compose/prod.sh
-	sh -n \
-		docker/release/tests/backup-progress-test.sh \
-		docker/release/tests/change-release-offline-test.sh \
-		docker/release/tests/deployment-data-status-test.sh \
-		docker/release/tests/deployment-backup-test.sh \
-		docker/release/tests/deployment-evidence-test.sh \
-		docker/release/tests/deployment-lock-test.sh \
-		docker/release/tests/deployment-port-preflight-test.sh \
-		docker/release/tests/deployment-smoke-test.sh \
-		docker/release/tests/deploy-plan-test.sh \
-		docker/release/tests/deploy-start-test.sh \
-		docker/release/tests/production-compose-target-test.sh \
-		docker/release/tests/publish-release-image-test.sh \
-		docker/release/tests/release-output-state-test.sh \
-		docker/release/tests/release-plan-test.sh \
-		docker/release/tests/recovery-rehearsal-plan-test.sh \
-		docker/release/tests/release-source-preparation-test.sh \
-		docker/release/tests/update-deployment-test.sh \
-		docker/release/tests/init-deployment-test.sh \
-		docker/release/tests/restore-progress-test.sh \
-		docker/release/tests/fixtures/docker \
-		docker/release/tests/fixtures/curl \
-		docker/release/tests/fixtures/ss
+shell-check: guard-user ## Syntax-check and lint every tracked or unignored POSIX shell script
+	docker/scripts/check-shell.sh
+.PHONY: shell-check
+
+release-check: guard-user shell-check ## Run shell quality and release contract tests
+	docker/release/tests/generic-smoke-test.sh
 	docker/release/tests/backup-progress-test.sh
 	docker/release/tests/change-release-offline-test.sh
 	docker/release/tests/deployment-data-status-test.sh

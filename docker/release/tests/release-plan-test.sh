@@ -6,6 +6,9 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../../.." && pwd)
 fixture_dir="${script_dir}/fixtures"
 temporary_root=$(mktemp -d)
 
+# shellcheck disable=SC1091
+. "${script_dir}/test-lib.sh"
+
 cleanup() {
     rm -rf -- "${temporary_root}"
 }
@@ -73,10 +76,7 @@ printf '%s\n' "${ready_output}" | grep -Fq 'image_reference=registry.example/geo
 printf '%s\n' "${ready_output}" | grep -Fq 'external_mutations=none'
 grep -Fq 'buildx version' "${log_file}"
 grep -Fq 'buildx build --help' "${log_file}"
-if grep -Eq '^(push|pull|load|run) ' "${log_file}"; then
-    echo 'Release plan test failed: read-only plan attempted a Docker mutation.' >&2
-    exit 1
-fi
+contract_assert_docker_log_read_only "${log_file}" 'release plan'
 
 if dirty_output=$(FAKE_GIT_DIRTY=1 run_plan 2>&1); then
     echo 'Release plan test failed: dirty source was accepted.' >&2

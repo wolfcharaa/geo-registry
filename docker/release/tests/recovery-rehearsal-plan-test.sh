@@ -6,6 +6,9 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../../.." && pwd)
 fixture_dir="${script_dir}/fixtures"
 temporary_root=$(mktemp -d)
 
+# shellcheck disable=SC1091
+. "${script_dir}/test-lib.sh"
+
 cleanup() {
     rm -rf -- "${temporary_root}"
 }
@@ -113,11 +116,7 @@ if printf '%s\n' "${plan_output}" | grep -Fq 'test-database-password'; then
     echo 'Recovery rehearsal plan test failed: a secret reached plan output.' >&2
     exit 1
 fi
-if grep -Eq '^(load|pull|push|run|stop|up) ' "${log_file}" \
-    || grep -Eq '^compose .* (up|stop|run|rm|down)( |$)' "${log_file}"; then
-    echo 'Recovery rehearsal plan test failed: read-only plan attempted mutation.' >&2
-    exit 1
-fi
+contract_assert_docker_log_read_only "${log_file}" 'recovery rehearsal plan'
 
 if same_target_output=$(TEST_RECOVERY_SOURCE_TARGET=moscow-rehearsal \
     run_plan 2>&1); then

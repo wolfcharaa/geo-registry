@@ -6,6 +6,9 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../../.." && pwd)
 fixture_dir="${script_dir}/fixtures"
 temporary_root=$(mktemp -d)
 
+# shellcheck disable=SC1091
+. "${script_dir}/test-lib.sh"
+
 cleanup() {
     rm -rf -- "${temporary_root}"
 }
@@ -62,10 +65,7 @@ if missing_output=$(run_prod up --detach app 2>&1); then
     exit 1
 fi
 printf '%s\n' "${missing_output}" | grep -Fq 'DEPLOY_TARGET must be an explicit label'
-if grep -Fq ' up ' "${log_file}"; then
-    echo 'Production target test failed: blocked mutation reached Docker Compose.' >&2
-    exit 1
-fi
+contract_assert_docker_log_read_only "${log_file}" 'blocked production Compose mutation'
 
 if confirmation_output=$(TEST_DEPLOY_TARGET=moscow-primary \
     TEST_EXPECTED_CONTEXT=production TEST_CONFIRM_TARGET=other-target \

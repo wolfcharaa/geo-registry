@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-project_root=$(CDPATH= cd -- "${script_dir}/../.." && pwd)
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
 
 collection=${POSTMAN_COLLECTION:-${project_root}/docs/api/postman/geo-registry.postman_collection.json}
 case "${collection}" in
@@ -33,7 +33,7 @@ fi
 
 artifact_dir=${RELEASE_ARTIFACT_DIR:-/tmp/geo-registry-release-smoke}
 mkdir -p "${artifact_dir}"
-artifact_dir=$(CDPATH= cd -- "${artifact_dir}" && pwd)
+artifact_dir=$(CDPATH='' cd -- "${artifact_dir}" && pwd)
 
 run_name=${RELEASE_RUN_NAME:-current}
 case "${run_name}" in
