@@ -98,6 +98,8 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/release/publish-release-image.sh \
 		docker/release/release-candidates.sh \
 		docker/release/release-plan.sh \
+		docker/release/deploy-doctor.sh \
+		docker/release/deploy-plan.sh \
 		docker/release/prepare-release-source.sh \
 		docker/release/pull-release-image.sh \
 		docker/release/change-release.sh \
@@ -126,6 +128,7 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/release/tests/deployment-data-status-test.sh \
 		docker/release/tests/deployment-backup-test.sh \
 		docker/release/tests/deployment-port-preflight-test.sh \
+		docker/release/tests/deploy-plan-test.sh \
 		docker/release/tests/publish-release-image-test.sh \
 		docker/release/tests/release-output-state-test.sh \
 		docker/release/tests/release-plan-test.sh \
@@ -140,6 +143,7 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 	docker/release/tests/deployment-data-status-test.sh
 	docker/release/tests/deployment-backup-test.sh
 	docker/release/tests/deployment-port-preflight-test.sh
+	docker/release/tests/deploy-plan-test.sh
 	docker/release/tests/publish-release-image-test.sh
 	docker/release/tests/release-output-state-test.sh
 	docker/release/tests/release-plan-test.sh
@@ -175,6 +179,24 @@ extract-release-data: guard-user ## Verify and extract the optional PostgreSQL b
 deploy-init: guard-user ## Create one protected production config with generated managed PostgreSQL passwords
 	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" docker/release/init-deployment.sh
 .PHONY: deploy-init
+
+deploy-doctor: guard-user ## Check the explicit deployment target and Docker capabilities without mutations
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" RELEASE_ENV_FILE="$(RELEASE_ENV_FILE)" \
+		DEPLOY_TARGET="$(DEPLOY_TARGET)" \
+		DEPLOY_EXPECTED_DOCKER_CONTEXT="$(DEPLOY_EXPECTED_DOCKER_CONTEXT)" \
+		docker/release/deploy-doctor.sh
+.PHONY: deploy-doctor
+
+deploy-plan: guard-user ## Show target, identity, config, scope and data gates without mutations
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" RELEASE_ENV_FILE="$(RELEASE_ENV_FILE)" \
+		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" DOCKER_PLATFORM="$(DOCKER_PLATFORM)" \
+		DEPLOY_TARGET="$(DEPLOY_TARGET)" \
+		DEPLOY_EXPECTED_DOCKER_CONTEXT="$(DEPLOY_EXPECTED_DOCKER_CONTEXT)" \
+		DEPLOY_DATA_MODE="$(DEPLOY_DATA_MODE)" \
+		DEPLOY_SERVICE_SCOPE="$(DEPLOY_SERVICE_SCOPE)" \
+		DEPLOY_BACKUP_DIR="$(DEPLOY_BACKUP_DIR)" \
+		docker/release/deploy-plan.sh
+.PHONY: deploy-plan
 
 deploy-image: guard-user ## Pull or load and verify the frozen application image automatically
 	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" DOCKER_PLATFORM="$(DOCKER_PLATFORM)" \

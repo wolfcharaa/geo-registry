@@ -16,6 +16,26 @@ if [ -n "${FAKE_DOCKER_LOG:-}" ]; then
 fi
 
 case "${command_name}" in
+    --version)
+        printf '%s\n' 'Docker version 29.8.1, build test'
+        ;;
+    context)
+        case "${1:-}" in
+            show)
+                printf '%s\n' "${FAKE_DOCKER_CONTEXT:-production}"
+                ;;
+            inspect)
+                printf '%s\n' "${FAKE_DOCKER_CONTEXT_ENDPOINT:-ssh://deploy@example.test}"
+                ;;
+            *) exit 64 ;;
+        esac
+        ;;
+    info)
+        [ "${FAKE_DOCKER_ENGINE_AVAILABLE:-1}" = 1 ] || exit 1
+        printf '%s|%s\n' \
+            "${FAKE_DOCKER_HOST_PLATFORM:-linux/amd64}" \
+            "${FAKE_DOCKER_SERVER_VERSION:-29.8.1}"
+        ;;
     image)
         action=${1:-}
         [ "$#" -gt 0 ] && shift
@@ -101,9 +121,12 @@ case "${command_name}" in
         if [ "${1:-}" = --format ]; then
             case "${2:-}" in
                 '{{.State.Running}}') printf '%s\n' "${FAKE_DOCKER_CONTAINER_RUNNING:-true}" ;;
-                '{{.Config.Image}}') printf '%s\n' 'postgis:17-test' ;;
+                '{{.Config.Image}}') printf '%s\n' "${FAKE_DOCKER_CURRENT_IMAGE_REFERENCE:-postgis:17-test}" ;;
+                '{{.Image}}') printf '%s\n' "${FAKE_DOCKER_CURRENT_IMAGE_ID:-sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb}" ;;
                 '{{.Id}}') printf '%s\n' 'sha256:postgres-test' ;;
                 '{{.Name}}') printf '/%s\n' "${FAKE_DOCKER_POSTGRES_CONTAINER:-geo-registry-postgres-test}" ;;
+                '{{index .Config.Labels "org.opencontainers.image.version"}}') printf '%s\n' "${FAKE_DOCKER_CURRENT_VERSION:-v0.2.4}" ;;
+                '{{index .Config.Labels "org.opencontainers.image.revision"}}') printf '%s\n' "${FAKE_DOCKER_CURRENT_SOURCE_REVISION:-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb}" ;;
                 *) exit 65 ;;
             esac
         fi
@@ -167,17 +190,30 @@ case "${command_name}" in
         esac
         ;;
     compose)
+        if [ "${1:-}" = version ]; then
+            printf '%s\n' "${FAKE_DOCKER_COMPOSE_VERSION:-5.5.1}"
+            exit 0
+        fi
         compose_command=
         compose_service=
+        compose_hash=0
         for argument in "$@"; do
             case "${argument}" in
                 config|ps|run|stop|up) compose_command=${argument} ;;
                 app|postgres) compose_service=${argument} ;;
+                --hash=*) compose_hash=1 ;;
             esac
         done
         case "${compose_command}" in
             config)
-                if [ -n "${FAKE_DOCKER_COMPOSE_CONFIG_FILE:-}" ]; then
+                if printf '%s\n' "$*" | grep -Fq ' --help'; then
+                    printf '%s\n' '      --hash string   Print the service config hash'
+                elif [ "${compose_hash}" = 1 ]; then
+                    printf '%s\n' "${FAKE_DOCKER_COMPOSE_HASHES:-app aaaa
+postgres bbbb
+worker-address cccc
+worker-runtime dddd}"
+                elif [ -n "${FAKE_DOCKER_COMPOSE_CONFIG_FILE:-}" ]; then
                     cat "${FAKE_DOCKER_COMPOSE_CONFIG_FILE}"
                 fi
                 ;;

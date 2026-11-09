@@ -43,7 +43,7 @@ application-only release switch без удаления persistent volumes.
 | --- | --- | --- |
 | H1 | Immutable manifest и удалённо проверяемая публикация | `Completed in main` |
 | H2 | Source preparation до build и единый final tag OID | `Completed in main` |
-| H3 | Target plan, capabilities, lock и deployment evidence | `Planned` |
+| H3 | Target plan, capabilities, lock и deployment evidence | `In progress` |
 | H4 | Явные offline scopes и полный local image identity | `Planned` |
 | H5 | Bounded health/business smoke и observation result | `Planned` |
 | H6 | Production-like recovery rehearsal и сохранённые RPO/RTO | `External gate` |
@@ -141,7 +141,7 @@ tag OID mismatch до Docker build. Реальный tag, image, push и transpo
 
 ## H3 — Target Plan, Lock И Evidence
 
-- [ ] Добавить `deploy-doctor` и read-only `deploy-plan`: target label, Docker
+- [x] Добавить `deploy-doctor` и read-only `deploy-plan`: target label, Docker
   context/endpoint, project, host platform, current/desired identity, rendered
   config checksum, service scope, data mode, backup gate и last safe abort.
 - [ ] Не допускать production mutation с неявным или неподтверждённым target.
@@ -157,6 +157,21 @@ tag OID mismatch до Docker build. Реальный tag, image, push и transpo
 Автоматический rollback или restore после неоднозначной ошибки запрещён.
 Partial state сохраняет diagnostics и recovery branch; data restore выполняется
 только отдельной подтверждённой процедурой.
+
+Первый slice H3 добавляет `make deploy-doctor` и `make deploy-plan`. Обе команды
+требуют явные `DEPLOY_TARGET` и `DEPLOY_EXPECTED_DOCKER_CONTEXT`, не выбирают
+context сами и не выполняют `pull`, `load`, запуск containers, migrations или
+запись evidence. Endpoint печатается без userinfo. Plan считает checksum по
+отсортированным service hashes итоговой Compose-модели, поэтому secret values
+не попадают в вывод или временный state. Для `DEPLOY_DATA_MODE=update` и
+`restore` требуется локально проверяемый `DEPLOY_BACKUP_DIR`; update также
+связывает `application_revision` backup с source OID текущего container.
+
+Недоступный Docker Engine, отсутствующие secrets, несовпавший context,
+неполная artifact identity, invalid backup или невозможность получить
+rendered config дают `status=blocked`. Это discovery gate, а не разрешение на
+mutation: подключение plan к mutating entrypoints, per-target lock и evidence
+остаются следующими slices H3.
 
 ## H4 — Offline Scopes
 

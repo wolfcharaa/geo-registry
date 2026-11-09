@@ -9,6 +9,49 @@ API keys.
 пакета `iproute2`. Команды выполняются non-root deployment user с доступом к
 Docker.
 
+## Проверить Цель До Любого Изменения
+
+Назначьте стабильную operator label цели и отдельно укажите уже выбранный
+Docker context. Команды не переключают context и не исправляют окружение:
+
+```shell
+make deploy-doctor \
+  DEPLOY_TARGET=moscow-primary \
+  DEPLOY_EXPECTED_DOCKER_CONTEXT=production
+
+make deploy-plan \
+  DEPLOY_TARGET=moscow-primary \
+  DEPLOY_EXPECTED_DOCKER_CONTEXT=production \
+  DEPLOY_DATA_MODE=inspect \
+  DEPLOY_SERVICE_SCOPE=core
+```
+
+`deploy-doctor` показывает target, текущий context и endpoint без userinfo,
+Compose project, host platform, версии Docker/Compose и наличие обязательных
+локальных файлов. `deploy-plan` добавляет current/desired image identity,
+checksum service hashes итоговой Compose-модели, scope, data mode, backup gate
+и следующий безопасный шаг. Обе команды read-only: они не выполняют `pull`,
+`load`, `up`, migrations, restore или запись deployment evidence.
+
+Поддерживаемые data modes: `inspect`, `fresh`, `restore`, `update`. Для restore
+и update передайте каталог с `manifest.txt` и dump:
+
+```shell
+make deploy-plan \
+  DEPLOY_TARGET=moscow-primary \
+  DEPLOY_EXPECTED_DOCKER_CONTEXT=production \
+  DEPLOY_DATA_MODE=update \
+  DEPLOY_SERVICE_SCOPE=application \
+  DEPLOY_BACKUP_DIR=/srv/backups/application-postgres-20261109T120000Z
+```
+
+Plan полностью проверяет bytes и SHA-256 backup. Для update его
+`application_revision` обязан совпасть с source OID текущего application
+container. `status=ready` означает только согласованный read-only план;
+mutation по-прежнему запускается отдельной подтверждаемой командой. При
+`status=blocked` ориентируйтесь на поле `blockers`; последняя безопасная точка
+остаётся `before-artifact-acquire`.
+
 ## Выберите Сценарий
 
 | Сценарий | Путь |
