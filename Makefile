@@ -106,6 +106,7 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/release/deployment-lib.sh \
 		docker/release/deploy-doctor.sh \
 		docker/release/deploy-plan.sh \
+		docker/release/recovery-rehearsal-plan.sh \
 		docker/release/deploy-start.sh \
 		docker/release/deployment-handover.sh \
 		docker/release/prepare-release-source.sh \
@@ -138,17 +139,20 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/release/tests/deployment-evidence-test.sh \
 		docker/release/tests/deployment-lock-test.sh \
 		docker/release/tests/deployment-port-preflight-test.sh \
+		docker/release/tests/deployment-smoke-test.sh \
 		docker/release/tests/deploy-plan-test.sh \
 		docker/release/tests/deploy-start-test.sh \
 		docker/release/tests/production-compose-target-test.sh \
 		docker/release/tests/publish-release-image-test.sh \
 		docker/release/tests/release-output-state-test.sh \
 		docker/release/tests/release-plan-test.sh \
+		docker/release/tests/recovery-rehearsal-plan-test.sh \
 		docker/release/tests/release-source-preparation-test.sh \
 		docker/release/tests/update-deployment-test.sh \
 		docker/release/tests/init-deployment-test.sh \
 		docker/release/tests/restore-progress-test.sh \
 		docker/release/tests/fixtures/docker \
+		docker/release/tests/fixtures/curl \
 		docker/release/tests/fixtures/ss
 	docker/release/tests/backup-progress-test.sh
 	docker/release/tests/change-release-offline-test.sh
@@ -157,12 +161,14 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 	docker/release/tests/deployment-evidence-test.sh
 	docker/release/tests/deployment-lock-test.sh
 	docker/release/tests/deployment-port-preflight-test.sh
+	docker/release/tests/deployment-smoke-test.sh
 	docker/release/tests/deploy-plan-test.sh
 	docker/release/tests/deploy-start-test.sh
 	docker/release/tests/production-compose-target-test.sh
 	docker/release/tests/publish-release-image-test.sh
 	docker/release/tests/release-output-state-test.sh
 	docker/release/tests/release-plan-test.sh
+	docker/release/tests/recovery-rehearsal-plan-test.sh
 	docker/release/tests/release-source-preparation-test.sh
 	docker/release/tests/init-deployment-test.sh
 	docker/release/tests/restore-progress-test.sh
@@ -216,6 +222,19 @@ deploy-plan: guard-user ## Show target, identity, config, scope and data gates w
 		docker/release/deploy-plan.sh
 .PHONY: deploy-plan
 
+recovery-rehearsal-plan: guard-user ## Validate an isolated recovery rehearsal contract without mutations
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" RELEASE_ENV_FILE="$(RELEASE_ENV_FILE)" \
+		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" DOCKER_PLATFORM="$(DOCKER_PLATFORM)" \
+		DEPLOY_TARGET="$(DEPLOY_TARGET)" \
+		DEPLOY_EXPECTED_DOCKER_CONTEXT="$(DEPLOY_EXPECTED_DOCKER_CONTEXT)" \
+		DEPLOY_BACKUP_DIR="$(DEPLOY_BACKUP_DIR)" \
+		RECOVERY_SOURCE_TARGET="$(RECOVERY_SOURCE_TARGET)" \
+		RECOVERY_OFF_HOST_COPY_REFERENCE="$(RECOVERY_OFF_HOST_COPY_REFERENCE)" \
+		RECOVERY_NOMINATIM_STRATEGY="$(RECOVERY_NOMINATIM_STRATEGY)" \
+		RECOVERY_OBSERVATION_SECONDS="$(RECOVERY_OBSERVATION_SECONDS)" \
+		docker/release/recovery-rehearsal-plan.sh
+.PHONY: recovery-rehearsal-plan
+
 deploy-image: guard-user ## Pull or load and verify the frozen application image automatically
 	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" DOCKER_PLATFORM="$(DOCKER_PLATFORM)" \
 		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" docker/release/prepare-deployment-image.sh
@@ -225,7 +244,7 @@ deploy-port-preflight: guard-user ## Fail early when the configured production H
 	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" docker/release/deployment-port-preflight.sh
 .PHONY: deploy-port-preflight
 
-deploy-smoke: guard-user ## Probe the production HTTP binding resolved from Compose YAML
+deploy-smoke: guard-user ## Probe bounded health and address search through the production HTTP binding
 	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" docker/release/deployment-smoke.sh
 .PHONY: deploy-smoke
 
@@ -320,7 +339,7 @@ data-status: guard-user ## Show live GAR import/rebuild checkpoints and active P
 	$(PRODUCTION_COMPOSE) run --rm --no-deps maintenance bin/app gar:activity
 .PHONY: data-status
 
-deploy-start: guard-user ## Verify restored data, activate the immutable application and run health smoke
+deploy-start: guard-user ## Verify restored data, activate the immutable application and run bounded smoke
 	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" RELEASE_ENV_FILE="$(RELEASE_ENV_FILE)" \
 		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" DOCKER_PLATFORM="$(DOCKER_PLATFORM)" \
 		docker/release/deploy-start.sh

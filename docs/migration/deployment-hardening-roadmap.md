@@ -26,11 +26,8 @@ production `--no-build --pull never`, атомарные offline archives, annot
 Git bundle, fail-closed restore в отсутствующую БД, migration/GAR gates и
 application-only release switch без удаления persistent volumes.
 
-Открытые ограничения после H3:
+Открытые ограничения после H5:
 
-- offline payload переносит application image, но не обязательный PostgreSQL
-  image для полностью изолированного first install;
-- health smoke должен иметь общий deadline и representative business check;
 - полный production-like backup/restore rehearsal ещё не сохранён как recovery
   evidence.
 
@@ -42,8 +39,8 @@ application-only release switch без удаления persistent volumes.
 | H2 | Source preparation до build и единый final tag OID | `Completed in main` |
 | H3 | Target plan, capabilities, lock и deployment evidence | `Completed in main` |
 | H4 | Явные offline scopes и полный local image identity | `Completed in main` |
-| H5 | Bounded health/business smoke и observation result | `Planned` |
-| H6 | Production-like recovery rehearsal и сохранённые RPO/RTO | `External gate` |
+| H5 | Bounded health/business smoke и observation result | `Completed in main` |
+| H6 | Production-like recovery rehearsal и сохранённые RPO/RTO | `In progress; external gate pending` |
 
 ## H1 — Manifest И Registry Publication
 
@@ -233,17 +230,49 @@ digest, local image ID и platform. Target либо повторно испол�
 
 ## H5 — Bounded Verification
 
-- [ ] Добавить connect и total timeout ко всем deployment smoke requests.
-- [ ] Проверять health и один representative address-search flow через
+- [x] Добавить connect и total timeout ко всем deployment smoke requests.
+- [x] Проверять health и один representative address-search flow через
   публичный HTTP contract.
-- [ ] Записывать deadline, endpoint без credentials и результат в deployment
+- [x] Записывать deadline, endpoint без credentials и результат в deployment
   evidence.
-- [ ] Проверить timeout/failure branch без production mutation.
+- [x] Проверить timeout/failure branch без production mutation.
 
 Полный Postman suite остаётся release/integration gate и не переносится в
 короткий deployment smoke.
 
+H5 заменяет unbounded health-only вызов четырьмя HTTP requests под общим
+`45s` budget. Каждый request получает connect timeout `3s` и total timeout не
+больше `10s` либо оставшегося общего budget. После live/startup/ready tooling
+вызывает публичный `GET /api/addresses/search` для стабильного GAR объекта
+региона 50 и проверяет success/meta/non-empty suggestions/expected object ID.
+Endpoint сохраняется без credentials вместе с budget и отдельными health/search
+status в том же operation evidence; failure после activation остаётся partial.
+Contract test подтверждает success, HTTP timeout и invalid business response,
+а также отсутствие Docker mutation в failure branch.
+
 ## H6 — Recovery Gate
+
+### H6.1 — Read-only Rehearsal Contract
+
+- [x] Добавить план, который связывает distinct source/rehearsal targets,
+  exact release, проверенный application PostgreSQL backup и off-host copy
+  reference без mutation.
+- [x] Зафиксировать обязательную стратегию Nominatim, observation window,
+  определения RPO/RTO и каталог будущего evidence.
+- [x] Fail-closed отклонять active application target, существующую target DB,
+  совпавшие source/target labels и попытку молча пропустить Nominatim.
+- [x] Contract test-ом доказать read-only поведение и отсутствие secret values
+  в выводе.
+
+`make recovery-rehearsal-plan` переиспользует `deploy-plan` в режиме
+`restore/core`, повторно проверяет backup bytes/SHA-256 и читает target database
+state. Если PostgreSQL ещё не запущен, отсутствие БД остаётся явным deferred
+gate и повторно проверяется самим restore entrypoint. План не создаёт evidence,
+не поднимает containers и не разрешает rehearsal: он формирует проверяемый
+контракт для отдельного авторизованного запуска. Off-host reference является
+не secret label утверждённой копии, но не подменяет её фактическую проверку.
+
+### H6.2 — External Production-like Rehearsal
 
 - [ ] На утверждённой production-like цели выполнить полный application
   PostgreSQL backup и restore в новый target.

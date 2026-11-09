@@ -180,6 +180,12 @@ grep -Fq 'backup_status=verified' "${target_state}/current.env"
 grep -Fq 'schema_compatibility=backward-compatible' "${target_state}/current.env"
 grep -Fq 'migration_status=applied' "${target_state}/current.env"
 grep -Fq 'smoke_status=passed' "${target_state}/current.env"
+grep -Fq 'smoke_endpoint=http://10.20.30.40:18080/api/addresses/search' \
+    "${target_state}/current.env"
+grep -Fq 'smoke_deadline_seconds=45' "${target_state}/current.env"
+grep -Fq 'smoke_health_status=dry-run' "${target_state}/current.env"
+grep -Fq 'smoke_address_search_status=dry-run' \
+    "${target_state}/current.env"
 
 if failure_output=$(FAKE_DOCKER_FAIL_MATCH=migrate:up run_update --yes 2>&1); then
     echo 'Deployment update test failed: injected migration failure was ignored.' >&2

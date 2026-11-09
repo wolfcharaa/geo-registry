@@ -112,6 +112,7 @@ ignored `docker/data/deployment/<target>/operations/`. Последний усп
 | Новый сервер с готовым PostgreSQL backup | [Отдельный линейный runbook](deploy-with-backup.md): `deploy-init` → `deploy-image` → `data-restore` → `deploy-start` |
 | Новый сервер с официальными источниками | [Отдельный линейный runbook](deploy-from-sources.md): `deploy-init` → `deploy-image` → `data-init` → import/rebuild → `deploy-start` |
 | Обновление уже managed Compose deployment | `deploy-image` → `deploy-update-preflight` → `deploy-update` |
+| Production-like recovery rehearsal | `recovery-rehearsal-plan` → отдельное разрешение restore/migrations/projection/smoke |
 | Переход с `v0.2.1` или вручную восстановленной БД | сохранить старый контур → создать/проверить backup → восстановить его в новый managed volume → `deploy-start` |
 
 Не смешивайте эти пути. `data-restore` создаёт отсутствующую БД и отказывается
@@ -360,6 +361,21 @@ exact image, снимает pause и запускает smoke. При non-intera
 используйте `DEPLOY_UPDATE_FLAGS=--yes` только после успешного preflight.
 Backup повторно проверяется под target lock, включая bytes, SHA-256, database и
 совпадение `application_revision` с source OID текущего app container.
+
+Deployment smoke ограничен общим budget `45` секунд. Каждый HTTP request имеет
+connect timeout `3` секунды и total timeout не больше `10` секунд либо остатка
+общего budget. Он проверяет `/health/live`, `/health/startup`, `/health/ready`,
+а затем публичный `GET /api/addresses/search` по representative адресу
+`Химки Лавочкина 17` региона `50` и ожидает GAR `object_id=43685301`. Значения
+можно переопределить через `DEPLOY_SMOKE_CONNECT_TIMEOUT_SECONDS`,
+`DEPLOY_SMOKE_REQUEST_TIMEOUT_SECONDS` и `DEPLOY_SMOKE_DEADLINE_SECONDS`; все
+они задаются целым положительным числом секунд.
+
+Во время `deploy-start` и `deploy-update` в operation evidence записываются
+sanitized endpoint без credentials, три timeout/budget, отдельные статусы
+health и address search и итоговый `smoke_status`. Ошибка либо timeout после
+activation классифицируется как partial deployment и требует обычного recovery
+handover. Короткий smoke намеренно не заменяет полный `make smoke-release`.
 
 После update проверьте локальный binding, health endpoint и доступ с разрешённого
 consumer host:

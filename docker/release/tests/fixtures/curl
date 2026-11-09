@@ -1,0 +1,50 @@
+#!/bin/sh
+set -eu
+
+if [ -n "${FAKE_CURL_LOG:-}" ]; then
+    {
+        printf '%s' curl
+        for argument in "$@"; do
+            printf ' %s' "${argument}"
+        done
+        printf '\n'
+    } >>"${FAKE_CURL_LOG}"
+fi
+
+output_file=
+request_url=
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --connect-timeout|--max-time|--header|--data-urlencode|--data|--output)
+            option=$1
+            shift
+            [ "$#" -gt 0 ] || exit 64
+            if [ "${option}" = --output ]; then
+                output_file=$1
+            fi
+            ;;
+        --fail|--silent|--show-error|--get) ;;
+        http://*|https://*) request_url=$1 ;;
+        *) exit 64 ;;
+    esac
+    shift
+done
+
+[ -n "${request_url}" ] || exit 64
+if [ -n "${FAKE_CURL_FAIL_MATCH:-}" ]; then
+    case "${request_url}" in
+        *"${FAKE_CURL_FAIL_MATCH}"*) exit "${FAKE_CURL_FAIL_CODE:-28}" ;;
+    esac
+fi
+
+[ -n "${output_file}" ] || exit 64
+case "${request_url}" in
+    */health/*)
+        printf '%s\n' '{"status":"ok"}' >"${output_file}"
+        ;;
+    */api/addresses/search)
+        printf '%s\n' "${FAKE_CURL_SEARCH_RESPONSE:-{\"success\":true,\"count\":1,\"suggestions\":[{\"data\":{\"object_id\":43685301}}],\"meta\":{\"endpoint\":\"search\"}}}" \
+            >"${output_file}"
+        ;;
+    *) exit 65 ;;
+esac

@@ -244,6 +244,29 @@ application получает новый URL через runtime configuration. С
 
 ## Что Закрывает Delivery Gate
 
+Перед production-like rehearsal сформируйте read-only план на restore host.
+Source и rehearsal target обязаны различаться; off-host copy указывается
+нечувствительным evidence label, а не URL с credentials:
+
+```shell
+make recovery-rehearsal-plan \
+  DEPLOY_TARGET=moscow-recovery-rehearsal \
+  DEPLOY_EXPECTED_DOCKER_CONTEXT=production-rehearsal \
+  RECOVERY_SOURCE_TARGET=moscow-primary \
+  DEPLOY_BACKUP_DIR=/srv/backups/application-postgres-<UTC> \
+  RECOVERY_OFF_HOST_COPY_REFERENCE=vault-copy-<UTC> \
+  RECOVERY_NOMINATIM_STRATEGY=rebuild \
+  RECOVERY_OBSERVATION_SECONDS=600
+```
+
+План проверяет release/config/image identity, backup bytes/SHA-256, отсутствие
+active application и, когда PostgreSQL доступен, отсутствие target database.
+Состояние `postgres-not-running` оставляет database absence как обязательный
+deferred gate самого restore. Вывод определяет RPO как интервал от
+`backup_created_at` до rehearsal cutover, а RTO — от начала restore до успешного
+bounded smoke. Команда ничего не загружает, не запускает, не восстанавливает и
+не создаёт rehearsal evidence; mutating rehearsal требует отдельного разрешения.
+
 Tooling и read-only capacity preflight сами по себе не закрывают gate. До
 первого production switch нужны сохранённые evidence:
 

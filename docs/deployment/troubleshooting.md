@@ -103,6 +103,27 @@ migration history, GAR integrity, точное покрытие регионов
 application processes и выполняет HTTP smoke. Только успешный `deploy-start`
 означает, что сервис активирован.
 
+## Smoke Завершился По Timeout Или Не Нашёл Representative Адрес
+
+Deployment smoke ограничен общим budget и отдельными connect/total timeout.
+Он последовательно проверяет три health endpoint и публичный address search;
+неуспех после activation оставляет `partial.env`, даже если containers выглядят
+healthy. Сначала откройте evidence path из сообщения и сравните поля
+`smoke_health_status`, `smoke_address_search_status`, `smoke_endpoint` и
+`smoke_*_seconds`.
+
+Если health прошёл, а address search нет, повторите только read-only probe:
+
+```shell
+make deploy-smoke
+```
+
+Не увеличивайте deadline без диагностики PostgreSQL/OpenSearch и не снимайте
+`partial.env` вручную. Timeout не доказывает, что activation безопасно откатить:
+выберите `roll-forward`, совместимый binary rollback или restore по schema/data
+contract и зафиксируйте решение через `make deploy-handover`. Contract test
+этой ветки использует fake HTTP timeout и не меняет production target.
+
 ## Появилось Предупреждение Об Orphan Containers
 
 Compose может увидеть Nominatim или OpenSearch от предыдущего контура. Во время

@@ -107,5 +107,10 @@ grep -Fq 'migration_status=history-checked' "${evidence_file}"
 grep -Fq 'data_checks_status=passed' "${evidence_file}"
 grep -Fq 'activation_status=passed' "${evidence_file}"
 grep -Fq 'smoke_status=passed' "${evidence_file}"
+grep -Fq 'smoke_endpoint=http://127.0.0.1:18080/api/addresses/search' \
+    "${evidence_file}"
+grep -Fq 'smoke_deadline_seconds=45' "${evidence_file}"
+grep -Fq 'smoke_health_status=dry-run' "${evidence_file}"
+grep -Fq 'smoke_address_search_status=dry-run' "${evidence_file}"
 
 echo 'Deployment start orchestration contract test passed.'

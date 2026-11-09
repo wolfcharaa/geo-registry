@@ -486,6 +486,12 @@ deployment_evidence_begin() {
         printf '%s\n' 'data_checks_status=pending'
         printf '%s\n' 'activation_status=pending'
         printf '%s\n' 'smoke_status=pending'
+        printf '%s\n' 'smoke_endpoint=pending'
+        printf '%s\n' 'smoke_connect_timeout_seconds=pending'
+        printf '%s\n' 'smoke_request_timeout_seconds=pending'
+        printf '%s\n' 'smoke_deadline_seconds=pending'
+        printf '%s\n' 'smoke_health_status=pending'
+        printf '%s\n' 'smoke_address_search_status=pending'
         printf '%s\n' 'final_state=active'
         printf '%s\n' 'recovery_branch=undecided'
         printf 'evidence_file=%s\n' "${DEPLOY_EVIDENCE_FILE}"
