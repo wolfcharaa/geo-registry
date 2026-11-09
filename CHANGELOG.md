@@ -4,6 +4,23 @@
 
 ## [Unreleased]
 
+- Release workflow разделён на reviewable source preparation, повторяемую
+  сборку, фиксацию exact image identity и отдельно разрешаемую публикацию с
+  проверкой registry digest и возобновляемым phase state.
+- Deployment получил read-only doctor/plan, явные target и Docker context,
+  per-target lock, проверяемые data/schema gates и атомарное operation evidence
+  для successful, safe-abort и partial состояний.
+- Offline delivery поддерживает отдельные `app-update` и `new-host-core` scopes
+  с проверкой digest, image ID и platform каждого переносимого образа.
+- Activation и update используют bounded health/business smoke, а recovery
+  rehearsal имеет отдельный fail-closed план с backup, RPO/RTO и Nominatim
+  gates без неявной мутации целевого окружения.
+- Shell-сценарии подключены к единому syntax/ShellCheck gate; release phase и
+  deployment evidence переведены на строгие атомарные state-модули.
+- `deploy-doctor` нормализует Docker Engine aliases `x86_64`/`aarch64` в
+  канонические OCI platforms `amd64`/`arm64`, сохраняя отказ для неизвестной
+  архитектуры.
+
 ## [0.2.5] - 2026-11-09
 
 - MessageBus dependencies обновлены до опубликованных релизов `v0.1.1`, а
