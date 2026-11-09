@@ -157,6 +157,13 @@ release_validate_manifest_format() {
     esac
 }
 
+release_validate_offline_scope() {
+    case "$1" in
+        app-update|new-host-core) ;;
+        *) release_fail "offline scope must be app-update or new-host-core" ;;
+    esac
+}
+
 release_sha256() {
     release_file=$1
 
@@ -211,6 +218,43 @@ release_validate_image_id() {
     esac
     [ "${#release_image_id_hash}" -eq 64 ] \
         || release_fail "image ID must contain 64 hexadecimal characters"
+}
+
+release_local_image_matches() {
+    release_local_reference=$1
+    release_local_expected_id=$2
+    release_local_expected_platform=$3
+
+    docker image inspect "${release_local_reference}" >/dev/null 2>&1 \
+        || return 1
+    release_local_actual_id=$(docker image inspect --format '{{.Id}}' \
+        "${release_local_reference}" 2>/dev/null || true)
+    release_local_actual_platform=$(docker image inspect \
+        --format '{{.Os}}/{{.Architecture}}' \
+        "${release_local_reference}" 2>/dev/null || true)
+    [ "${release_local_actual_id}" = "${release_local_expected_id}" ] \
+        && [ "${release_local_actual_platform}" = "${release_local_expected_platform}" ]
+}
+
+release_validate_local_image() {
+    release_local_reference=$1
+    release_local_expected_id=$2
+    release_local_expected_platform=$3
+    release_local_role=$4
+
+    release_validate_image_id "${release_local_expected_id}"
+    release_validate_platform "${release_local_expected_platform}"
+    docker image inspect "${release_local_reference}" >/dev/null 2>&1 \
+        || release_fail "${release_local_role} image is not loaded: ${release_local_reference}"
+    release_local_actual_id=$(docker image inspect --format '{{.Id}}' \
+        "${release_local_reference}" 2>/dev/null || true)
+    [ "${release_local_actual_id}" = "${release_local_expected_id}" ] \
+        || release_fail "${release_local_role} image ID is ${release_local_actual_id:-unavailable}, expected ${release_local_expected_id}"
+    release_local_actual_platform=$(docker image inspect \
+        --format '{{.Os}}/{{.Architecture}}' \
+        "${release_local_reference}" 2>/dev/null || true)
+    [ "${release_local_actual_platform}" = "${release_local_expected_platform}" ] \
+        || release_fail "${release_local_role} image platform is ${release_local_actual_platform:-unavailable}, expected ${release_local_expected_platform}"
 }
 
 release_validate_size() {

@@ -40,7 +40,7 @@ deployment_acquire_target_lock \
 COMPOSE_ENV_FILE="${secrets_file}" "${project_root}/docker/compose/prod.sh" \
     stop app worker-address worker-runtime >/dev/null 2>&1 || true
 
-COMPOSE_ENV_FILE="${secrets_file}" "${project_root}/docker/compose/prod.sh" pull postgres
+deployment_prepare_postgres_image "${release_env_file}" "${secrets_file}"
 COMPOSE_ENV_FILE="${secrets_file}" "${project_root}/docker/compose/prod.sh" \
     up --detach --wait postgres
 container=$(COMPOSE_ENV_FILE="${secrets_file}" \

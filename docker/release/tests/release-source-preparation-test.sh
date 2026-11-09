@@ -243,6 +243,8 @@ grep -Fq 'APP_IMAGE_DIGEST=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 core_oid=$(awk -F= '$1 == "built_core_oid" {print $2}' "${artifact_dir}/phase-manifest.txt")
 worker_oid=$(awk -F= '$1 == "built_worker_oid" {print $2}' "${artifact_dir}/phase-manifest.txt")
+postgres_image=ghcr.io/cargosense/postgis:17-3.6-alpine@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+postgres_image_id=sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
 PATH="${fake_bin}:${PATH}" \
 FAKE_DOCKER_STATE="${state_file}" \
 FAKE_DOCKER_LOG="${docker_log}" \
@@ -274,18 +276,33 @@ FAKE_DOCKER_VERSION=v9.9.9 \
 FAKE_DOCKER_SOURCE_REVISION=1111111111111111111111111111111111111111 \
 FAKE_DOCKER_CORE_REVISION="${core_oid}" \
 FAKE_DOCKER_WORKER_REVISION="${worker_oid}" \
+FAKE_DOCKER_POSTGRES_IMAGE_REFERENCE="${postgres_image}" \
+FAKE_DOCKER_POSTGRES_IMAGE_ID="${postgres_image_id}" \
+FAKE_DOCKER_POSTGRES_LOADED=1 \
+FAKE_DOCKER_COMPOSE_IMAGES="registry.example/geo-registry/app:v9.9.9-linux-amd64
+registry.example/geo-registry/app:v9.9.9-linux-amd64
+${postgres_image}" \
 FAKE_GIT_LOG="${git_log}" \
 FAKE_GIT_TAG_EXISTS=1 \
 RELEASE_PROJECT_ROOT="${prepared_root}" \
 RELEASE_ENV_FILE="${prepared_root}/docker/compose/prod/release.env" \
 RELEASE_COMPOSE_FILE="${prepared_root}/docker/compose/prod/compose.yaml" \
 RELEASE_ARTIFACT_DIR="${artifact_dir}" \
+RELEASE_OFFLINE_SCOPE=new-host-core \
 DOCKER_PLATFORM=linux/amd64 \
     "${project_root}/docker/release/build-offline-payload.sh"
 grep -Fq 'config_revision=sha256:' "${artifact_dir}/source-manifest.txt"
 grep -Fq 'git_commit=1111111111111111111111111111111111111111' \
     "${artifact_dir}/source-manifest.txt"
+grep -Fq 'offline_scope=new-host-core' "${artifact_dir}/source-manifest.txt"
+grep -Fq 'image_count=2' "${artifact_dir}/source-manifest.txt"
+grep -Fq 'image_2_role=postgres' "${artifact_dir}/source-manifest.txt"
+grep -Fq "image_2_reference=${postgres_image}" "${artifact_dir}/source-manifest.txt"
+grep -Fq "image_2_id=${postgres_image_id}" "${artifact_dir}/source-manifest.txt"
 grep -Fq 'offline_payload_state=verified' "${artifact_dir}/phase-manifest.txt"
+grep -Fq 'offline_payload_scope=new-host-core' "${artifact_dir}/phase-manifest.txt"
+grep -Fq "save --output" "${docker_log}"
+grep -Fq "${postgres_image}" "${docker_log}"
 
 offline_archive="${temporary_root}/release-v9.9.9-offline.tar"
 PATH="${fake_bin}:${PATH}" \
@@ -298,10 +315,12 @@ RELEASE_ENV_FILE="${prepared_root}/docker/compose/prod/release.env" \
 RELEASE_COMPOSE_FILE="${prepared_root}/docker/compose/prod/compose.yaml" \
 RELEASE_ARTIFACT_DIR="${artifact_dir}" \
 OFFLINE_ARCHIVE_PATH="${offline_archive}" \
+RELEASE_OFFLINE_SCOPE=new-host-core \
 DOCKER_PLATFORM=linux/amd64 \
     "${project_root}/docker/release/build-offline-archive.sh"
 tar -tf "${offline_archive}" | grep -Fxq 'release-artifact.env'
 grep -Fq 'offline_export_state=verified' "${artifact_dir}/phase-manifest.txt"
+grep -Fq 'offline_export_scope=new-host-core' "${artifact_dir}/phase-manifest.txt"
 
 if grep -Eq ' (add|commit|tag|push)( |$)' "${git_log}"; then
     echo 'Release source preparation test failed: release production mutated Git history.' >&2

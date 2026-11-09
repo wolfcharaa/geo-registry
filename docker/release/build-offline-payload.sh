@@ -8,7 +8,7 @@ project_root=${RELEASE_PROJECT_ROOT:-${default_project_root}}
 # shellcheck disable=SC1091
 . "${script_dir}/release-lib.sh"
 
-for command_name in awk docker git grep mkdir mktemp mv tr wc; do
+for command_name in awk docker git grep mkdir mktemp mv sort tr wc; do
     release_require_command "${command_name}"
 done
 
@@ -24,9 +24,11 @@ release_require_file "${compose_file}"
 release_version=$(release_env_value RELEASE_VERSION "${source_env_file}" || true)
 platform=${DOCKER_PLATFORM:-linux/amd64}
 release_branch=${RELEASE_BRANCH:-main}
+offline_scope=${RELEASE_OFFLINE_SCOPE:-app-update}
 
 release_validate_version "${release_version}"
 release_validate_platform "${platform}"
+release_validate_offline_scope "${offline_scope}"
 
 platform_slug=$(printf '%s' "${platform}" | tr / -)
 artifact_dir=$(release_resolve_path "${RELEASE_ARTIFACT_DIR:-docker/data/release/${release_version}}")
@@ -68,6 +70,51 @@ release_validate_git_oid "${application_source_commit}"
 release_validate_git_oid "${core_commit}"
 release_validate_git_oid "${worker_commit}"
 release_validate_image_id "${image_id}"
+
+image_count=1
+postgres_image_reference=none
+postgres_image_digest=none
+postgres_image_id=none
+postgres_image_platform=none
+if [ "${offline_scope}" = new-host-core ]; then
+    render_env_file=$(release_resolve_path \
+        "${RELEASE_RENDER_ENV_FILE:-config/prod.secrets.env.example}")
+    release_require_file "${render_env_file}"
+    rendered_images=$(COMPOSE_PROFILES='' docker compose \
+        --env-file "${render_env_file}" \
+        --env-file "${identity_file}" \
+        --file "${compose_file}" \
+        config --images | sort -u)
+    rendered_application_count=0
+    rendered_support_count=0
+    for rendered_image in ${rendered_images}; do
+        if [ "${rendered_image}" = "${tagged_image}" ]; then
+            rendered_application_count=$((rendered_application_count + 1))
+        else
+            rendered_support_count=$((rendered_support_count + 1))
+            postgres_image_reference=${rendered_image}
+        fi
+    done
+    [ "${rendered_application_count}" -eq 1 ] \
+        || release_fail "rendered core Compose model must contain the frozen application image"
+    [ "${rendered_support_count}" -eq 1 ] \
+        || release_fail "rendered core Compose model must contain exactly one non-application image"
+    case "${postgres_image_reference}" in
+        *@sha256:*) ;;
+        *) release_fail "rendered PostgreSQL image must use an exact sha256 digest" ;;
+    esac
+    postgres_image_digest=${postgres_image_reference}
+    release_validate_digest "${postgres_image_digest##*@}"
+    postgres_image_id=$(docker image inspect --format '{{.Id}}' \
+        "${postgres_image_reference}" 2>/dev/null || true)
+    postgres_image_platform=$(docker image inspect \
+        --format '{{.Os}}/{{.Architecture}}' \
+        "${postgres_image_reference}" 2>/dev/null || true)
+    release_validate_image_id "${postgres_image_id}"
+    [ "${postgres_image_platform}" = "${platform}" ] \
+        || release_fail "PostgreSQL image platform is ${postgres_image_platform:-unavailable}, expected ${platform}"
+    image_count=2
+fi
 
 git -C "${project_root}" cat-file -e "${application_source_commit}^{commit}" 2>/dev/null \
     || release_fail "image source revision is not available in the application repository"
@@ -122,6 +169,10 @@ if [ -f "${phase_manifest_path}" ]; then
             release_phase_manifest_expect "${phase_manifest_path}" frozen_image_digest "${exact_image}"
         fi
         if [ "$(release_manifest_value offline_payload_state "${phase_manifest_path}" || true)" = verified ]; then
+            release_phase_manifest_expect "${phase_manifest_path}" offline_payload_scope "${offline_scope}"
+            release_phase_manifest_expect "${phase_manifest_path}" offline_payload_image_count "${image_count}"
+            release_phase_manifest_expect "${phase_manifest_path}" offline_payload_postgres_image_reference "${postgres_image_reference}"
+            release_phase_manifest_expect "${phase_manifest_path}" offline_payload_postgres_image_id "${postgres_image_id}"
             release_phase_manifest_expect "${phase_manifest_path}" offline_payload_release_oid "${release_commit}"
             release_phase_manifest_expect "${phase_manifest_path}" offline_payload_config_revision "${config_revision}"
             release_phase_manifest_expect "${phase_manifest_path}" offline_payload_image_reference "${tagged_image}"
@@ -139,8 +190,22 @@ if [ -f "${phase_manifest_path}" ]; then
                 || release_fail "verified offline payload checksum changed; refusing an implicit rebuild"
             [ "$(release_manifest_value git_commit "${manifest_path}" || true)" = "${release_commit}" ] \
                 || release_fail "verified offline payload manifest commit changed"
+            [ "$(release_manifest_value offline_scope "${manifest_path}" || true)" = "${offline_scope}" ] \
+                || release_fail "verified offline payload manifest scope changed"
             [ "$(release_manifest_value image_1_id "${manifest_path}" || true)" = "${image_id}" ] \
                 || release_fail "verified offline payload manifest image ID changed"
+            [ "$(release_manifest_value image_1_platform "${manifest_path}" || true)" = "${platform}" ] \
+                || release_fail "verified offline payload application platform changed"
+            [ "$(release_manifest_value image_count "${manifest_path}" || true)" = "${image_count}" ] \
+                || release_fail "verified offline payload manifest image count changed"
+            if [ "${offline_scope}" = new-host-core ]; then
+                [ "$(release_manifest_value image_2_reference "${manifest_path}" || true)" = "${postgres_image_reference}" ] \
+                    || release_fail "verified offline payload PostgreSQL reference changed"
+                [ "$(release_manifest_value image_2_id "${manifest_path}" || true)" = "${postgres_image_id}" ] \
+                    || release_fail "verified offline payload PostgreSQL image ID changed"
+                [ "$(release_manifest_value image_2_platform "${manifest_path}" || true)" = "${postgres_image_platform}" ] \
+                    || release_fail "verified offline payload PostgreSQL platform changed"
+            fi
 
             echo "Reusing verified offline image payload: ${archive_path}"
             echo "Manifest: ${manifest_path}"
@@ -157,13 +222,18 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-docker save --output "${archive_temporary}" "${tagged_image}"
+set -- docker save --output "${archive_temporary}" "${tagged_image}"
+if [ "${offline_scope}" = new-host-core ]; then
+    set -- "$@" "${postgres_image_reference}"
+fi
+"$@"
 archive_sha256=$(release_sha256 "${archive_temporary}")
 archive_size=$(release_file_size "${archive_temporary}")
 mv "${archive_temporary}" "${archive_path}"
 
 {
     printf '%s\n' 'manifest_format=3'
+    printf 'offline_scope=%s\n' "${offline_scope}"
     printf 'release_tag=%s\n' "${release_version}"
     printf 'release_version=%s\n' "${release_version}"
     printf 'git_commit=%s\n' "${release_commit}"
@@ -176,10 +246,19 @@ mv "${archive_temporary}" "${archive_path}"
     printf 'archive=%s\n' "${archive_name}"
     printf 'archive_size=%s\n' "${archive_size}"
     printf 'archive_sha256=%s\n' "${archive_sha256}"
-    printf '%s\n' 'image_count=1'
+    printf 'image_count=%s\n' "${image_count}"
+    printf '%s\n' 'image_1_role=application'
     printf 'image_1_reference=%s\n' "${tagged_image}"
     printf 'image_1_digest=%s\n' "${exact_image}"
     printf 'image_1_id=%s\n' "${image_id}"
+    printf 'image_1_platform=%s\n' "${platform}"
+    if [ "${offline_scope}" = new-host-core ]; then
+        printf '%s\n' 'image_2_role=postgres'
+        printf 'image_2_reference=%s\n' "${postgres_image_reference}"
+        printf 'image_2_digest=%s\n' "${postgres_image_digest}"
+        printf 'image_2_id=%s\n' "${postgres_image_id}"
+        printf 'image_2_platform=%s\n' "${postgres_image_platform}"
+    fi
     printf 'image_tag=%s\n' "${tagged_image}"
     printf 'image_digest=%s\n' "${exact_image}"
     printf '%s\n' 'assurance=integrity-only'
@@ -197,6 +276,10 @@ release_phase_manifest_update "${phase_manifest_path}" \
     release_config_revision "${config_revision}" \
     application_source_oid "${application_source_commit}" \
     offline_payload_state verified \
+    offline_payload_scope "${offline_scope}" \
+    offline_payload_image_count "${image_count}" \
+    offline_payload_postgres_image_reference "${postgres_image_reference}" \
+    offline_payload_postgres_image_id "${postgres_image_id}" \
     offline_payload_release_oid "${release_commit}" \
     offline_payload_config_revision "${config_revision}" \
     offline_payload_image_reference "${tagged_image}" \
@@ -210,5 +293,6 @@ release_phase_manifest_update "${phase_manifest_path}" \
     offline_payload_verified_by "$(id -un)"
 
 echo "Offline image payload created: ${archive_path}"
+echo "Offline scope: ${offline_scope} (${image_count} images)"
 echo "Manifest: ${manifest_path}"
 echo "Archive SHA-256: ${archive_sha256}"

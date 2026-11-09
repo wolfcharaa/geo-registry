@@ -66,12 +66,26 @@ deployment_require_confirmed_target \
 deployment_acquire_target_lock \
     change-release application "${DEPLOY_DATA_MODE:-none}" "${identity_file}"
 
-if release_registry_image_is_loaded "${tagged_image}" "${exact_image}"; then
+manifest_offline_scope=app-update
+if [ -f "${manifest_path}" ]; then
+    detected_manifest_format=$(release_manifest_value manifest_format \
+        "${manifest_path}" || true)
+    release_validate_manifest_format "${detected_manifest_format}"
+    if [ "${detected_manifest_format}" = 3 ]; then
+        manifest_offline_scope=$(release_manifest_value offline_scope \
+            "${manifest_path}" || true)
+        [ -n "${manifest_offline_scope}" ] \
+            || manifest_offline_scope=app-update
+        release_validate_offline_scope "${manifest_offline_scope}"
+    fi
+fi
+
+if [ "${manifest_offline_scope}" = app-update ] \
+    && release_registry_image_is_loaded "${tagged_image}" "${exact_image}"; then
     echo "Frozen registry digest is already loaded; archive verification and docker load are skipped."
     release_validate_registry_image \
         "${tagged_image}" "${exact_image}" "${platform}" "${release_version}"
 else
-    release_require_file "${archive_path}"
     release_require_file "${manifest_path}"
 
     manifest_format=$(release_manifest_value manifest_format "${manifest_path}" || true)
@@ -90,11 +104,19 @@ else
         || release_fail "manifest image digest does not match"
 
     expected_image_id=
+    expected_postgres_reference=
+    expected_postgres_image_id=
+    expected_postgres_platform=
     case "${manifest_format}" in
         1)
             expected_image_id=$(release_manifest_value image_id "${manifest_path}" || true)
             ;;
         3)
+            manifest_offline_scope=$(release_manifest_value offline_scope \
+                "${manifest_path}" || true)
+            [ -n "${manifest_offline_scope}" ] \
+                || manifest_offline_scope=app-update
+            release_validate_offline_scope "${manifest_offline_scope}"
             [ "$(release_manifest_value release_tag "${manifest_path}" || true)" = "${release_version}" ] \
                 || release_fail "manifest release tag does not match"
             if [ "${source_identity_format}" = 2 ]; then
@@ -104,42 +126,103 @@ else
             fi
             [ "$(release_manifest_value config_revision "${manifest_path}" || true)" = "${expected_config_revision}" ] \
                 || release_fail "manifest config revision does not match current checkout"
-            [ "$(release_manifest_value image_count "${manifest_path}" || true)" = 1 ] \
-                || release_fail "manifest image count must be one"
+            case "${manifest_offline_scope}" in
+                app-update) expected_image_count=1 ;;
+                new-host-core) expected_image_count=2 ;;
+            esac
+            [ "$(release_manifest_value image_count "${manifest_path}" || true)" = "${expected_image_count}" ] \
+                || release_fail "manifest image count does not match offline scope"
             [ "$(release_manifest_value image_1_reference "${manifest_path}" || true)" = "${tagged_image}" ] \
                 || release_fail "manifest image reference does not match"
             [ "$(release_manifest_value image_1_digest "${manifest_path}" || true)" = "${exact_image}" ] \
                 || release_fail "manifest exact image does not match"
             expected_image_id=$(release_manifest_value image_1_id "${manifest_path}" || true)
+            manifest_application_platform=$(release_manifest_value \
+                image_1_platform "${manifest_path}" || true)
+            if [ -n "${manifest_application_platform}" ]; then
+                [ "${manifest_application_platform}" = "${platform}" ] \
+                    || release_fail "manifest application platform does not match target platform"
+            fi
+            if [ "${manifest_offline_scope}" = new-host-core ]; then
+                [ "$(release_manifest_value image_1_role "${manifest_path}" || true)" = application ] \
+                    || release_fail "new-host-core first image must own the application role"
+                [ "$(release_manifest_value image_2_role "${manifest_path}" || true)" = postgres ] \
+                    || release_fail "new-host-core second image must own the postgres role"
+                expected_postgres_reference=$(release_manifest_value \
+                    image_2_reference "${manifest_path}" || true)
+                expected_postgres_digest=$(release_manifest_value \
+                    image_2_digest "${manifest_path}" || true)
+                [ "${expected_postgres_reference}" = "${expected_postgres_digest}" ] \
+                    || release_fail "new-host-core PostgreSQL reference and digest must match"
+                rendered_postgres_reference=$(deployment_resolve_core_support_image \
+                    "${identity_file}" "${secrets_file}")
+                [ "${expected_postgres_reference}" = "${rendered_postgres_reference}" ] \
+                    || release_fail "new-host-core PostgreSQL image does not match rendered Compose"
+                expected_postgres_image_id=$(release_manifest_value \
+                    image_2_id "${manifest_path}" || true)
+                expected_postgres_platform=$(release_manifest_value \
+                    image_2_platform "${manifest_path}" || true)
+                release_validate_image_id "${expected_postgres_image_id}"
+                [ "${expected_postgres_platform}" = "${platform}" ] \
+                    || release_fail "new-host-core PostgreSQL platform does not match target platform"
+            fi
             [ "$(release_manifest_value assurance "${manifest_path}" || true)" = integrity-only ] \
                 || release_fail "manifest assurance must be integrity-only"
-
-            expected_archive_size=$(release_manifest_value archive_size "${manifest_path}" || true)
-            release_validate_size "${expected_archive_size}"
-            [ "$(release_file_size "${archive_path}")" = "${expected_archive_size}" ] \
-                || release_fail "offline image archive size does not match"
             ;;
     esac
     if [ -n "${expected_image_id}" ]; then
         release_validate_image_id "${expected_image_id}"
     fi
 
-    expected_archive_sha256=$(release_manifest_value archive_sha256 "${manifest_path}" || true)
-    actual_archive_sha256=$(release_sha256 "${archive_path}")
-    [ "${actual_archive_sha256}" = "${expected_archive_sha256}" ] \
-        || release_fail "offline image archive checksum does not match"
+    local_payload_ready=0
+    if [ -n "${expected_image_id}" ] \
+        && release_local_image_matches \
+            "${tagged_image}" "${expected_image_id}" "${platform}"; then
+        if [ "${manifest_offline_scope}" = app-update ]; then
+            local_payload_ready=1
+        elif release_local_image_matches \
+            "${expected_postgres_reference}" \
+            "${expected_postgres_image_id}" \
+            "${expected_postgres_platform}"; then
+            local_payload_ready=1
+        fi
+    fi
 
-    echo "Loading verified image archive: ${archive_path}"
-    docker load --input "${archive_path}"
+    if [ "${local_payload_ready}" = 1 ]; then
+        echo "All ${manifest_offline_scope} images already match manifest ID and platform; archive load is skipped."
+    else
+        release_require_file "${archive_path}"
+        if [ "${manifest_format}" = 3 ]; then
+            expected_archive_size=$(release_manifest_value archive_size \
+                "${manifest_path}" || true)
+            release_validate_size "${expected_archive_size}"
+            [ "$(release_file_size "${archive_path}")" = "${expected_archive_size}" ] \
+                || release_fail "offline image archive size does not match"
+        fi
+        expected_archive_sha256=$(release_manifest_value archive_sha256 \
+            "${manifest_path}" || true)
+        actual_archive_sha256=$(release_sha256 "${archive_path}")
+        [ "${actual_archive_sha256}" = "${expected_archive_sha256}" ] \
+            || release_fail "offline image archive checksum does not match"
+
+        echo "Loading verified ${manifest_offline_scope} image archive: ${archive_path}"
+        docker load --input "${archive_path}"
+    fi
 
     release_validate_runtime_image \
         "${tagged_image}" "${platform}" "${release_version}"
     if [ -n "${expected_image_id}" ]; then
-        actual_image_id=$(docker image inspect --format '{{.Id}}' "${tagged_image}")
-        [ "${actual_image_id}" = "${expected_image_id}" ] \
-            || release_fail "loaded image ID is ${actual_image_id}, expected ${expected_image_id}"
+        release_validate_local_image \
+            "${tagged_image}" "${expected_image_id}" "${platform}" application
     fi
-    echo "Offline image tag is bound to the verified archive checksum; a registry digest association is not required."
+    if [ "${manifest_offline_scope}" = new-host-core ]; then
+        release_validate_local_image \
+            "${expected_postgres_reference}" \
+            "${expected_postgres_image_id}" \
+            "${expected_postgres_platform}" \
+            postgres
+    fi
+    echo "Offline image identities are bound to the manifest and verified local IDs; registry digest associations are not required after load."
 fi
 
 actual_image_id=$(docker image inspect --format '{{.Id}}' "${tagged_image}")

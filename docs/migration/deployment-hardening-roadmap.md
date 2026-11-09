@@ -26,11 +26,8 @@ production `--no-build --pull never`, атомарные offline archives, annot
 Git bundle, fail-closed restore в отсутствующую БД, migration/GAR gates и
 application-only release switch без удаления persistent volumes.
 
-Открытые ограничения после H1/H2:
+Открытые ограничения после H3:
 
-- production target, Docker context и service scope не объединены одним
-  read-only plan, отсутствует общий per-target mutation lock;
-- deployment не сохраняет единое current/previous/result evidence;
 - offline payload переносит application image, но не обязательный PostgreSQL
   image для полностью изолированного first install;
 - health smoke должен иметь общий deadline и representative business check;
@@ -43,8 +40,8 @@ application-only release switch без удаления persistent volumes.
 | --- | --- | --- |
 | H1 | Immutable manifest и удалённо проверяемая публикация | `Completed in main` |
 | H2 | Source preparation до build и единый final tag OID | `Completed in main` |
-| H3 | Target plan, capabilities, lock и deployment evidence | `In progress` |
-| H4 | Явные offline scopes и полный local image identity | `Planned` |
+| H3 | Target plan, capabilities, lock и deployment evidence | `Completed in main` |
+| H4 | Явные offline scopes и полный local image identity | `Completed in main` |
 | H5 | Bounded health/business smoke и observation result | `Planned` |
 | H6 | Production-like recovery rehearsal и сохранённые RPO/RTO | `External gate` |
 
@@ -145,11 +142,11 @@ tag OID mismatch до Docker build. Реальный tag, image, push и transpo
   context/endpoint, project, host platform, current/desired identity, rendered
   config checksum, service scope, data mode, backup gate и last safe abort.
 - [x] Не допускать production mutation с неявным или неподтверждённым target.
-- [ ] Ввести один per-target lock для init, restore, update, migrations и
+- [x] Ввести один per-target lock для init, restore, update, migrations и
   release switch; lock охватывает bounded smoke и запись результата.
-- [ ] Привязать update к проверенному backup manifest текущего deployment и
+- [x] Привязать update к проверенному backup manifest текущего deployment и
   явно классифицировать schema compatibility.
-- [ ] Сохранять current/previous/desired identity, actor, timing, checks,
+- [x] Сохранять current/previous/desired identity, actor, timing, checks,
   migration/backup/smoke status и final/partial state.
 - [x] Перенести полную orchestration из Make recipes в testable scripts; Make
   остаётся тонким facade.
@@ -170,8 +167,8 @@ context сами и не выполняют `pull`, `load`, запуск contain
 Недоступный Docker Engine, отсутствующие secrets, несовпавший context,
 неполная artifact identity, invalid backup или невозможность получить
 rendered config дают `status=blocked`. Это discovery gate, а не разрешение на
-mutation: подключение plan к mutating entrypoints, per-target lock и evidence
-остаются следующими slices H3.
+mutation. Следующие slices подключают тот же target contract, lock и evidence
+непосредственно к mutating entrypoints.
 
 Второй slice H3 вводит единый target gate в production Compose wrapper и в
 entrypoints, способные изменить secret file, local image store, backup либо
@@ -190,27 +187,49 @@ restore, fresh database initialization, backup, update и release switch
 сериализуются по `DEPLOY_TARGET`; конкурентный owner получает fail-fast и
 metadata активной операции. `deploy-start` перенесён из многострочного Make
 recipe в `deploy-start.sh`, а update smoke — внутрь `update-deployment.sh`,
-поэтому один lock теперь охватывает data gates, activation и smoke. Пункт lock
-пока не закрыт: stale metadata является диагностикой, но ещё не final/partial
-evidence и не блокирует продолжение без recovery handover.
+поэтому один lock теперь охватывает data gates, activation и smoke.
+
+Финальный slice H3 переносит lock перед фактический update-preflight, связывает
+update с bytes/SHA-256 backup, его `application_revision` и текущим source OID,
+а также требует классификацию schema compatibility. Каждая activation/update
+пишет отдельное operation evidence, атомарно продвигает `current.env` и
+`previous.env`, сохраняет статусы artifact/backup/migrations/data/smoke. Ошибка
+до service/data mutation завершается `safe-abort`; ошибка после начала mutation
+публикует `partial.env` и блокирует последующие изменения. Снять блок можно
+только отдельным подтверждённым `deploy-handover`, который архивирует выбранную
+recovery branch, но сам не выполняет rollback, restore или service mutation.
 
 ## H4 — Offline Scopes
 
-- [ ] Назвать текущий минимальный scope `app-update`: application image и
+- [x] Назвать текущий минимальный scope `app-update`: application image и
   optional application PostgreSQL backup, но без support images.
-- [ ] Добавить `new-host-core` с exact application и PostgreSQL images,
+- [x] Добавить `new-host-core` с exact application и PostgreSQL images,
   полученными из rendered production model.
-- [ ] Заменить обязательный registry pull в offline init/restore на fail-closed
+- [x] Заменить обязательный registry pull в offline init/restore на fail-closed
   проверку exact уже загруженного PostgreSQL image.
-- [ ] Оставить OpenSearch отдельным optional scope, Nominatim — отдельным data
+- [x] Оставить OpenSearch отдельным optional scope, Nominatim — отдельным data
   lifecycle.
-- [ ] Проверять count/reference/digest/ID/platform каждого image после load.
-- [ ] Зафиксировать, что checksum обеспечивает integrity только относительно
+- [x] Проверять count/reference/digest/ID/platform каждого image после load.
+- [x] Зафиксировать, что checksum обеспечивает integrity только относительно
   доверенно полученного значения и не является publisher authentication.
 
-До завершения этапа полностью изолированный first install не поддерживается:
-текущий archive нельзя описывать как полный air-gapped host bootstrap, а
-versioned init/restore tooling требует registry access для PostgreSQL image.
+Первый slice H4 добавляет обязательный producer contract
+`RELEASE_OFFLINE_SCOPE=app-update`. Scope записывается в `source-manifest.txt`,
+phase evidence и имя transport archive; повторное использование проверяет его
+вместе с release/config/platform identity. Legacy manifest v3 без поля
+читается как `app-update`, но новый producer всегда пишет поле явно.
+
+Финальный slice H4 добавляет `new-host-core`: producer получает application и
+PostgreSQL references из rendered production Compose без optional profiles,
+требует digest-pinned support image и сохраняет для обоих role, reference,
+digest, local image ID и platform. Target либо повторно использует оба уже
+совпавших local objects, либо проверяет archive и после `docker load` снова
+сверяет обе identity. `data-init` и `data-restore` пропускают registry pull
+только для валидного `new-host-core`; отсутствие или mismatch PostgreSQL image
+завершается fail-closed. OpenSearch остаётся отдельным optional profile и
+перестраиваемой проекцией, Nominatim — отдельным data lifecycle. Transport
+сохраняет `assurance=integrity-only`: соседний checksum не объявляется
+аутентификацией издателя.
 
 ## H5 — Bounded Verification
 

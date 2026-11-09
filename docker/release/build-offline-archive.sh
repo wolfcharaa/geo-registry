@@ -29,6 +29,12 @@ release_validate_version "${release_version}"
 platform=${DOCKER_PLATFORM:-linux/amd64}
 release_validate_platform "${platform}"
 platform_slug=$(printf '%s' "${platform}" | tr / -)
+offline_scope=${RELEASE_OFFLINE_SCOPE:-app-update}
+release_validate_offline_scope "${offline_scope}"
+case "${offline_scope}" in
+    app-update) expected_image_count=1 ;;
+    new-host-core) expected_image_count=2 ;;
+esac
 
 [ -z "$(git -C "${project_root}" status --porcelain)" ] \
     || release_fail "repository must be clean before building an offline archive"
@@ -57,7 +63,7 @@ archive_name="source-${platform_slug}.tar"
 archive_path="${artifact_dir}/${archive_name}"
 manifest_path="${artifact_dir}/source-manifest.txt"
 phase_manifest_path="${artifact_dir}/phase-manifest.txt"
-outer_path=$(release_resolve_path "${OFFLINE_ARCHIVE_PATH:-release-geo-registry-${release_version}-offline.tar}")
+outer_path=$(release_resolve_path "${OFFLINE_ARCHIVE_PATH:-release-geo-registry-${release_version}-${offline_scope}-offline.tar}")
 checksum_path="${outer_path}.sha256"
 
 include_application_data=${RELEASE_INCLUDE_APPLICATION_DATA:-0}
@@ -92,11 +98,14 @@ if [ -f "${phase_manifest_path}" ]; then
         release_phase_manifest_expect "${phase_manifest_path}" release_version "${release_version}"
         release_phase_manifest_expect "${phase_manifest_path}" platform "${platform}"
         if [ "$(release_manifest_value offline_payload_state "${phase_manifest_path}" || true)" = verified ]; then
+            release_phase_manifest_expect "${phase_manifest_path}" offline_payload_scope "${offline_scope}"
             release_phase_manifest_expect "${phase_manifest_path}" offline_payload_release_oid "${release_commit}"
             release_phase_manifest_expect "${phase_manifest_path}" offline_payload_config_revision "${config_revision}"
             release_phase_manifest_expect "${phase_manifest_path}" offline_payload_archive "${archive_name}"
         fi
         if [ "$(release_manifest_value offline_export_state "${phase_manifest_path}" || true)" = verified ]; then
+            release_phase_manifest_expect "${phase_manifest_path}" offline_export_scope "${offline_scope}"
+            release_phase_manifest_expect "${phase_manifest_path}" offline_export_image_count "${expected_image_count}"
             release_phase_manifest_expect "${phase_manifest_path}" offline_export_release_oid "${release_commit}"
             release_phase_manifest_expect "${phase_manifest_path}" offline_export_config_revision "${config_revision}"
             release_phase_manifest_expect "${phase_manifest_path}" offline_export_data_bundle "${requested_data_bundle}"
@@ -138,12 +147,14 @@ release_validate_manifest_format "${manifest_format}"
 [ "$(release_manifest_value archive "${manifest_path}" || true)" = "${archive_name}" ] \
     || release_fail "manifest archive name does not match"
 if [ "${manifest_format}" = 3 ]; then
+    [ "$(release_manifest_value offline_scope "${manifest_path}" || true)" = "${offline_scope}" ] \
+        || release_fail "manifest offline scope does not match requested transport scope"
     [ "$(release_manifest_value release_tag "${manifest_path}" || true)" = "${release_version}" ] \
         || release_fail "manifest release tag does not match"
     [ "$(release_manifest_value config_revision "${manifest_path}" || true)" = "${manifest_config_revision}" ] \
         || release_fail "manifest config revision does not match prepared source"
-    [ "$(release_manifest_value image_count "${manifest_path}" || true)" = 1 ] \
-        || release_fail "manifest image count must be one"
+    [ "$(release_manifest_value image_count "${manifest_path}" || true)" = "${expected_image_count}" ] \
+        || release_fail "manifest image count does not match offline scope"
     [ "$(release_manifest_value image_1_reference "${manifest_path}" || true)" = \
         "$(release_manifest_value image_tag "${manifest_path}" || true)" ] \
         || release_fail "manifest image reference fields do not match"
@@ -152,6 +163,26 @@ if [ "${manifest_format}" = 3 ]; then
         || release_fail "manifest image digest fields do not match"
     release_validate_image_id \
         "$(release_manifest_value image_1_id "${manifest_path}" || true)"
+    manifest_application_platform=$(release_manifest_value image_1_platform \
+        "${manifest_path}" || true)
+    if [ -n "${manifest_application_platform}" ]; then
+        [ "${manifest_application_platform}" = "${platform}" ] \
+            || release_fail "manifest application platform does not match"
+    fi
+    if [ "${offline_scope}" = new-host-core ]; then
+        [ "$(release_manifest_value image_2_role "${manifest_path}" || true)" = postgres ] \
+            || release_fail "new-host-core second image must own the postgres role"
+        [ "$(release_manifest_value image_2_reference "${manifest_path}" || true)" = \
+            "$(release_manifest_value image_2_digest "${manifest_path}" || true)" ] \
+            || release_fail "new-host-core PostgreSQL reference and digest must match"
+        [ "$(release_manifest_value image_2_platform "${manifest_path}" || true)" = "${platform}" ] \
+            || release_fail "new-host-core PostgreSQL platform does not match"
+        manifest_postgres_digest=$(release_manifest_value image_2_digest \
+            "${manifest_path}" || true)
+        release_validate_digest "${manifest_postgres_digest##*@}"
+        release_validate_image_id \
+            "$(release_manifest_value image_2_id "${manifest_path}" || true)"
+    fi
     [ "$(release_manifest_value assurance "${manifest_path}" || true)" = integrity-only ] \
         || release_fail "manifest assurance must be integrity-only"
     if [ "${source_identity_format}" = 2 ]; then
@@ -324,6 +355,8 @@ release_phase_manifest_update "${phase_manifest_path}" \
     release_oid "${release_commit}" \
     release_config_revision "${config_revision}" \
     offline_export_state verified \
+    offline_export_scope "${offline_scope}" \
+    offline_export_image_count "${expected_image_count}" \
     offline_export_release_oid "${release_commit}" \
     offline_export_config_revision "${config_revision}" \
     offline_export_data_bundle "${requested_data_bundle}" \
@@ -339,5 +372,6 @@ release_phase_manifest_update "${phase_manifest_path}" \
     offline_export_verified_by "$(id -un)"
 
 echo "Offline release archive created: ${outer_path}"
+echo "Offline scope: ${offline_scope} (${expected_image_count} images)"
 echo "SHA-256: ${outer_sha256}"
 echo "Checksum file: ${checksum_path}"

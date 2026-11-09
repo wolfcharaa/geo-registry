@@ -147,6 +147,24 @@ producer/workers. При `State: conflict` running deployment остаётся �
 изменений; после устранения владельца повторите preflight и только затем
 `make deploy-update`.
 
+Если update уже начал останавливать services или менять схему и завершился с
+ошибкой, tooling создаёт
+`docker/data/deployment/<target>/partial.env`. Следующий mutating entrypoint
+будет остановлен сообщением `requires an explicit recovery handover`. Сначала
+прочитайте partial evidence, проверьте containers/logs и migration state, затем
+выберите recovery branch. Например, для продолжения вперёд:
+
+```shell
+make deploy-handover \
+  DEPLOY_RECOVERY_BRANCH=roll-forward \
+  DEPLOY_HANDOVER_CONFIRM=handover:moscow-primary:roll-forward
+```
+
+Допустимы `roll-forward`, `restore`, `manual-recovery` и `safe-abort` только
+при доказанном отсутствии durable mutation. Handover не исправляет состояние
+сам: он архивирует решение, снимает блок и разрешает отдельно выполнить
+выбранную процедуру. `partial.env` вручную не удаляйте.
+
 Если вы меняете binding в уже опубликованном `v0.2.3`, в котором автоматическое
 распознавание rebind ещё отсутствовало, остановите только managed HTTP app и
 сразу продолжите обычный workflow:

@@ -49,6 +49,23 @@ case "${data_mode}" in
     *) add_blocker data-mode-invalid ;;
 esac
 
+schema_compatibility=${DEPLOY_SCHEMA_COMPATIBILITY:-unclassified}
+schema_recovery=not-applicable
+if [ "${data_mode}" = update ]; then
+    case "${schema_compatibility}" in
+        none) schema_recovery=binary-rollback-allowed ;;
+        backward-compatible) schema_recovery=binary-rollback-after-verification ;;
+        expand-contract) schema_recovery=rollback-before-contract-only ;;
+        forward-only) schema_recovery=roll-forward-or-approved-restore ;;
+        *)
+            schema_recovery=unclassified
+            add_blocker schema-compatibility-required
+            ;;
+    esac
+elif [ "${schema_compatibility}" != unclassified ]; then
+    add_blocker schema-compatibility-only-valid-for-update
+fi
+
 service_scope=${DEPLOY_SERVICE_SCOPE:-core}
 case "${service_scope}" in
     core)
@@ -268,6 +285,54 @@ case "${data_mode}" in
     inspect) backup_gate=not-evaluated ;;
 esac
 
+deployment_state=unrecorded
+last_operation=none
+last_operation_state=none
+last_operation_final_state=none
+last_operation_evidence=none
+partial_recovery_branch=none
+plan_target=$(release_env_value doctor_target "${doctor_output}" || true)
+case "${plan_target}" in
+    ''|*[!A-Za-z0-9._-]*|[!A-Za-z0-9]*) ;;
+    *)
+        deployment_state_root=$(release_resolve_path \
+            "${DEPLOY_STATE_ROOT:-docker/data/deployment}")
+        deployment_target_state="${deployment_state_root}/${plan_target}"
+        partial_evidence="${deployment_target_state}/partial.env"
+        current_evidence="${deployment_target_state}/current.env"
+        if [ -L "${partial_evidence}" ]; then
+            deployment_state=invalid-partial-marker
+            add_blocker partial-state-invalid
+        elif [ -f "${partial_evidence}" ]; then
+            deployment_state=partial
+            last_operation=$(release_env_value operation \
+                "${partial_evidence}" || true)
+            last_operation_state=$(release_env_value state \
+                "${partial_evidence}" || true)
+            last_operation_final_state=$(release_env_value final_state \
+                "${partial_evidence}" || true)
+            last_operation_evidence=$(release_env_value evidence_file \
+                "${partial_evidence}" || true)
+            partial_recovery_branch=$(release_env_value recovery_branch \
+                "${partial_evidence}" || true)
+            add_blocker partial-state-requires-handover
+        elif [ -L "${current_evidence}" ]; then
+            deployment_state=invalid-current-evidence
+            add_blocker current-evidence-invalid
+        elif [ -f "${current_evidence}" ]; then
+            deployment_state=recorded
+            last_operation=$(release_env_value operation \
+                "${current_evidence}" || true)
+            last_operation_state=$(release_env_value state \
+                "${current_evidence}" || true)
+            last_operation_final_state=$(release_env_value final_state \
+                "${current_evidence}" || true)
+            last_operation_evidence=$(release_env_value evidence_file \
+                "${current_evidence}" || true)
+        fi
+        ;;
+esac
+
 plan_status=ready
 if [ -n "${blockers}" ]; then
     plan_status=blocked
@@ -288,6 +353,8 @@ echo "Deployment plan (read-only)"
 cat "${doctor_output}"
 printf 'status=%s\n' "${plan_status}"
 printf 'data_mode=%s\n' "${data_mode}"
+printf 'schema_compatibility=%s\n' "${schema_compatibility}"
+printf 'schema_recovery=%s\n' "${schema_recovery}"
 printf 'service_scope=%s\n' "${service_scope}"
 printf 'services=%s\n' "${services}"
 printf 'source_identity_format=%s\n' "${source_identity_format}"
@@ -311,6 +378,12 @@ printf 'current_relation=%s\n' "${current_relation}"
 printf 'backup_directory=%s\n' "${backup_directory:-unset}"
 printf 'backup_gate=%s\n' "${backup_gate}"
 printf 'backup_revision=%s\n' "${backup_revision}"
+printf 'deployment_state=%s\n' "${deployment_state}"
+printf 'last_operation=%s\n' "${last_operation:-unknown}"
+printf 'last_operation_state=%s\n' "${last_operation_state:-unknown}"
+printf 'last_operation_final_state=%s\n' "${last_operation_final_state:-unknown}"
+printf 'last_operation_evidence=%s\n' "${last_operation_evidence:-unknown}"
+printf 'partial_recovery_branch=%s\n' "${partial_recovery_branch:-unknown}"
 printf 'blockers=%s\n' "${blockers}"
 printf 'next_action=%s\n' "${next_action}"
 printf '%s\n' 'external_mutations=none'

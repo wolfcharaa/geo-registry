@@ -57,6 +57,7 @@ build-production: guard-user ## Build the self-contained production image from l
 release-plan: guard-user ## Show immutable source, config and artifact inputs without mutating state
 	DOCKER_IMAGE_PREFIX="$(DOCKER_IMAGE_PREFIX)" RELEASE_VERSION="$(RELEASE_VERSION)" \
 		DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_BRANCH="$(RELEASE_BRANCH)" \
+		RELEASE_OFFLINE_SCOPE="$(RELEASE_OFFLINE_SCOPE)" \
 		docker/release/release-plan.sh
 .PHONY: release-plan
 
@@ -72,8 +73,9 @@ freeze-release: guard-user ## Freeze exact artifact identity without changing tr
 		docker/release/freeze-release.sh
 .PHONY: freeze-release
 
-release-payload: guard-user ## Save the frozen application image and write its checksum manifest
+release-payload: guard-user ## Save the selected offline image scope and write its checksum manifest
 	DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
+		RELEASE_OFFLINE_SCOPE="$(RELEASE_OFFLINE_SCOPE)" \
 		RELEASE_BRANCH="$(RELEASE_BRANCH)" docker/release/build-offline-payload.sh
 .PHONY: release-payload
 
@@ -105,6 +107,7 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/release/deploy-doctor.sh \
 		docker/release/deploy-plan.sh \
 		docker/release/deploy-start.sh \
+		docker/release/deployment-handover.sh \
 		docker/release/prepare-release-source.sh \
 		docker/release/pull-release-image.sh \
 		docker/release/change-release.sh \
@@ -132,6 +135,7 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/release/tests/change-release-offline-test.sh \
 		docker/release/tests/deployment-data-status-test.sh \
 		docker/release/tests/deployment-backup-test.sh \
+		docker/release/tests/deployment-evidence-test.sh \
 		docker/release/tests/deployment-lock-test.sh \
 		docker/release/tests/deployment-port-preflight-test.sh \
 		docker/release/tests/deploy-plan-test.sh \
@@ -150,6 +154,7 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 	docker/release/tests/change-release-offline-test.sh
 	docker/release/tests/deployment-data-status-test.sh
 	docker/release/tests/deployment-backup-test.sh
+	docker/release/tests/deployment-evidence-test.sh
 	docker/release/tests/deployment-lock-test.sh
 	docker/release/tests/deployment-port-preflight-test.sh
 	docker/release/tests/deploy-plan-test.sh
@@ -171,8 +176,9 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 	test -f docs/migration/deployment-hardening-roadmap.md
 .PHONY: release-check
 
-release-offline: release-payload ## Assemble the flat tagged offline transport archive
+release-offline: release-payload ## Assemble the selected scoped offline transport archive
 	DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
+		RELEASE_OFFLINE_SCOPE="$(RELEASE_OFFLINE_SCOPE)" \
 		OFFLINE_ARCHIVE_PATH="$(OFFLINE_ARCHIVE_PATH)" \
 		RELEASE_BRANCH="$(RELEASE_BRANCH)" \
 		RELEASE_INCLUDE_APPLICATION_DATA="$(RELEASE_INCLUDE_APPLICATION_DATA)" \
@@ -206,6 +212,7 @@ deploy-plan: guard-user ## Show target, identity, config, scope and data gates w
 		DEPLOY_DATA_MODE="$(DEPLOY_DATA_MODE)" \
 		DEPLOY_SERVICE_SCOPE="$(DEPLOY_SERVICE_SCOPE)" \
 		DEPLOY_BACKUP_DIR="$(DEPLOY_BACKUP_DIR)" \
+		DEPLOY_SCHEMA_COMPATIBILITY="$(DEPLOY_SCHEMA_COMPATIBILITY)" \
 		docker/release/deploy-plan.sh
 .PHONY: deploy-plan
 
@@ -322,14 +329,26 @@ deploy-start: guard-user ## Verify restored data, activate the immutable applica
 deploy-update-preflight: guard-user ## Verify an existing managed deployment without changing it
 	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" DEPLOY_UPDATE_DRY_RUN=1 \
 		DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
+		DEPLOY_BACKUP_DIR="$(DEPLOY_BACKUP_DIR)" \
+		DEPLOY_SCHEMA_COMPATIBILITY="$(DEPLOY_SCHEMA_COMPATIBILITY)" \
 		docker/release/update-deployment.sh
 .PHONY: deploy-update-preflight
 
 deploy-update: guard-user ## Quiesce and update an existing managed deployment in place
 	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" DOCKER_PLATFORM="$(DOCKER_PLATFORM)" \
 		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
+		DEPLOY_BACKUP_DIR="$(DEPLOY_BACKUP_DIR)" \
+		DEPLOY_SCHEMA_COMPATIBILITY="$(DEPLOY_SCHEMA_COMPATIBILITY)" \
 		docker/release/update-deployment.sh $(DEPLOY_UPDATE_FLAGS)
 .PHONY: deploy-update
+
+deploy-handover: guard-user ## Record an explicit recovery branch and release a partial-state block
+	COMPOSE_ENV_FILE="$(COMPOSE_ENV_FILE)" RELEASE_ENV_FILE="$(RELEASE_ENV_FILE)" \
+		RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \
+		DEPLOY_RECOVERY_BRANCH="$(DEPLOY_RECOVERY_BRANCH)" \
+		DEPLOY_HANDOVER_CONFIRM="$(DEPLOY_HANDOVER_CONFIRM)" \
+		docker/release/deployment-handover.sh
+.PHONY: deploy-handover
 
 change-release: guard-user ## Verify/load the frozen image and recreate application processes only
 	DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_ARTIFACT_DIR="$(RELEASE_ARTIFACT_DIR)" \

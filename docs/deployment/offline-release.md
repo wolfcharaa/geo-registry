@@ -1,18 +1,23 @@
 # Offline Release И Rollback
 
-Offline release всегда переносит immutable application runtime. По умолчанию
-он code-only; явный `RELEASE_INCLUDE_APPLICATION_DATA=1` дополнительно включает
-проверенный logical dump application PostgreSQL. Dump не встраивается в image.
-Nominatim и OpenSearch сохраняют отдельный lifecycle: Nominatim переносится
-своим backup, OpenSearch полностью перестраивается из PostgreSQL.
+Offline release всегда переносит immutable application runtime и выбирает один
+из двух явных scopes:
 
-Текущий runtime payload содержит только application image. Это offline
-application release, а не полный air-gapped bootstrap нового host: exact
-PostgreSQL image не входит в archive, а current init/restore tooling явно
-выполняет registry pull. Полностью изолированный first install пока не
-поддерживается; не обходите gate редактированием versioned scripts. Отдельные
-`app-update`, `new-host-core` и optional OpenSearch scopes запланированы в
-[roadmap усиления delivery](../migration/deployment-hardening-roadmap.md).
+- `app-update` содержит только application image и предназначен для host, где
+  PostgreSQL image уже доступен локально либо может быть получен из registry;
+- `new-host-core` содержит application и exact PostgreSQL images из rendered
+  production Compose и поддерживает core bootstrap без registry access.
+
+Оба scope по умолчанию code-only. Явный
+`RELEASE_INCLUDE_APPLICATION_DATA=1` дополнительно включает проверенный logical
+dump application PostgreSQL; dump не встраивается в image. Для полностью
+изолированного наполненного нового host выбирайте `new-host-core` вместе с
+этим data bundle либо отдельно подготовленным совместимым backup.
+
+Nominatim и OpenSearch не входят в `new-host-core`: Nominatim сохраняет
+отдельный image/data lifecycle, OpenSearch — optional profile и полностью
+перестраиваемая проекция из PostgreSQL. Их отсутствие не маскируется названием
+core scope.
 
 ## Артефакты
 
@@ -32,25 +37,30 @@ DEPLOY.md
 должен лежать рядом с `source-manifest.txt` в
 `docker/data/release/<tag>/` на target.
 
-Рядом создаётся отдельный checksum-файл
-`release-geo-registry-vX.Y.Z-offline.tar.sha256`. Он не вкладывается внутрь
+Transport archive и отдельный checksum-файл включают scope в имя, например
+`release-geo-registry-vX.Y.Z-app-update-offline.tar` либо
+`release-geo-registry-vX.Y.Z-new-host-core-offline.tar` и соответствующий
+`.sha256`. Checksum не вкладывается внутрь
 проверяемого tar и передаётся по согласованному доверенному каналу вместе с
 ним. Без подписи или другого identity binding это `integrity-only`: checksum
 сам по себе не подтверждает издателя, если атакующий может заменить и archive,
 и checksum.
 
-Full-data вариант содержит шестой файл:
+Full-data вариант содержит дополнительный файл (шестой без
+`release-artifact.env`, седьмой вместе с ним):
 
 ```text
 application-postgres-backup.tar
 ```
 
-`source-linux-amd64.tar` содержит self-contained application image с HTTP и
-worker runtime. `source-manifest.txt` связывает release commit, исходный commit
+В `app-update` файл `source-linux-amd64.tar` содержит self-contained application
+image с HTTP и worker runtime; в `new-host-core` тот же payload дополнительно
+содержит exact PostgreSQL image. `source-manifest.txt` связывает release commit, исходный commit
 image, source references двух locked MessageBus packages, platform, frozen
 tag, config revision, registry digest, local image ID/config digest, размер и
-SHA-256 Docker archive и достигнутый assurance level. После `docker load`
-tooling требует совпадения загруженного image ID с manifest. Git bundle
+SHA-256 Docker archive, offline scope и достигнутый assurance level. Для каждого
+image фиксируются role, reference, digest, ID и platform. После `docker load`
+tooling требует совпадения всего image set с manifest. Git bundle
 содержит application release branch и annotated tag. Библиотеки уже находятся
 в `vendor` внутри image; для сборки нового image нужен application repository
 и доступ к Composer dist archives, но не соседние library checkout.
@@ -118,10 +128,20 @@ commit отсутствует. Существующий tag перемещать
 Полный tag gate находится в
 `docs/deployment/source-release.md` в repository checkout.
 
-После commit/tag:
+После commit/tag выберите scope. Для routine update:
 
 ```shell
-make release-offline DOCKER_PLATFORM=linux/amd64
+make release-offline \
+  RELEASE_OFFLINE_SCOPE=app-update \
+  DOCKER_PLATFORM=linux/amd64
+```
+
+Для нового изолированного core host:
+
+```shell
+make release-offline \
+  RELEASE_OFFLINE_SCOPE=new-host-core \
+  DOCKER_PLATFORM=linux/amd64
 ```
 
 Команда повторно проверяет image, создаёт atomic Docker archive и manifest,
@@ -133,6 +153,10 @@ protected storage.
 
 Payload и transport assembly сериализованы ignored `flock` на пару
 release/platform. Одновременный producer завершается до записи artifacts.
+Scope является частью reuse binding: один artifact directory нельзя молча
+переключить с `app-update` на `new-host-core` или обратно. Выберите scope до
+создания payload; для другого варианта используйте отдельный подготовленный
+release artifact lifecycle.
 Список retained candidates проверяется без удаления:
 
 ```shell
@@ -141,7 +165,7 @@ make release-candidates
 
 Успешные `offline-payload` и `offline-exported` записываются в накопительный
 `phase-manifest.txt`. Повторный запуск проверяет release/config identity,
-platform, image digest/ID, archive path, size и SHA-256. Совпавший artifact
+platform, offline scope, image digest/ID, archive path, size и SHA-256. Совпавший artifact
 переиспользуется без `docker save` или повторной упаковки; отсутствие либо
 изменение verified файла является ошибкой, а не разрешением молча пересобрать
 тот же release.
@@ -152,6 +176,7 @@ jobs/import/rebuild согласно backup runbook, затем выполнит
 
 ```shell
 make release-offline \
+  RELEASE_OFFLINE_SCOPE=new-host-core \
   DOCKER_PLATFORM=linux/amd64 \
   RELEASE_INCLUDE_APPLICATION_DATA=1 \
   RELEASE_DATA_CONTAINER=<application-postgres-container> \
@@ -162,6 +187,7 @@ make release-offline \
 
 ```shell
 make release-offline \
+  RELEASE_OFFLINE_SCOPE=new-host-core \
   DOCKER_PLATFORM=linux/amd64 \
   RELEASE_INCLUDE_APPLICATION_DATA=1 \
   RELEASE_DATA_BACKUP_DIR=/srv/backups/geo-registry/application-postgres-<UTC> \
@@ -175,8 +201,8 @@ archive не создаётся и не включается.
 Проверка состава:
 
 ```shell
-tar -tf release-geo-registry-v1.0.0-offline.tar
-sha256sum --check release-geo-registry-v1.0.0-offline.tar.sha256
+tar -tf release-geo-registry-v1.0.0-app-update-offline.tar
+sha256sum --check release-geo-registry-v1.0.0-app-update-offline.tar.sha256
 ```
 
 ## Установка С Носителя
@@ -186,9 +212,9 @@ sha256sum --check release-geo-registry-v1.0.0-offline.tar.sha256
 
 ```shell
 cd /srv/releases/geo-registry
-sha256sum --check release-geo-registry-v1.0.0-offline.tar.sha256
+sha256sum --check release-geo-registry-v1.0.0-app-update-offline.tar.sha256
 mkdir -p /srv/releases/geo-registry/v1.0.0
-tar -xf release-geo-registry-v1.0.0-offline.tar \
+tar -xf release-geo-registry-v1.0.0-app-update-offline.tar \
   -C /srv/releases/geo-registry/v1.0.0
 ```
 
@@ -252,11 +278,19 @@ Docker context должен совпасть с ожидаемым, а endpoint 
 до `docker load` или Compose mutation.
 
 Если tag уже связан с frozen registry digest, archive не требуется. В offline
-сценарии `deploy-image` fail-closed проверяет manifest и SHA-256 до
+сценарии `deploy-image` читает `app-update` либо `new-host-core` из manifest,
+затем fail-closed проверяет manifest и SHA-256 до
 `docker load`, а затем проверяет загруженный version tag, platform, OCI version
 label, runtime и, для manifest v3, local image ID/config digest.
-`docker load` не обязан восстанавливать registry `RepoDigest`, поэтому offline
-проверка не пытается использовать `repository@digest` как локальное имя.
+`docker load` не обязан восстанавливать registry `RepoDigest`, поэтому
+application image сверяется по transported local ID. Для digest-pinned
+PostgreSQL reference tooling дополнительно требует, чтобы rendered Compose
+reference разрешался в тот же local ID; иначе new-host bootstrap останавливается
+до запуска PostgreSQL.
+
+После успешного `deploy-image` команды `data-init` и `data-restore` при scope
+`new-host-core` повторно проверяют PostgreSQL reference/ID/platform и не делают
+registry pull. При `app-update` сохраняется explicit connected pull.
 Фактическое переключение:
 
 ```shell

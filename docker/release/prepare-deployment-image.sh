@@ -36,11 +36,16 @@ artifact_dir=$(release_resolve_path "${RELEASE_ARTIFACT_DIR:-docker/data/release
 archive_path="${artifact_dir}/source-${platform_slug}.tar"
 manifest_path="${artifact_dir}/source-manifest.txt"
 
-if [ -f "${archive_path}" ] || [ -f "${manifest_path}" ]; then
-    if [ ! -f "${archive_path}" ] || [ ! -f "${manifest_path}" ]; then
-        release_fail "offline payload is incomplete: both ${archive_path} and ${manifest_path} are required"
-    fi
-    echo "Preparing the frozen application image from verified offline media."
+if [ -f "${archive_path}" ] && [ ! -f "${manifest_path}" ]; then
+    release_fail "offline payload is incomplete: ${manifest_path} is required"
+fi
+if [ -f "${manifest_path}" ]; then
+    manifest_format=$(release_manifest_value manifest_format "${manifest_path}" || true)
+    release_validate_manifest_format "${manifest_format}"
+    offline_scope=$(release_manifest_value offline_scope "${manifest_path}" || true)
+    [ -n "${offline_scope}" ] || offline_scope=app-update
+    release_validate_offline_scope "${offline_scope}"
+    echo "Preparing offline scope ${offline_scope} from verified media."
 else
     echo "Offline payload is absent; pulling the frozen application image from its registry."
     COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-config/prod.secrets.env}" \

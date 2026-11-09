@@ -30,8 +30,10 @@ make deploy-plan \
 Compose project, host platform, версии Docker/Compose и наличие обязательных
 локальных файлов. `deploy-plan` добавляет current/desired image identity,
 checksum service hashes итоговой Compose-модели, scope, data mode, backup gate
-и следующий безопасный шаг. Обе команды read-only: они не выполняют `pull`,
-`load`, `up`, migrations, restore или запись deployment evidence.
+и последний deployment evidence state. При наличии `partial.env` plan получает
+blocker `partial-state-requires-handover` и показывает recovery branch. Обе
+команды read-only: они не выполняют `pull`, `load`, `up`, migrations, restore
+или запись deployment evidence.
 
 Поддерживаемые data modes: `inspect`, `fresh`, `restore`, `update`. Для restore
 и update передайте каталог с `manifest.txt` и dump:
@@ -42,7 +44,8 @@ make deploy-plan \
   DEPLOY_EXPECTED_DOCKER_CONTEXT=production \
   DEPLOY_DATA_MODE=update \
   DEPLOY_SERVICE_SCOPE=application \
-  DEPLOY_BACKUP_DIR=/srv/backups/application-postgres-20261109T120000Z
+  DEPLOY_BACKUP_DIR=/srv/backups/application-postgres-20261109T120000Z \
+  DEPLOY_SCHEMA_COMPATIBILITY=backward-compatible
 ```
 
 Plan полностью проверяет bytes и SHA-256 backup. Для update его
@@ -51,6 +54,15 @@ container. `status=ready` означает только согласованны
 mutation по-прежнему запускается отдельной подтверждаемой командой. При
 `status=blocked` ориентируйтесь на поле `blockers`; последняя безопасная точка
 остаётся `before-artifact-acquire`.
+
+Для update обязательна одна из четырёх классификаций схемы:
+
+- `none` — migration не меняет схему, разрешён binary rollback;
+- `backward-compatible` — старая версия сохраняет совместимость, но rollback
+  всё равно требует проверки;
+- `expand-contract` — rollback допустим только до contract-фазы;
+- `forward-only` — после migration разрешены roll-forward либо отдельно
+  подтверждённый restore.
 
 Перед первой mutating-командой в deployment-сессии задайте target contract.
 Третья переменная должна буквально повторять label цели:
@@ -81,9 +93,17 @@ lock-файл вручную не удаляйте. Kernel lock освобожд
 процесса, а оставшийся файл сохраняет последнюю диагностику.
 
 `deploy-start` и `deploy-update` удерживают один descriptor через preflight,
-data gates, activation и финальный smoke; их Make targets являются тонким
-facade над testable scripts. Соответствующий пункт H3 всё ещё открыт до записи
-final/partial evidence и явного recovery handover после неоднозначной ошибки.
+data gates, activation, финальный smoke и запись результата; их Make targets
+являются тонким facade над testable scripts. Каждая операция сохраняется в
+ignored `docker/data/deployment/<target>/operations/`. Последний успешный
+результат атомарно публикуется как `current.env`, предшествующий — как
+`previous.env`. Файлы содержат identity, actor, UTC timing и статусы gates, но
+не secret values.
+
+Ошибка до изменения application/data фиксируется как `safe-abort` и не
+блокирует повтор. Ошибка после начала изменения создаёт `partial.env`; пока он
+существует, новые mutating operations fail-closed. Не удаляйте этот файл
+вручную: recovery handover описан ниже.
 
 ## Выберите Сценарий
 
@@ -143,6 +163,13 @@ make deploy-image DOCKER_PLATFORM=linux/amd64
 загружает archive. Если их нет, она делает explicit registry pull exact frozen
 image. Частичный offline payload является ошибкой, а не причиной fallback в
 registry.
+
+Offline manifest имеет scope `app-update` либо `new-host-core` (legacy v3 без
+поля трактуется как `app-update`). Первый переносит только application image.
+Второй переносит также exact PostgreSQL image из rendered production Compose;
+`deploy-image` проверяет count/reference/digest/ID/platform обоих images, а
+`data-init`/`data-restore` повторно проверяют PostgreSQL и пропускают registry
+pull. OpenSearch и Nominatim в core scope не входят.
 
 Для release identity format 2 в том же каталоге обязателен
 `release-artifact.env`, полученный вместе с offline transport или из
@@ -310,13 +337,20 @@ Read-only preflight проверяет image, managed PostgreSQL и итогов
 но не останавливает процессы и не меняет БД:
 
 ```shell
-make deploy-update-preflight DOCKER_PLATFORM=linux/amd64
+BACKUP_DIR=/srv/backups/application-postgres-20261109T120000Z
+make deploy-update-preflight \
+  DOCKER_PLATFORM=linux/amd64 \
+  DEPLOY_BACKUP_DIR="${BACKUP_DIR}" \
+  DEPLOY_SCHEMA_COMPATIBILITY=backward-compatible
 ```
 
 После review выполните update:
 
 ```shell
-make deploy-update DOCKER_PLATFORM=linux/amd64
+make deploy-update \
+  DOCKER_PLATFORM=linux/amd64 \
+  DEPLOY_BACKUP_DIR="${BACKUP_DIR}" \
+  DEPLOY_SCHEMA_COMPATIBILITY=backward-compatible
 ```
 
 Команда показывает точные release/container/database, просит подтверждение,
@@ -324,6 +358,8 @@ make deploy-update DOCKER_PLATFORM=linux/amd64
 graceful stop, применяет migrations, выполняет региональные gates, активирует
 exact image, снимает pause и запускает smoke. При non-interactive automation
 используйте `DEPLOY_UPDATE_FLAGS=--yes` только после успешного preflight.
+Backup повторно проверяется под target lock, включая bytes, SHA-256, database и
+совпадение `application_revision` с source OID текущего app container.
 
 После update проверьте локальный binding, health endpoint и доступ с разрешённого
 consumer host:
@@ -340,10 +376,24 @@ ss -H -ltnp 'sport = :<published-port>'
 curl --fail http://<geo-registry-private-ip>:<published-port>/health/ready
 ```
 
-Если update прервался после quiesce, не запускайте workers вручную. Сохраните
-вывод, проверьте `docker compose ... ps/logs` и состояние migrations; затем
-примите явное решение завершить update либо восстановить backup. Code rollback
-не гарантирует обратную совместимость уже применённых migrations.
+Если update прервался после quiesce, не запускайте workers вручную и не удаляйте
+`partial.env`. Сохраните вывод, проверьте exact evidence path из сообщения,
+`docker compose ... ps/logs` и состояние migrations. Затем выберите одну ветку:
+`roll-forward`, `restore`, `manual-recovery` либо `safe-abort` только когда
+доказано отсутствие durable изменений. Зафиксируйте handover точным
+подтверждением, например:
+
+```shell
+make deploy-handover \
+  DEPLOY_RECOVERY_BRANCH=roll-forward \
+  DEPLOY_HANDOVER_CONFIRM=handover:moscow-primary:roll-forward
+```
+
+Handover архивирует evidence в
+`docker/data/deployment/<target>/handovers/` и снимает partial-блок, но не
+запускает containers, rollback, migrations или restore. После него отдельно
+выполните ровно выбранную recovery procedure. Code rollback не гарантирует
+обратную совместимость уже применённых migrations.
 
 ## Переход С v0.2.1 Или Ручного PostgreSQL
 
@@ -403,6 +453,10 @@ secret contract соответственно.
   workers во время import/rebuild;
 - `make deploy-image` — повторно подготовить exact image без запуска services;
 - `make deploy-update-preflight` — проверить существующий managed target;
+- `docker/data/deployment/<target>/partial.env` — прочитать точный failed step,
+  identity и recovery branch перед handover;
+- `make deploy-handover ...` — зафиксировать явное recovery-решение без
+  автоматического rollback/restore;
 - `docker compose --env-file config/prod.secrets.env logs -f postgres` — PostgreSQL;
 - `docker compose --env-file config/prod.secrets.env logs -f app` — HTTP;
 - `make verify-data-backup ...` — повторная read-only проверка backup;

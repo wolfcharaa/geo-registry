@@ -15,6 +15,14 @@ if [ -n "${FAKE_DOCKER_LOG:-}" ]; then
     } >>"${FAKE_DOCKER_LOG}"
 fi
 
+if [ -n "${FAKE_DOCKER_FAIL_MATCH:-}" ]; then
+    case " ${command_name} $* " in
+        *"${FAKE_DOCKER_FAIL_MATCH}"*)
+            exit "${FAKE_DOCKER_FAIL_CODE:-97}"
+            ;;
+    esac
+fi
+
 case "${command_name}" in
     --version)
         printf '%s\n' 'Docker version 29.8.1, build test'
@@ -47,22 +55,49 @@ case "${command_name}" in
             shift 2
         fi
         image=${1:-}
+        image_role=application
+        if [ -n "${FAKE_DOCKER_POSTGRES_IMAGE_REFERENCE:-}" ] \
+            && [ "${image}" = "${FAKE_DOCKER_POSTGRES_IMAGE_REFERENCE}" ]; then
+            image_role=postgres
+        fi
 
-        case "${image}" in
-            *@sha256:*)
-                [ "${FAKE_DOCKER_EXACT_LOADED:-0}" = 1 ] || exit 1
-                ;;
-            *)
-                [ "${FAKE_DOCKER_EXACT_LOADED:-0}" = 1 ] || [ -f "${state_file}" ] || exit 1
-                ;;
-        esac
+        if [ "${image_role}" = postgres ]; then
+            [ "${FAKE_DOCKER_POSTGRES_LOADED:-${FAKE_DOCKER_EXACT_LOADED:-0}}" = 1 ] \
+                || [ -f "${state_file}" ] || exit 1
+        else
+            case "${image}" in
+                *@sha256:*)
+                    [ "${FAKE_DOCKER_EXACT_LOADED:-0}" = 1 ] || exit 1
+                    ;;
+                *)
+                    [ "${FAKE_DOCKER_EXACT_LOADED:-0}" = 1 ] || [ -f "${state_file}" ] || exit 1
+                    ;;
+            esac
+        fi
 
         case "${format}" in
             '') ;;
-            '{{range .RepoDigests}}{{println .}}{{end}}') printf '%s\n' "${FAKE_DOCKER_EXACT_IMAGE:-}" ;;
-            '{{index .RepoDigests 0}}') printf '%s\n' "${FAKE_DOCKER_EXACT_IMAGE:-}" ;;
-            '{{.Os}}/{{.Architecture}}') printf '%s\n' "${FAKE_DOCKER_PLATFORM:-linux/amd64}" ;;
-            '{{.Id}}') printf '%s\n' "${FAKE_DOCKER_IMAGE_ID:-sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}" ;;
+            '{{range .RepoDigests}}{{println .}}{{end}}'|'{{index .RepoDigests 0}}')
+                if [ "${image_role}" = postgres ]; then
+                    printf '%s\n' "${FAKE_DOCKER_POSTGRES_IMAGE_REFERENCE}"
+                else
+                    printf '%s\n' "${FAKE_DOCKER_EXACT_IMAGE:-}"
+                fi
+                ;;
+            '{{.Os}}/{{.Architecture}}')
+                if [ "${image_role}" = postgres ]; then
+                    printf '%s\n' "${FAKE_DOCKER_POSTGRES_PLATFORM:-linux/amd64}"
+                else
+                    printf '%s\n' "${FAKE_DOCKER_PLATFORM:-linux/amd64}"
+                fi
+                ;;
+            '{{.Id}}')
+                if [ "${image_role}" = postgres ]; then
+                    printf '%s\n' "${FAKE_DOCKER_POSTGRES_IMAGE_ID:-sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc}"
+                else
+                    printf '%s\n' "${FAKE_DOCKER_IMAGE_ID:-sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}"
+                fi
+                ;;
             '{{index .Config.Labels "org.opencontainers.image.version"}}') printf '%s\n' "${FAKE_DOCKER_VERSION:-v0.2.0}" ;;
             '{{index .Config.Labels "org.opencontainers.image.revision"}}') printf '%s\n' "${FAKE_DOCKER_SOURCE_REVISION:-}" ;;
             '{{index .Config.Labels "org.geo-registry.message-bus-core.revision"}}') printf '%s\n' "${FAKE_DOCKER_CORE_REVISION:-}" ;;
@@ -197,11 +232,13 @@ case "${command_name}" in
         compose_command=
         compose_service=
         compose_hash=0
+        compose_images=0
         for argument in "$@"; do
             case "${argument}" in
                 config|ps|run|stop|up) compose_command=${argument} ;;
                 app|postgres) compose_service=${argument} ;;
                 --hash=*) compose_hash=1 ;;
+                --images) compose_images=1 ;;
             esac
         done
         case "${compose_command}" in
@@ -213,6 +250,8 @@ case "${command_name}" in
 postgres bbbb
 worker-address cccc
 worker-runtime dddd}"
+                elif [ "${compose_images}" = 1 ]; then
+                    printf '%s\n' "${FAKE_DOCKER_COMPOSE_IMAGES:-}"
                 elif [ -n "${FAKE_DOCKER_COMPOSE_CONFIG_FILE:-}" ]; then
                     cat "${FAKE_DOCKER_COMPOSE_CONFIG_FILE}"
                 fi

@@ -45,6 +45,7 @@ run_plan() {
     test_engine_available=${TEST_DOCKER_ENGINE_AVAILABLE-1}
     test_data_mode=${TEST_DEPLOY_DATA_MODE-inspect}
     test_service_scope=${TEST_DEPLOY_SERVICE_SCOPE-core}
+    test_schema_compatibility=${TEST_SCHEMA_COMPATIBILITY-}
     test_release_env=${TEST_RELEASE_ENV_FILE-}
     test_artifact_env=${TEST_RELEASE_ARTIFACT_ENV_FILE-}
     test_compose_model=${TEST_PRODUCTION_COMPOSE_MODEL-}
@@ -64,6 +65,8 @@ run_plan() {
     DEPLOY_EXPECTED_DOCKER_CONTEXT="${test_expected_context}" \
     DEPLOY_DATA_MODE="${test_data_mode}" \
     DEPLOY_SERVICE_SCOPE="${test_service_scope}" \
+    DEPLOY_SCHEMA_COMPATIBILITY="${test_schema_compatibility}" \
+    DEPLOY_STATE_ROOT="${temporary_root}/deployment-state" \
     RELEASE_ENV_FILE="${test_release_env}" \
     RELEASE_ARTIFACT_ENV_FILE="${test_artifact_env}" \
     PRODUCTION_COMPOSE_MODEL="${test_compose_model}" \
@@ -92,6 +95,7 @@ printf '%s\n' "${plan_output}" | grep -Fq "desired_tagged_image=${tagged_image}"
 printf '%s\n' "${plan_output}" | grep -Eq 'rendered_config_checksum=sha256:[0-9a-f]{64}'
 printf '%s\n' "${plan_output}" | grep -Fq 'current_relation=desired'
 printf '%s\n' "${plan_output}" | grep -Fq 'backup_gate=not-evaluated'
+printf '%s\n' "${plan_output}" | grep -Fq 'deployment_state=unrecorded'
 printf '%s\n' "${plan_output}" | grep -Fq 'external_mutations=none'
 if printf '%s\n' "${plan_output}" | grep -Fq 'test-database-password'; then
     echo 'Deployment plan test failed: a secret value reached plan output.' >&2
@@ -195,7 +199,29 @@ if update_output=$(TEST_DEPLOY_DATA_MODE=update run_plan 2>&1); then
 fi
 printf '%s\n' "${update_output}" | grep -Fq 'backup_gate=missing'
 printf '%s\n' "${update_output}" | grep -Fq 'backup-required'
+printf '%s\n' "${update_output}" | grep -Fq 'schema-compatibility-required'
 printf '%s\n' "${update_output}" \
     | grep -Fq 'no pull, load, container, data or evidence mutation was attempted'
+
+partial_directory="${temporary_root}/deployment-state/moscow-primary"
+mkdir -p "${partial_directory}"
+cat >"${partial_directory}/partial.env" <<EOF
+evidence_format=1
+state=partial
+operation=deploy-update
+final_state=partial-unclassified
+recovery_branch=roll-forward-or-approved-restore
+evidence_file=${partial_directory}/operations/update.env
+EOF
+if partial_plan_output=$(run_plan 2>&1); then
+    echo 'Deployment plan test failed: a partial target was reported ready.' >&2
+    exit 1
+fi
+printf '%s\n' "${partial_plan_output}" | grep -Fq 'deployment_state=partial'
+printf '%s\n' "${partial_plan_output}" | grep -Fq 'last_operation=deploy-update'
+printf '%s\n' "${partial_plan_output}" \
+    | grep -Fq 'partial_recovery_branch=roll-forward-or-approved-restore'
+printf '%s\n' "${partial_plan_output}" \
+    | grep -Fq 'partial-state-requires-handover'
 
 echo 'Deployment doctor and read-only plan contract test passed.'

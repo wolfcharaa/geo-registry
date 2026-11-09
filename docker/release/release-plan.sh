@@ -20,12 +20,14 @@ release_version=${RELEASE_VERSION:-${1:-}}
 image_prefix=${DOCKER_IMAGE_PREFIX:-}
 platform=${DOCKER_PLATFORM:-linux/amd64}
 release_branch=${RELEASE_BRANCH:-main}
+offline_scope=${RELEASE_OFFLINE_SCOPE:-app-update}
 source_env_file=$(release_resolve_path "${RELEASE_SOURCE_ENV_FILE:-docker/compose/prod/release.env}")
 compose_file=$(release_resolve_path "${RELEASE_COMPOSE_FILE:-docker/compose/prod/compose.yaml}")
 
 release_validate_version "${release_version}"
 release_validate_prefix "${image_prefix}"
 release_validate_platform "${platform}"
+release_validate_offline_scope "${offline_scope}"
 
 platform_slug=$(printf '%s' "${platform}" | tr / -)
 image_reference="${image_prefix}/app:${release_version}-${platform_slug}"
@@ -89,6 +91,7 @@ printf 'source_oid=%s\n' "${source_oid}"
 printf 'source_identity_format=%s\n' "${source_identity_format}"
 printf 'tag_state=%s\n' "${tag_state}"
 printf 'platform=%s\n' "${platform}"
+printf 'offline_scope=%s\n' "${offline_scope}"
 printf 'image_reference=%s\n' "${image_reference}"
 printf 'current_config_revision=%s\n' "${config_revision}"
 printf 'message_bus_core_oid=%s\n' "${core_revision}"

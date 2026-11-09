@@ -48,6 +48,7 @@ state_file="${temporary_root}/docker.state"
 log_file="${temporary_root}/docker.log"
 
 run_plan() {
+    test_offline_scope=${TEST_OFFLINE_SCOPE-app-update}
     PATH="${fake_bin}:${PATH}" \
     FAKE_DOCKER_STATE="${state_file}" \
     FAKE_DOCKER_LOG="${log_file}" \
@@ -57,6 +58,7 @@ run_plan() {
     RELEASE_VERSION=v9.9.9 \
     DOCKER_IMAGE_PREFIX=registry.example/geo-registry \
     DOCKER_PLATFORM=linux/amd64 \
+    RELEASE_OFFLINE_SCOPE="${test_offline_scope}" \
         "${project_root}/docker/release/release-plan.sh"
 }
 
@@ -66,6 +68,7 @@ printf '%s\n' "${ready_output}" | grep -Fq 'Release plan (read-only)'
 printf '%s\n' "${ready_output}" | grep -Fq 'status=ready'
 printf '%s\n' "${ready_output}" | grep -Fq 'source_oid=1111111111111111111111111111111111111111'
 printf '%s\n' "${ready_output}" | grep -Fq 'tag_state=absent'
+printf '%s\n' "${ready_output}" | grep -Fq 'offline_scope=app-update'
 printf '%s\n' "${ready_output}" | grep -Fq 'image_reference=registry.example/geo-registry/app:v9.9.9-linux-amd64'
 printf '%s\n' "${ready_output}" | grep -Fq 'external_mutations=none'
 grep -Fq 'buildx version' "${log_file}"
@@ -96,5 +99,15 @@ if branch_output=$(FAKE_GIT_BRANCH=feature/test run_plan 2>&1); then
 fi
 printf '%s\n' "${branch_output}" | grep -Fq 'current_branch=feature/test'
 printf '%s\n' "${branch_output}" | grep -Fq 'status=blocked'
+
+core_output=$(TEST_OFFLINE_SCOPE=new-host-core run_plan)
+printf '%s\n' "${core_output}" | grep -Fq 'offline_scope=new-host-core'
+
+if invalid_scope_output=$(TEST_OFFLINE_SCOPE=everything run_plan 2>&1); then
+    echo 'Release plan test failed: unknown offline scope was accepted.' >&2
+    exit 1
+fi
+printf '%s\n' "${invalid_scope_output}" \
+    | grep -Fq 'offline scope must be app-update or new-host-core'
 
 echo 'Release read-only plan test passed.'

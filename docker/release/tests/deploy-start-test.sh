@@ -99,5 +99,13 @@ grep -Fq 'gar:status' "${log_file}"
 grep -Fq 'message-bus:registry:check' "${log_file}"
 grep -Fq ' up --detach --force-recreate --wait --wait-timeout 120 app worker-address worker-runtime --no-build --pull never' \
     "${log_file}"
+evidence_file="${temporary_root}/deployment-state/moscow-primary/current.env"
+grep -Fq 'state=success' "${evidence_file}"
+grep -Fq 'operation=deploy-start' "${evidence_file}"
+grep -Fq 'artifact_status=verified' "${evidence_file}"
+grep -Fq 'migration_status=history-checked' "${evidence_file}"
+grep -Fq 'data_checks_status=passed' "${evidence_file}"
+grep -Fq 'activation_status=passed' "${evidence_file}"
+grep -Fq 'smoke_status=passed' "${evidence_file}"
 
 echo 'Deployment start orchestration contract test passed.'
