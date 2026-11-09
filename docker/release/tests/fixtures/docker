@@ -41,6 +41,7 @@ case "${command_name}" in
             '') ;;
             '{{range .RepoDigests}}{{println .}}{{end}}') printf '%s\n' "${FAKE_DOCKER_EXACT_IMAGE:-}" ;;
             '{{.Os}}/{{.Architecture}}') printf '%s\n' "${FAKE_DOCKER_PLATFORM:-linux/amd64}" ;;
+            '{{.Id}}') printf '%s\n' "${FAKE_DOCKER_IMAGE_ID:-sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}" ;;
             '{{index .Config.Labels "org.opencontainers.image.version"}}') printf '%s\n' "${FAKE_DOCKER_VERSION:-v0.2.0}" ;;
             '{{index .Config.Labels "org.opencontainers.image.revision"}}') printf '%s\n' "${FAKE_DOCKER_SOURCE_REVISION:-}" ;;
             *) exit 65 ;;
@@ -52,6 +53,39 @@ case "${command_name}" in
         ;;
     pull)
         : >"${state_file}"
+        ;;
+    push)
+        printf 'Pushed image: %s\n' "${1:-}"
+        ;;
+    buildx)
+        case "${1:-}" in
+            version)
+                printf '%s\n' 'github.com/docker/buildx v0.37.1 test'
+                ;;
+            build)
+                [ "${2:-}" = --help ] || exit 64
+                printf '%s\n' '      --load              Shorthand for --output=type=docker'
+                printf '%s\n' '      --platform string   Set target platform'
+                ;;
+            imagetools)
+                [ "${2:-}" = inspect ] || exit 64
+                if [ "${3:-}" = --help ]; then
+                    if [ "${FAKE_DOCKER_BUILDX_FORMAT_SUPPORTED:-1}" = 1 ]; then
+                        printf '%s\n' '      --format string   Format the output'
+                    fi
+                    exit 0
+                fi
+                [ "${3:-}" = --format ] || exit 64
+                [ "${4:-}" = '{{.Manifest.Digest}}' ] || exit 65
+                case "${5:-}" in
+                    *@sha256:*) printf '%s\n' "${FAKE_DOCKER_REMOTE_EXACT_DIGEST:-${FAKE_DOCKER_REMOTE_DIGEST:-sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}}" ;;
+                    *) printf '%s\n' "${FAKE_DOCKER_REMOTE_DIGEST:-sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}" ;;
+                esac
+                ;;
+            *)
+                exit 64
+                ;;
+        esac
         ;;
     inspect)
         if [ "${1:-}" = --format ]; then

@@ -195,6 +195,7 @@ make worker-logs
 - [Новый сервер с наполнением из источников](docs/deployment/deploy-from-sources.md)
 - [Сетевой доступ для других приложений](docs/deployment/network-access.md)
 - [Диагностика развёртывания](docs/deployment/troubleshooting.md)
+- [Roadmap усиления release и deployment](docs/migration/deployment-hardening-roadmap.md)
 
 Исторические сравнения, benchmark и migration evidence находятся в
 `docs/migration/`; для первого запуска они не нужны.

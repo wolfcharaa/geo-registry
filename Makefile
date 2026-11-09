@@ -51,6 +51,12 @@ build-production: guard-user ## Build the self-contained production image from l
 		docker/scripts/build-production-image.sh
 .PHONY: build-production
 
+release-plan: guard-user ## Show immutable source, config and artifact inputs without mutating state
+	DOCKER_IMAGE_PREFIX="$(DOCKER_IMAGE_PREFIX)" RELEASE_VERSION="$(RELEASE_VERSION)" \
+		DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_BRANCH="$(RELEASE_BRANCH)" \
+		docker/release/release-plan.sh
+.PHONY: release-plan
+
 freeze-release: guard-user ## Freeze the tracked production release identity for an already built image
 	DOCKER_IMAGE_PREFIX="$(DOCKER_IMAGE_PREFIX)" RELEASE_VERSION="$(RELEASE_VERSION)" APP_IMAGE_DIGEST="$(APP_IMAGE_DIGEST)" \
 		DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_BRANCH="$(RELEASE_BRANCH)" \
@@ -67,6 +73,12 @@ release-publish: guard-user ## Push the frozen exact application image to its co
 		docker/release/publish-release-image.sh
 .PHONY: release-publish
 
+release-candidates: guard-user ## Preview retained release candidates without deleting artifacts
+	RELEASE_ARTIFACT_ROOT="$(RELEASE_ARTIFACT_ROOT)" \
+		RELEASE_CANDIDATE_TTL_DAYS="$(RELEASE_CANDIDATE_TTL_DAYS)" \
+		docker/release/release-candidates.sh
+.PHONY: release-candidates
+
 release-pull: guard-user ## Explicitly pull and verify the frozen exact application image
 	DOCKER_PLATFORM="$(DOCKER_PLATFORM)" docker/release/pull-release-image.sh
 .PHONY: release-pull
@@ -78,6 +90,8 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/release/build-offline-payload.sh \
 		docker/release/build-offline-archive.sh \
 		docker/release/publish-release-image.sh \
+		docker/release/release-candidates.sh \
+		docker/release/release-plan.sh \
 		docker/release/pull-release-image.sh \
 		docker/release/change-release.sh \
 		docker/release/extract-release-data.sh \
@@ -105,6 +119,9 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/release/tests/deployment-data-status-test.sh \
 		docker/release/tests/deployment-backup-test.sh \
 		docker/release/tests/deployment-port-preflight-test.sh \
+		docker/release/tests/publish-release-image-test.sh \
+		docker/release/tests/release-output-state-test.sh \
+		docker/release/tests/release-plan-test.sh \
 		docker/release/tests/update-deployment-test.sh \
 		docker/release/tests/init-deployment-test.sh \
 		docker/release/tests/restore-progress-test.sh \
@@ -115,6 +132,9 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 	docker/release/tests/deployment-data-status-test.sh
 	docker/release/tests/deployment-backup-test.sh
 	docker/release/tests/deployment-port-preflight-test.sh
+	docker/release/tests/publish-release-image-test.sh
+	docker/release/tests/release-output-state-test.sh
+	docker/release/tests/release-plan-test.sh
 	docker/release/tests/init-deployment-test.sh
 	docker/release/tests/restore-progress-test.sh
 	docker/release/tests/update-deployment-test.sh
@@ -124,6 +144,7 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 	test -f docs/deployment/network-access.md
 	test -f docs/deployment/release-deploy.md
 	test -f docs/deployment/troubleshooting.md
+	test -f docs/migration/deployment-hardening-roadmap.md
 .PHONY: release-check
 
 release-offline: release-payload ## Assemble the flat tagged offline transport archive

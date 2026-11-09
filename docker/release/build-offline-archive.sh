@@ -7,7 +7,7 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
 # shellcheck disable=SC1091
 . "${script_dir}/release-lib.sh"
 
-for command_name in awk basename cp docker git grep ln mkdir mktemp mv tar tr; do
+for command_name in awk basename cp docker git grep ln mkdir mktemp mv tar tr wc; do
     release_require_command "${command_name}"
 done
 
@@ -31,6 +31,8 @@ platform_slug=$(printf '%s' "${platform}" | tr / -)
     || release_fail "repository must be clean before building an offline archive"
 release_commit=$(git -C "${project_root}" rev-parse HEAD)
 tag_commit=$(git -C "${project_root}" rev-parse "refs/tags/${release_version}^{commit}" 2>/dev/null || true)
+release_validate_git_oid "${release_commit}"
+release_validate_git_oid "${tag_commit}"
 [ "${tag_commit}" = "${release_commit}" ] \
     || release_fail "annotated tag ${release_version} must point to the current commit"
 [ "$(git -C "${project_root}" cat-file -t "refs/tags/${release_version}")" = tag ] \
@@ -43,17 +45,73 @@ release_branch=${RELEASE_BRANCH:-main}
     || release_fail "offline archive must be built from ${release_branch}, current branch is ${branch}"
 
 artifact_dir=$(release_resolve_path "${RELEASE_ARTIFACT_DIR:-docker/data/release/${release_version}}")
+mkdir -p "${artifact_dir}"
+release_acquire_output_lock \
+    "${artifact_dir}/.release-${platform_slug}.lock" \
+    build-offline-archive "${release_version}" "${platform}"
+
 archive_name="source-${platform_slug}.tar"
 archive_path="${artifact_dir}/${archive_name}"
 manifest_path="${artifact_dir}/source-manifest.txt"
+phase_manifest_path="${artifact_dir}/phase-manifest.txt"
 outer_path=$(release_resolve_path "${OFFLINE_ARCHIVE_PATH:-release-geo-registry-${release_version}-offline.tar}")
 checksum_path="${outer_path}.sha256"
+
+include_application_data=${RELEASE_INCLUDE_APPLICATION_DATA:-0}
+case "${include_application_data}" in
+    0|1) ;;
+    *) release_fail "RELEASE_INCLUDE_APPLICATION_DATA must be 0 or 1" ;;
+esac
+case "${include_application_data}" in
+    1) requested_data_bundle=application-postgres ;;
+    *) requested_data_bundle=none ;;
+esac
+
+config_revision=$(release_config_revision \
+    "${project_root}/docker/compose/prod/compose.yaml" "${release_env_file}")
+if [ -f "${phase_manifest_path}" ]; then
+    phase_manifest_format=$(release_manifest_value phase_manifest_format "${phase_manifest_path}" || true)
+    release_validate_phase_manifest_format "${phase_manifest_format}"
+    if [ "${phase_manifest_format}" = 2 ]; then
+        release_phase_manifest_expect "${phase_manifest_path}" release_version "${release_version}"
+        release_phase_manifest_expect "${phase_manifest_path}" platform "${platform}"
+        if [ "$(release_manifest_value offline_payload_state "${phase_manifest_path}" || true)" = verified ]; then
+            release_phase_manifest_expect "${phase_manifest_path}" offline_payload_release_oid "${release_commit}"
+            release_phase_manifest_expect "${phase_manifest_path}" offline_payload_config_revision "${config_revision}"
+            release_phase_manifest_expect "${phase_manifest_path}" offline_payload_archive "${archive_name}"
+        fi
+        if [ "$(release_manifest_value offline_export_state "${phase_manifest_path}" || true)" = verified ]; then
+            release_phase_manifest_expect "${phase_manifest_path}" offline_export_release_oid "${release_commit}"
+            release_phase_manifest_expect "${phase_manifest_path}" offline_export_config_revision "${config_revision}"
+            release_phase_manifest_expect "${phase_manifest_path}" offline_export_data_bundle "${requested_data_bundle}"
+            release_phase_manifest_expect "${phase_manifest_path}" offline_export_path "${outer_path}"
+            release_phase_manifest_expect "${phase_manifest_path}" offline_export_checksum_path "${checksum_path}"
+            release_require_file "${outer_path}"
+            release_require_file "${checksum_path}"
+            expected_outer_size=$(release_manifest_value offline_export_size "${phase_manifest_path}" || true)
+            expected_outer_sha256=$(release_manifest_value offline_export_sha256 "${phase_manifest_path}" || true)
+            release_validate_size "${expected_outer_size}"
+            [ "$(release_file_size "${outer_path}")" = "${expected_outer_size}" ] \
+                || release_fail "verified offline transport size changed; refusing an implicit rebuild"
+            [ "$(release_sha256 "${outer_path}")" = "${expected_outer_sha256}" ] \
+                || release_fail "verified offline transport checksum changed; refusing an implicit rebuild"
+            [ "$(awk '{print $1; exit}' "${checksum_path}")" = "${expected_outer_sha256}" ] \
+                || release_fail "verified offline checksum sidecar changed"
+
+            echo "Reusing verified offline release archive: ${outer_path}"
+            echo "SHA-256: ${expected_outer_sha256}"
+            echo "Checksum file: ${checksum_path}"
+            exit 0
+        fi
+    fi
+fi
+
 [ ! -e "${outer_path}" ] || release_fail "offline archive already exists: ${outer_path}"
 [ ! -e "${checksum_path}" ] || release_fail "offline checksum already exists: ${checksum_path}"
 release_require_file "${archive_path}"
 release_require_file "${manifest_path}"
-release_validate_manifest_format \
-    "$(release_manifest_value manifest_format "${manifest_path}" || true)"
+manifest_format=$(release_manifest_value manifest_format "${manifest_path}" || true)
+release_validate_manifest_format "${manifest_format}"
 [ "$(release_manifest_value release_version "${manifest_path}" || true)" = "${release_version}" ] \
     || release_fail "manifest release version does not match"
 [ "$(release_manifest_value git_commit "${manifest_path}" || true)" = "${release_commit}" ] \
@@ -62,15 +120,31 @@ release_validate_manifest_format \
     || release_fail "manifest platform does not match"
 [ "$(release_manifest_value archive "${manifest_path}" || true)" = "${archive_name}" ] \
     || release_fail "manifest archive name does not match"
+if [ "${manifest_format}" = 3 ]; then
+    [ "$(release_manifest_value release_tag "${manifest_path}" || true)" = "${release_version}" ] \
+        || release_fail "manifest release tag does not match"
+    [ "$(release_manifest_value config_revision "${manifest_path}" || true)" = "${release_commit}" ] \
+        || release_fail "manifest config revision does not match release commit"
+    [ "$(release_manifest_value image_count "${manifest_path}" || true)" = 1 ] \
+        || release_fail "manifest image count must be one"
+    [ "$(release_manifest_value image_1_reference "${manifest_path}" || true)" = \
+        "$(release_manifest_value image_tag "${manifest_path}" || true)" ] \
+        || release_fail "manifest image reference fields do not match"
+    [ "$(release_manifest_value image_1_digest "${manifest_path}" || true)" = \
+        "$(release_manifest_value image_digest "${manifest_path}" || true)" ] \
+        || release_fail "manifest image digest fields do not match"
+    release_validate_image_id \
+        "$(release_manifest_value image_1_id "${manifest_path}" || true)"
+    [ "$(release_manifest_value assurance "${manifest_path}" || true)" = integrity-only ] \
+        || release_fail "manifest assurance must be integrity-only"
+    expected_archive_size=$(release_manifest_value archive_size "${manifest_path}" || true)
+    release_validate_size "${expected_archive_size}"
+    [ "$(release_file_size "${archive_path}")" = "${expected_archive_size}" ] \
+        || release_fail "image archive size does not match manifest"
+fi
 expected_archive_sha256=$(release_manifest_value archive_sha256 "${manifest_path}" || true)
 [ "$(release_sha256 "${archive_path}")" = "${expected_archive_sha256}" ] \
     || release_fail "image archive checksum does not match before transport packaging"
-
-include_application_data=${RELEASE_INCLUDE_APPLICATION_DATA:-0}
-case "${include_application_data}" in
-    0|1) ;;
-    *) release_fail "RELEASE_INCLUDE_APPLICATION_DATA must be 0 or 1" ;;
-esac
 
 data_archive_name=application-postgres-backup.tar
 data_archive_path="${artifact_dir}/${data_archive_name}"
@@ -227,6 +301,28 @@ mv "${checksum_temporary}" "${checksum_path}"
 outer_published=0
 trap - EXIT INT TERM
 rm -rf "${stage_dir}"
+
+outer_size=$(release_file_size "${outer_path}")
+release_phase_manifest_update "${phase_manifest_path}" \
+    phase_manifest_format 2 \
+    phase offline-exported \
+    release_version "${release_version}" \
+    platform "${platform}" \
+    release_oid "${release_commit}" \
+    release_config_revision "${config_revision}" \
+    offline_export_state verified \
+    offline_export_release_oid "${release_commit}" \
+    offline_export_config_revision "${config_revision}" \
+    offline_export_data_bundle "${requested_data_bundle}" \
+    offline_export_path "${outer_path}" \
+    offline_export_size "${outer_size}" \
+    offline_export_sha256 "${outer_sha256}" \
+    offline_export_checksum_path "${checksum_path}" \
+    offline_export_bundle "${bundle_name}" \
+    offline_export_bundle_sha256 "${bundle_sha256}" \
+    offline_export_manifest_sha256 "$(release_sha256 "${manifest_path}")" \
+    offline_export_verified_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+    offline_export_verified_by "$(id -un)"
 
 echo "Offline release archive created: ${outer_path}"
 echo "SHA-256: ${outer_sha256}"

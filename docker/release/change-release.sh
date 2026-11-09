@@ -7,7 +7,7 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
 # shellcheck disable=SC1091
 . "${script_dir}/release-lib.sh"
 
-for command_name in awk docker git grep tr; do
+for command_name in awk docker git grep tr wc; do
     release_require_command "${command_name}"
 done
 
@@ -51,11 +51,12 @@ else
     release_require_file "${archive_path}"
     release_require_file "${manifest_path}"
 
-    release_validate_manifest_format \
-        "$(release_manifest_value manifest_format "${manifest_path}" || true)"
+    manifest_format=$(release_manifest_value manifest_format "${manifest_path}" || true)
+    release_validate_manifest_format "${manifest_format}"
     [ "$(release_manifest_value release_version "${manifest_path}" || true)" = "${release_version}" ] \
         || release_fail "manifest release version does not match"
     current_commit=$(git -C "${project_root}" rev-parse HEAD)
+    release_validate_git_oid "${current_commit}"
     [ "$(release_manifest_value git_commit "${manifest_path}" || true)" = "${current_commit}" ] \
         || release_fail "manifest Git commit does not match current checkout"
     [ "$(release_manifest_value platform "${manifest_path}" || true)" = "${platform}" ] \
@@ -67,6 +68,36 @@ else
     [ "$(release_manifest_value image_digest "${manifest_path}" || true)" = "${exact_image}" ] \
         || release_fail "manifest image digest does not match"
 
+    expected_image_id=
+    case "${manifest_format}" in
+        1)
+            expected_image_id=$(release_manifest_value image_id "${manifest_path}" || true)
+            ;;
+        3)
+            [ "$(release_manifest_value release_tag "${manifest_path}" || true)" = "${release_version}" ] \
+                || release_fail "manifest release tag does not match"
+            [ "$(release_manifest_value config_revision "${manifest_path}" || true)" = "${current_commit}" ] \
+                || release_fail "manifest config revision does not match current checkout"
+            [ "$(release_manifest_value image_count "${manifest_path}" || true)" = 1 ] \
+                || release_fail "manifest image count must be one"
+            [ "$(release_manifest_value image_1_reference "${manifest_path}" || true)" = "${tagged_image}" ] \
+                || release_fail "manifest image reference does not match"
+            [ "$(release_manifest_value image_1_digest "${manifest_path}" || true)" = "${exact_image}" ] \
+                || release_fail "manifest exact image does not match"
+            expected_image_id=$(release_manifest_value image_1_id "${manifest_path}" || true)
+            [ "$(release_manifest_value assurance "${manifest_path}" || true)" = integrity-only ] \
+                || release_fail "manifest assurance must be integrity-only"
+
+            expected_archive_size=$(release_manifest_value archive_size "${manifest_path}" || true)
+            release_validate_size "${expected_archive_size}"
+            [ "$(release_file_size "${archive_path}")" = "${expected_archive_size}" ] \
+                || release_fail "offline image archive size does not match"
+            ;;
+    esac
+    if [ -n "${expected_image_id}" ]; then
+        release_validate_image_id "${expected_image_id}"
+    fi
+
     expected_archive_sha256=$(release_manifest_value archive_sha256 "${manifest_path}" || true)
     actual_archive_sha256=$(release_sha256 "${archive_path}")
     [ "${actual_archive_sha256}" = "${expected_archive_sha256}" ] \
@@ -77,6 +108,11 @@ else
 
     release_validate_runtime_image \
         "${tagged_image}" "${platform}" "${release_version}"
+    if [ -n "${expected_image_id}" ]; then
+        actual_image_id=$(docker image inspect --format '{{.Id}}' "${tagged_image}")
+        [ "${actual_image_id}" = "${expected_image_id}" ] \
+            || release_fail "loaded image ID is ${actual_image_id}, expected ${expected_image_id}"
+    fi
     echo "Offline image tag is bound to the verified archive checksum; a registry digest association is not required."
 fi
 

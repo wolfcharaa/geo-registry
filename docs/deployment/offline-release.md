@@ -6,6 +6,14 @@ Offline release всегда переносит immutable application runtime. �
 Nominatim и OpenSearch сохраняют отдельный lifecycle: Nominatim переносится
 своим backup, OpenSearch полностью перестраивается из PostgreSQL.
 
+Текущий runtime payload содержит только application image. Это offline
+application release, а не полный air-gapped bootstrap нового host: exact
+PostgreSQL image не входит в archive, а current init/restore tooling явно
+выполняет registry pull. Полностью изолированный first install пока не
+поддерживается; не обходите gate редактированием versioned scripts. Отдельные
+`app-update`, `new-host-core` и optional OpenSearch scopes запланированы в
+[roadmap усиления delivery](../migration/deployment-hardening-roadmap.md).
+
 ## Артефакты
 
 Code-only flat archive содержит пять файлов в корне:
@@ -20,7 +28,10 @@ DEPLOY.md
 
 Рядом создаётся отдельный checksum-файл
 `release-geo-registry-vX.Y.Z-offline.tar.sha256`. Он не вкладывается внутрь
-проверяемого tar и передаётся по согласованному каналу вместе с ним.
+проверяемого tar и передаётся по согласованному доверенному каналу вместе с
+ним. Без подписи или другого identity binding это `integrity-only`: checksum
+сам по себе не подтверждает издателя, если атакующий может заменить и archive,
+и checksum.
 
 Full-data вариант содержит шестой файл:
 
@@ -31,12 +42,16 @@ application-postgres-backup.tar
 `source-linux-amd64.tar` содержит self-contained application image с HTTP и
 worker runtime. `source-manifest.txt` связывает release commit, исходный commit
 image, source references двух locked MessageBus packages, platform, frozen
-tag, registry digest и SHA-256 Docker archive. Локальный Docker image ID не
-фиксируется: разные image stores после `docker load` могут представлять один и
-тот же проверенный archive разными ID. Git bundle содержит application release
-branch и annotated tag. Библиотеки уже находятся в `vendor` внутри image; для
-сборки нового image нужен application repository и доступ к Composer dist
-archives, но не соседние library checkout.
+tag, config revision, registry digest, local image ID/config digest, размер и
+SHA-256 Docker archive и достигнутый assurance level. После `docker load`
+tooling требует совпадения загруженного image ID с manifest. Git bundle
+содержит application release branch и annotated tag. Библиотеки уже находятся
+в `vendor` внутри image; для сборки нового image нужен application repository
+и доступ к Composer dist archives, но не соседние library checkout.
+
+Новые payloads используют `manifest_format=3`. Legacy v1/v2 остаются читаемыми
+из versioned releases, но v2 не даёт отдельного image-ID proof и не должен
+выдаваться за новый manifest contract.
 
 `application-postgres-backup.tar` содержит ровно custom-format
 `application-postgres.dump` и его `manifest.txt`. Внешний `source-manifest.txt`
@@ -100,6 +115,21 @@ make release-offline DOCKER_PLATFORM=linux/amd64
 `docker/data/release/<tag>/`. Готовые `.tar` и `.tar.sha256` не
 перезаписываются: существующий artifact нужно сначала перенести в versioned
 protected storage.
+
+Payload и transport assembly сериализованы ignored `flock` на пару
+release/platform. Одновременный producer завершается до записи artifacts.
+Список retained candidates проверяется без удаления:
+
+```shell
+make release-candidates
+```
+
+Успешные `offline-payload` и `offline-exported` записываются в накопительный
+`phase-manifest.txt`. Повторный запуск проверяет release/config identity,
+platform, image digest/ID, archive path, size и SHA-256. Совпавший artifact
+переиспользуется без `docker save` или повторной упаковки; отсутствие либо
+изменение verified файла является ошибкой, а не разрешением молча пересобрать
+тот же release.
 
 Чтобы сразу снять transaction-consistent dump из запущенного application
 PostgreSQL и включить его в тот же transport archive, сначала остановите новые
@@ -200,7 +230,7 @@ make deploy-image
 Если tag уже связан с frozen registry digest, archive не требуется. В offline
 сценарии `deploy-image` fail-closed проверяет manifest и SHA-256 до
 `docker load`, а затем проверяет загруженный version tag, platform, OCI version
-label и runtime.
+label, runtime и, для manifest v3, local image ID/config digest.
 `docker load` не обязан восстанавливать registry `RepoDigest`, поэтому offline
 проверка не пытается использовать `repository@digest` как локальное имя.
 Фактическое переключение:

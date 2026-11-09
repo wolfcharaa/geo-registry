@@ -4,6 +4,9 @@ set -eu
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
 
+# shellcheck disable=SC1091
+. "${project_root}/docker/release/release-lib.sh"
+
 fail() {
     echo "Production image build error: $*" >&2
     exit 1
@@ -23,39 +26,11 @@ require_clean_repository() {
         || fail "${label} repository has uncommitted changes"
 }
 
-locked_reference() {
-    package_name=$1
-
-    # shellcheck disable=SC2016
-    XDEBUG_MODE=off php -r '
-        $lock = json_decode(file_get_contents($argv[1]), true, flags: JSON_THROW_ON_ERROR);
-        foreach (array_merge($lock["packages"] ?? [], $lock["packages-dev"] ?? []) as $package) {
-            if (($package["name"] ?? null) === $argv[2]) {
-                if (($package["dist"]["type"] ?? null) !== "zip") {
-                    fwrite(STDERR, "Locked package must use a Packagist zip distribution: {$argv[2]}\n");
-                    exit(1);
-                }
-
-                $reference = $package["dist"]["reference"] ?? $package["source"]["reference"] ?? null;
-                if (!is_string($reference) || $reference === "") {
-                    fwrite(STDERR, "Locked package has no release reference: {$argv[2]}\n");
-                    exit(1);
-                }
-
-                echo $reference;
-                exit(0);
-            }
-        }
-        fwrite(STDERR, "Locked package is missing: {$argv[2]}\n");
-        exit(1);
-    ' "${project_root}/app/composer.lock" "${package_name}"
-}
-
 if [ "$(id -u)" -eq 0 ] || [ -n "${SUDO_USER:-}" ]; then
     fail "run as the build user, without sudo"
 fi
 
-for command_name in docker git grep php tr; do
+for command_name in docker git grep mkdir php tr; do
     require_command "${command_name}"
 done
 
@@ -81,13 +56,54 @@ current_branch=$(git -C "${project_root}" branch --show-current)
 if git -C "${project_root}" show-ref --verify --quiet "refs/tags/${release_version}"; then
     fail "release tag already exists and must not be reused: ${release_version}"
 fi
-core_revision=$(locked_reference romanfedorskij/message-bus-async)
-worker_revision=$(locked_reference romanfedorskij/message-bus-async-worker)
-
 platform_slug=$(printf '%s' "${platform}" | tr / -)
+artifact_dir=$(release_resolve_path "${RELEASE_ARTIFACT_DIR:-docker/data/release/${release_version}}")
+mkdir -p "${artifact_dir}"
+release_acquire_output_lock \
+    "${artifact_dir}/.release-${platform_slug}.lock" \
+    build-production "${release_version}" "${platform}"
+
+core_revision=$(release_locked_package_reference romanfedorskij/message-bus-async)
+worker_revision=$(release_locked_package_reference romanfedorskij/message-bus-async-worker)
+
 image_tag="${release_version}-${platform_slug}"
 image="${image_prefix}/app:${image_tag}"
 revision=$(git -C "${project_root}" rev-parse HEAD)
+release_validate_git_oid "${revision}"
+release_validate_git_oid "${core_revision}"
+release_validate_git_oid "${worker_revision}"
+phase_manifest_path="${artifact_dir}/phase-manifest.txt"
+
+if [ -f "${phase_manifest_path}" ]; then
+    phase_manifest_format=$(release_manifest_value phase_manifest_format "${phase_manifest_path}" || true)
+    release_validate_phase_manifest_format "${phase_manifest_format}"
+    if [ "${phase_manifest_format}" = 2 ]; then
+        release_phase_manifest_expect "${phase_manifest_path}" release_version "${release_version}"
+        release_phase_manifest_expect "${phase_manifest_path}" platform "${platform}"
+        if [ "$(release_manifest_value built_state "${phase_manifest_path}" || true)" = verified ]; then
+            release_phase_manifest_expect "${phase_manifest_path}" built_source_oid "${revision}"
+            release_phase_manifest_expect "${phase_manifest_path}" built_image_reference "${image}"
+            release_phase_manifest_expect "${phase_manifest_path}" built_core_oid "${core_revision}"
+            release_phase_manifest_expect "${phase_manifest_path}" built_worker_oid "${worker_revision}"
+
+            exact_image=$(release_manifest_value built_image_digest "${phase_manifest_path}" || true)
+            expected_image_id=$(release_manifest_value built_image_id "${phase_manifest_path}" || true)
+            release_validate_image_id "${expected_image_id}"
+            release_validate_registry_image "${image}" "${exact_image}" "${platform}" "${release_version}"
+            actual_image_id=$(docker image inspect --format '{{.Id}}' "${exact_image}")
+            [ "${actual_image_id}" = "${expected_image_id}" ] \
+                || release_fail "verified build image ID is ${actual_image_id}, expected ${expected_image_id}; refusing an implicit rebuild"
+
+            echo "Reusing verified production image: ${exact_image}"
+            echo "Release metadata:"
+            echo "DOCKER_IMAGE_PREFIX=${image_prefix}"
+            echo "APP_IMAGE_TAG=${image_tag}"
+            echo "APP_IMAGE_DIGEST=${exact_image#*@}"
+            echo "RELEASE_VERSION=${release_version}"
+            exit 0
+        fi
+    fi
+fi
 
 docker buildx build \
     --file "${project_root}/docker/php/production.Dockerfile" \
@@ -105,6 +121,35 @@ case "${image_reference}" in
     "${image_prefix}/app@sha256:"*) image_digest=${image_reference#*@} ;;
     *) fail "built image does not expose the expected repository digest" ;;
 esac
+exact_image="${image_prefix}/app@${image_digest}"
+image_id=$(docker image inspect --format '{{.Id}}' "${exact_image}")
+release_validate_image_id "${image_id}"
+release_validate_registry_image "${image}" "${exact_image}" "${platform}" "${release_version}"
+
+phase_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+phase_actor=$(id -un)
+release_phase_manifest_update "${phase_manifest_path}" \
+    phase_manifest_format 2 \
+    phase built \
+    release_version "${release_version}" \
+    platform "${platform}" \
+    prepared_state verified \
+    prepared_source_oid "${revision}" \
+    prepared_config_revision "${revision}" \
+    prepared_image_reference "${image}" \
+    prepared_core_oid "${core_revision}" \
+    prepared_worker_oid "${worker_revision}" \
+    prepared_at "${phase_time}" \
+    prepared_by "${phase_actor}" \
+    built_state verified \
+    built_source_oid "${revision}" \
+    built_image_reference "${image}" \
+    built_image_digest "${exact_image}" \
+    built_image_id "${image_id}" \
+    built_core_oid "${core_revision}" \
+    built_worker_oid "${worker_revision}" \
+    built_at "${phase_time}" \
+    built_by "${phase_actor}"
 
 echo "Production image built: ${image}"
 echo "Release metadata:"

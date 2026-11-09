@@ -1,0 +1,212 @@
+# Roadmap Усиления Release И Deployment
+
+- Статус: `Active`
+- Обновлено: `2026-11-09`
+- Операторский контракт: [release-deploy.md](../deployment/release-deploy.md)
+- Производство релиза: [source-release.md](../deployment/source-release.md)
+- Offline transport: [offline-release.md](../deployment/offline-release.md)
+- Recovery: [data-backup-restore.md](../deployment/data-backup-restore.md)
+
+## Назначение
+
+Roadmap переводит release и deployment tooling на единый проверяемый lifecycle:
+immutable source и image identity, отдельная публикация, явная цель, защита от
+параллельной мутации, bounded verification и сохранённое evidence. Изменения
+выполняются совместимыми slices; существующие релизы `v0.2.x` остаются
+проверяемыми своими versioned scripts и manifest formats.
+
+Документ не разрешает сам по себе push Git refs или images, deployment,
+migrations, restore, cleanup либо удаление старых artifacts. Каждая внешняя или
+production mutation требует отдельного запуска на явно подтверждённой цели.
+
+## Проверенная Точка Старта
+
+Уже реализованы exact application tag/digest, local runtime verification,
+production `--no-build --pull never`, атомарные offline archives, annotated-tag
+Git bundle, fail-closed restore в отсутствующую БД, migration/GAR gates и
+application-only release switch без удаления persistent volumes.
+
+Открытые ограничения:
+
+- application image строится до final release commit/tag, поэтому image source
+  OID и release OID различаются;
+- connected publication должна сохранять resumable phase state и проверять
+  registry удалённо;
+- production target, Docker context и service scope не объединены одним
+  read-only plan, отсутствует общий per-target mutation lock;
+- deployment не сохраняет единое current/previous/result evidence;
+- offline payload переносит application image, но не обязательный PostgreSQL
+  image для полностью изолированного first install;
+- health smoke должен иметь общий deadline и representative business check;
+- полный production-like backup/restore rehearsal ещё не сохранён как recovery
+  evidence.
+
+## Порядок Реализации
+
+| Этап | Результат | Статус |
+| --- | --- | --- |
+| H1 | Immutable manifest и удалённо проверяемая публикация | `Completed in main` |
+| H2 | Source preparation до build и единый final tag OID | `In progress` |
+| H3 | Target plan, capabilities, lock и deployment evidence | `Planned` |
+| H4 | Явные offline scopes и полный local image identity | `Planned` |
+| H5 | Bounded health/business smoke и observation result | `Planned` |
+| H6 | Production-like recovery rehearsal и сохранённые RPO/RTO | `External gate` |
+
+## H1 — Manifest И Registry Publication
+
+### H1.1 — Совместимый manifest v3
+
+- [x] Сохранить поддержку чтения legacy manifest v1/v2.
+- [x] Добавить в v3 `release_tag`, full release/config OID, archive size,
+  explicit image set, registry digest, local image ID/config digest и
+  `assurance=integrity-only`.
+- [x] После `docker load` сверять фактический image ID с manifest, а не доверять
+  одному tag.
+- [x] Покрыть принятие v1/v2/v3 и отказ при несовпадающем image ID contract
+  test-ом.
+
+Success evidence: `make release-check` проходит; новый `source-manifest.txt`
+имеет `manifest_format=3`. Последняя безопасная точка остановки — до
+`docker load`; при несовпадении после load services и data не изменяются,
+загруженный объект не считается verified.
+
+### H1.2 — Удалённая проверка connected publication
+
+- [x] После `docker push` разрешать success только когда registry tag и exact
+  digest удалённо разрешаются в ожидаемый platform digest.
+- [x] Атомарно записывать ignored `phase-manifest.txt` только после успешной
+  remote verification.
+- [x] Сохранять release/source OID, config revision, platform, image identity,
+  assurance, actor и UTC verification time.
+- [x] Проверять success и remote digest mismatch через fake-registry contract.
+
+Phase evidence не публикует Git refs и не является deployment evidence. Если
+push завершился, а remote verification или запись state не прошла, повторный
+`release-publish` должен проверить тот же immutable digest; Git tag/release
+наружу до успешного gate не публикуется.
+
+### H1.3 — Verified resume и retention
+
+- [x] Расширить phase manifest состояниями `prepared`, `built`,
+  `registry-published`, `offline-exported` и строгими reuse predicates.
+- [x] Ввести output lock для одного release/platform во всех build, freeze,
+  publish и offline artifact entrypoints.
+- [x] Добавить preview-only список release candidates с TTL и защитой current,
+  tagged и actively locked artifacts;
+  удаление оставить отдельной явно подтверждаемой операцией.
+
+Не требуется отдельный registry cleanup daemon. Достаточны machine-readable
+state, protected references и безопасный preview.
+
+`make release-candidates` использует TTL семь дней по умолчанию, показывает
+state/protection/expiration/lock и никогда не удаляет файлы. Lock реализован
+через kernel `flock`: аварийное завершение освобождает владение автоматически,
+а оставшийся lock-файл хранит только последнее диагностическое metadata.
+
+`phase_manifest_format=2` обновляется атомарно и накапливает независимые
+bindings `prepared`, `built`, `frozen`, `registry-published`,
+`offline-payload`, `offline-exported`. Verified build, registry publication и
+offline artifacts переиспользуются только после проверки source/config OID,
+platform, image reference/digest/ID и фактических checksum/size. Потерянный или
+изменённый verified artifact вызывает fail-closed; tooling не пересобирает его
+молча под той же release identity.
+
+Contract tests подтверждают atomic merge, сохранение ранних фаз, binding
+mismatch, lock contention, remote publication reuse и retention preview.
+Реальные production image build и offline transport tar в этом slice не
+создавались; их runtime rehearsal остаётся частью следующего разрешённого
+release window.
+
+## H2 — Source Preparation До Build
+
+- [x] Добавить read-only `release-plan` с version, platform, intended image
+  reference, source OID и config revision.
+- [ ] Отделить локальную подготовку final release commit/tag от artifact build;
+  preparation не строит и не публикует artifacts.
+- [ ] Строить image только из существующего prepared OID/tag; build не создаёт,
+  не двигает и не публикует refs.
+- [ ] Убрать необходимость post-build release commit, не ослабляя проверку
+  exact runtime image.
+- [ ] Обновить source/offline runbooks и failure tests для нового tag-контракта.
+
+До миграции `v0.2.x` сохраняет текущую допустимую границу: image source commit
+является родителем release commit, который меняет только frozen Compose и
+`release.env`. Существующие tags никогда не перемещаются.
+
+## H3 — Target Plan, Lock И Evidence
+
+- [ ] Добавить `deploy-doctor` и read-only `deploy-plan`: target label, Docker
+  context/endpoint, project, host platform, current/desired identity, rendered
+  config checksum, service scope, data mode, backup gate и last safe abort.
+- [ ] Не допускать production mutation с неявным или неподтверждённым target.
+- [ ] Ввести один per-target lock для init, restore, update, migrations и
+  release switch; lock охватывает bounded smoke и запись результата.
+- [ ] Привязать update к проверенному backup manifest текущего deployment и
+  явно классифицировать schema compatibility.
+- [ ] Сохранять current/previous/desired identity, actor, timing, checks,
+  migration/backup/smoke status и final/partial state.
+- [ ] Перенести полную orchestration из Make recipes в testable scripts; Make
+  остаётся тонким facade.
+
+Автоматический rollback или restore после неоднозначной ошибки запрещён.
+Partial state сохраняет diagnostics и recovery branch; data restore выполняется
+только отдельной подтверждённой процедурой.
+
+## H4 — Offline Scopes
+
+- [ ] Назвать текущий минимальный scope `app-update`: application image и
+  optional application PostgreSQL backup, но без support images.
+- [ ] Добавить `new-host-core` с exact application и PostgreSQL images,
+  полученными из rendered production model.
+- [ ] Заменить обязательный registry pull в offline init/restore на fail-closed
+  проверку exact уже загруженного PostgreSQL image.
+- [ ] Оставить OpenSearch отдельным optional scope, Nominatim — отдельным data
+  lifecycle.
+- [ ] Проверять count/reference/digest/ID/platform каждого image после load.
+- [ ] Зафиксировать, что checksum обеспечивает integrity только относительно
+  доверенно полученного значения и не является publisher authentication.
+
+До завершения этапа полностью изолированный first install не поддерживается:
+текущий archive нельзя описывать как полный air-gapped host bootstrap, а
+versioned init/restore tooling требует registry access для PostgreSQL image.
+
+## H5 — Bounded Verification
+
+- [ ] Добавить connect и total timeout ко всем deployment smoke requests.
+- [ ] Проверять health и один representative address-search flow через
+  публичный HTTP contract.
+- [ ] Записывать deadline, endpoint без credentials и результат в deployment
+  evidence.
+- [ ] Проверить timeout/failure branch без production mutation.
+
+Полный Postman suite остаётся release/integration gate и не переносится в
+короткий deployment smoke.
+
+## H6 — Recovery Gate
+
+- [ ] На утверждённой production-like цели выполнить полный application
+  PostgreSQL backup и restore в новый target.
+- [ ] Применить migrations из exact release image, выполнить GAR integrity и
+  exact status gates.
+- [ ] Перестроить OpenSearch из восстановленного PostgreSQL и проверить parity.
+- [ ] Зафиксировать размер, длительность, RPO/RTO, operator, off-host copy,
+  checksums и post-restore checks.
+- [ ] Отдельно подтвердить Nominatim backup/restore либо утверждённый rebuild
+  path.
+
+Tooling tests не закрывают этот gate. До сохранённого rehearsal evidence
+backup остаётся проверенным artifact, но не доказанным production recovery.
+
+## Общий Completion Gate
+
+Каждый slice завершается:
+
+```shell
+git diff --check
+make release-check
+make doctor
+```
+
+Изменённый shell дополнительно проходит `sh -n` и `shellcheck`. Build, push,
+live deployment и recovery rehearsal указываются как выполненные только если
+реально запускались на соответствующей цели.

@@ -7,7 +7,7 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
 # shellcheck disable=SC1091
 . "${script_dir}/release-lib.sh"
 
-for command_name in awk docker git grep tr; do
+for command_name in awk date docker git grep id mkdir mktemp mv tr; do
     release_require_command "${command_name}"
 done
 
@@ -42,6 +42,8 @@ current_branch=$(git -C "${project_root}" branch --show-current)
     || release_fail "release image must be published from ${release_branch}, current branch is ${current_branch:-detached}"
 release_commit=$(git -C "${project_root}" rev-parse HEAD)
 tag_commit=$(git -C "${project_root}" rev-parse "refs/tags/${release_version}^{commit}" 2>/dev/null || true)
+release_validate_git_oid "${release_commit}"
+release_validate_git_oid "${tag_commit}"
 [ "${tag_commit}" = "${release_commit}" ] \
     || release_fail "annotated tag ${release_version} must point to the current commit"
 [ "$(git -C "${project_root}" cat-file -t "refs/tags/${release_version}")" = tag ] \
@@ -49,8 +51,17 @@ tag_commit=$(git -C "${project_root}" rev-parse "refs/tags/${release_version}^{c
 
 tagged_image="${image_prefix}/app:${image_tag}"
 exact_image="${image_prefix}/app@${image_digest}"
+artifact_dir=$(release_resolve_path "${RELEASE_ARTIFACT_DIR:-docker/data/release/${release_version}}")
+mkdir -p "${artifact_dir}"
+release_acquire_output_lock \
+    "${artifact_dir}/.release-${platform_slug}.lock" \
+    publish-release-image "${release_version}" "${platform}"
+
 release_validate_registry_image "${tagged_image}" "${exact_image}" "${platform}" "${release_version}"
 application_source_commit=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "${exact_image}")
+image_id=$(docker image inspect --format '{{.Id}}' "${exact_image}")
+release_validate_git_oid "${application_source_commit}"
+release_validate_image_id "${image_id}"
 git -C "${project_root}" cat-file -e "${application_source_commit}^{commit}" 2>/dev/null \
     || release_fail "image source revision is not available in the application repository"
 if [ "${application_source_commit}" != "${release_commit}" ]; then
@@ -62,7 +73,65 @@ if [ "${application_source_commit}" != "${release_commit}" ]; then
     esac
 fi
 
+if ! docker buildx imagetools inspect --help | grep -Fq -- '--format'; then
+    release_fail "Docker Buildx imagetools inspect with --format is required before publication"
+fi
+
+phase_manifest_path="${artifact_dir}/phase-manifest.txt"
+config_revision=$(release_config_revision \
+    "${project_root}/docker/compose/prod/compose.yaml" "${release_env_file}")
+if [ -f "${phase_manifest_path}" ]; then
+    phase_manifest_format=$(release_manifest_value phase_manifest_format "${phase_manifest_path}" || true)
+    release_validate_phase_manifest_format "${phase_manifest_format}"
+    if [ "${phase_manifest_format}" = 2 ]; then
+        release_phase_manifest_expect "${phase_manifest_path}" release_version "${release_version}"
+        release_phase_manifest_expect "${phase_manifest_path}" platform "${platform}"
+        if [ "$(release_manifest_value built_state "${phase_manifest_path}" || true)" = verified ]; then
+            release_phase_manifest_expect "${phase_manifest_path}" built_source_oid "${application_source_commit}"
+            release_phase_manifest_expect "${phase_manifest_path}" built_image_reference "${tagged_image}"
+            release_phase_manifest_expect "${phase_manifest_path}" built_image_digest "${exact_image}"
+            release_phase_manifest_expect "${phase_manifest_path}" built_image_id "${image_id}"
+        fi
+        if [ "$(release_manifest_value frozen_state "${phase_manifest_path}" || true)" = verified ]; then
+            release_phase_manifest_expect "${phase_manifest_path}" frozen_source_oid "${application_source_commit}"
+            release_phase_manifest_expect "${phase_manifest_path}" frozen_config_revision "${config_revision}"
+            release_phase_manifest_expect "${phase_manifest_path}" frozen_image_reference "${tagged_image}"
+            release_phase_manifest_expect "${phase_manifest_path}" frozen_image_digest "${exact_image}"
+        fi
+        if [ "$(release_manifest_value registry_state "${phase_manifest_path}" || true)" = verified ]; then
+            release_phase_manifest_expect "${phase_manifest_path}" registry_release_oid "${release_commit}"
+            release_phase_manifest_expect "${phase_manifest_path}" registry_config_revision "${config_revision}"
+            release_phase_manifest_expect "${phase_manifest_path}" registry_image_reference "${tagged_image}"
+            release_phase_manifest_expect "${phase_manifest_path}" registry_image_digest "${exact_image}"
+            release_phase_manifest_expect "${phase_manifest_path}" registry_image_id "${image_id}"
+            release_validate_remote_registry_image "${tagged_image}" "${exact_image}"
+            echo "Reusing verified registry publication: ${exact_image}"
+            echo "Publication evidence: ${phase_manifest_path}"
+            exit 0
+        fi
+    fi
+fi
+
 docker push "${tagged_image}"
-release_validate_registry_image "${tagged_image}" "${exact_image}" "${platform}" "${release_version}"
+release_validate_remote_registry_image "${tagged_image}" "${exact_image}"
+
+release_phase_manifest_update "${phase_manifest_path}" \
+    phase_manifest_format 2 \
+    phase registry-published \
+    release_version "${release_version}" \
+    platform "${platform}" \
+    release_oid "${release_commit}" \
+    release_config_revision "${config_revision}" \
+    application_source_oid "${application_source_commit}" \
+    registry_state verified \
+    registry_release_oid "${release_commit}" \
+    registry_config_revision "${config_revision}" \
+    registry_image_reference "${tagged_image}" \
+    registry_image_digest "${exact_image}" \
+    registry_image_id "${image_id}" \
+    registry_assurance registry-digest \
+    registry_verified_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+    registry_verified_by "$(id -un)"
 
 echo "Frozen release image published: ${exact_image}"
+echo "Publication evidence: ${phase_manifest_path}"

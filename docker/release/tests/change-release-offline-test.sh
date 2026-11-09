@@ -42,7 +42,7 @@ services: {}
 EOF
 
 state_file="${temporary_root}/docker-load.state"
-for manifest_format in 1 2; do
+for manifest_format in 1 2 3; do
     {
         printf 'manifest_format=%s\n' "${manifest_format}"
         printf '%s\n' 'release_version=v0.2.0'
@@ -54,6 +54,16 @@ for manifest_format in 1 2; do
         printf 'image_digest=%s\n' "${exact_image}"
         if [ "${manifest_format}" = 1 ]; then
             printf 'image_id=sha256:%s\n' "${digest}"
+        fi
+        if [ "${manifest_format}" = 3 ]; then
+            printf '%s\n' 'release_tag=v0.2.0'
+            printf 'config_revision=%s\n' "${release_commit}"
+            printf 'archive_size=%s\n' "$(wc -c <"${archive_path}" | tr -d '[:space:]')"
+            printf '%s\n' 'image_count=1'
+            printf 'image_1_reference=%s\n' "${tagged_image}"
+            printf 'image_1_digest=%s\n' "${exact_image}"
+            printf 'image_1_id=sha256:%s\n' "${digest}"
+            printf '%s\n' 'assurance=integrity-only'
         fi
     } >"${artifact_dir}/source-manifest.txt"
 
@@ -77,6 +87,47 @@ for manifest_format in 1 2; do
     printf '%s\n' "${output}" | grep -Fq 'Offline image tag is bound to the verified archive checksum'
     printf '%s\n' "${output}" | grep -Fq 'Release v0.2.0 verified; dry-run leaves containers unchanged.'
 done
+
+{
+    printf '%s\n' 'manifest_format=3'
+    printf '%s\n' 'release_version=v0.2.0'
+    printf '%s\n' 'release_tag=v0.2.0'
+    printf 'git_commit=%s\n' "${release_commit}"
+    printf 'config_revision=%s\n' "${release_commit}"
+    printf '%s\n' 'platform=linux/amd64'
+    printf '%s\n' 'archive=source-linux-amd64.tar'
+    printf 'archive_size=%s\n' "$(wc -c <"${archive_path}" | tr -d '[:space:]')"
+    printf 'archive_sha256=%s\n' "${archive_sha256}"
+    printf '%s\n' 'image_count=1'
+    printf 'image_1_reference=%s\n' "${tagged_image}"
+    printf 'image_1_digest=%s\n' "${exact_image}"
+    printf '%s\n' 'image_1_id=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+    printf 'image_tag=%s\n' "${tagged_image}"
+    printf 'image_digest=%s\n' "${exact_image}"
+    printf '%s\n' 'assurance=integrity-only'
+} >"${artifact_dir}/source-manifest.txt"
+
+rm -f "${state_file}"
+if mismatch_output=$(
+    PATH="${fixture_dir}:${PATH}" \
+    FAKE_DOCKER_STATE="${state_file}" \
+    COMPOSE_ENV_FILE="${temporary_root}/prod.secrets.env" \
+    RELEASE_ENV_FILE="${temporary_root}/release.env" \
+    PRODUCTION_COMPOSE_MODEL="${temporary_root}/compose.yaml" \
+    RELEASE_ARTIFACT_DIR="${artifact_dir}" \
+    RELEASE_DRY_RUN=1 \
+    DOCKER_PLATFORM=linux/amd64 \
+        "${project_root}/docker/release/change-release.sh" 2>&1
+); then
+    echo 'Offline release contract test failed: mismatched image ID was accepted.' >&2
+    exit 1
+fi
+printf '%s\n' "${mismatch_output}" | grep -Fq 'loaded image ID is sha256:aaaaaaaa'
+
+# Restore one valid manifest for the prepare-deployment-image contract below.
+sed '/^image_1_id=/ s/b/a/g' \
+    "${artifact_dir}/source-manifest.txt" >"${artifact_dir}/source-manifest.txt.tmp"
+mv "${artifact_dir}/source-manifest.txt.tmp" "${artifact_dir}/source-manifest.txt"
 
 rm -f "${state_file}"
 prepare_output=$(

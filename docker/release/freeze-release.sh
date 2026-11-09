@@ -7,7 +7,7 @@ project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
 # shellcheck disable=SC1091
 . "${script_dir}/release-lib.sh"
 
-for command_name in awk docker git grep mktemp mv tr; do
+for command_name in awk docker git grep mkdir mktemp mv tr; do
     release_require_command "${command_name}"
 done
 
@@ -38,13 +38,39 @@ fi
 image_prefix=${DOCKER_IMAGE_PREFIX:-}
 release_validate_prefix "${image_prefix}"
 platform_slug=$(printf '%s' "${platform}" | tr / -)
+artifact_dir=$(release_resolve_path "${RELEASE_ARTIFACT_DIR:-docker/data/release/${release_version}}")
+mkdir -p "${artifact_dir}"
+release_acquire_output_lock \
+    "${artifact_dir}/.release-${platform_slug}.lock" \
+    freeze-release "${release_version}" "${platform}"
+
 image_tag="${release_version}-${platform_slug}"
 tagged_image="${image_prefix}/app:${image_tag}"
 exact_image="${image_prefix}/app@${image_digest}"
+phase_manifest_path="${artifact_dir}/phase-manifest.txt"
+
+if [ -f "${phase_manifest_path}" ]; then
+    phase_manifest_format=$(release_manifest_value phase_manifest_format "${phase_manifest_path}" || true)
+    release_validate_phase_manifest_format "${phase_manifest_format}"
+    if [ "${phase_manifest_format}" = 2 ]; then
+        release_phase_manifest_expect "${phase_manifest_path}" release_version "${release_version}"
+        release_phase_manifest_expect "${phase_manifest_path}" platform "${platform}"
+        release_phase_manifest_expect "${phase_manifest_path}" built_state verified
+        release_phase_manifest_expect "${phase_manifest_path}" built_image_reference "${tagged_image}"
+        release_phase_manifest_expect "${phase_manifest_path}" built_image_digest "${exact_image}"
+        expected_image_id=$(release_manifest_value built_image_id "${phase_manifest_path}" || true)
+        release_validate_image_id "${expected_image_id}"
+        actual_image_id=$(docker image inspect --format '{{.Id}}' "${exact_image}")
+        [ "${actual_image_id}" = "${expected_image_id}" ] \
+            || release_fail "built image ID does not match verified phase state"
+    fi
+fi
 
 release_validate_registry_image "${tagged_image}" "${exact_image}" "${platform}" "${release_version}"
 current_commit=$(git -C "${project_root}" rev-parse HEAD)
 image_source_commit=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "${exact_image}")
+release_validate_git_oid "${current_commit}"
+release_validate_git_oid "${image_source_commit}"
 [ "${image_source_commit}" = "${current_commit}" ] \
     || release_fail "image source revision does not match current HEAD"
 
@@ -83,6 +109,22 @@ docker compose \
 mv "${temporary_compose}" "${compose_file}"
 mv "${temporary_file}" "${release_env_file}"
 trap - EXIT INT TERM
+
+config_revision=$(release_config_revision "${compose_file}" "${release_env_file}")
+phase_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+release_phase_manifest_update "${phase_manifest_path}" \
+    phase_manifest_format 2 \
+    phase frozen \
+    release_version "${release_version}" \
+    platform "${platform}" \
+    frozen_state verified \
+    frozen_source_oid "${image_source_commit}" \
+    frozen_base_oid "${current_commit}" \
+    frozen_config_revision "${config_revision}" \
+    frozen_image_reference "${tagged_image}" \
+    frozen_image_digest "${exact_image}" \
+    frozen_at "${phase_time}" \
+    frozen_by "$(id -un)"
 
 echo "Production release identity frozen: ${release_version}"
 echo "Image: ${exact_image}"

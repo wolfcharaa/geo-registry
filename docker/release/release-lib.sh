@@ -49,9 +49,38 @@ release_manifest_value() {
     release_env_value "${release_key}" "${release_file}"
 }
 
+release_locked_package_reference() {
+    release_package_name=$1
+    release_require_command php
+
+    # shellcheck disable=SC2016,SC2154
+    XDEBUG_MODE=off php -r '
+        $lock = json_decode(file_get_contents($argv[1]), true, flags: JSON_THROW_ON_ERROR);
+        foreach (array_merge($lock["packages"] ?? [], $lock["packages-dev"] ?? []) as $package) {
+            if (($package["name"] ?? null) === $argv[2]) {
+                if (($package["dist"]["type"] ?? null) !== "zip") {
+                    fwrite(STDERR, "Locked package must use a Packagist zip distribution: {$argv[2]}\n");
+                    exit(1);
+                }
+
+                $reference = $package["dist"]["reference"] ?? $package["source"]["reference"] ?? null;
+                if (!is_string($reference) || $reference === "") {
+                    fwrite(STDERR, "Locked package has no release reference: {$argv[2]}\n");
+                    exit(1);
+                }
+
+                echo $reference;
+                exit(0);
+            }
+        }
+        fwrite(STDERR, "Locked package is missing: {$argv[2]}\n");
+        exit(1);
+    ' "${project_root}/app/composer.lock" "${release_package_name}"
+}
+
 release_validate_manifest_format() {
     case "$1" in
-        1|2) ;;
+        1|2|3) ;;
         *) release_fail "unsupported manifest format" ;;
     esac
 }
@@ -84,6 +113,188 @@ release_validate_digest() {
     esac
     [ "${#release_digest_hash}" -eq 64 ] \
         || release_fail "image digest must contain 64 hexadecimal characters"
+}
+
+release_validate_git_oid() {
+    release_oid=$1
+
+    case "${release_oid}" in
+        ''|*[!0-9a-f]*) release_fail "Git OID must contain lowercase hexadecimal characters" ;;
+    esac
+    case "${#release_oid}" in
+        40|64) ;;
+        *) release_fail "Git OID must contain 40 or 64 hexadecimal characters" ;;
+    esac
+}
+
+release_validate_image_id() {
+    release_image_id=$1
+
+    case "${release_image_id}" in
+        sha256:*) release_image_id_hash=${release_image_id#sha256:} ;;
+        *) release_fail "image ID must use sha256" ;;
+    esac
+    case "${release_image_id_hash}" in
+        *[!0-9a-f]*) release_fail "image ID must contain lowercase hexadecimal characters" ;;
+    esac
+    [ "${#release_image_id_hash}" -eq 64 ] \
+        || release_fail "image ID must contain 64 hexadecimal characters"
+}
+
+release_validate_size() {
+    case "$1" in
+        ''|*[!0-9]*) release_fail "artifact size must be a non-negative integer" ;;
+    esac
+}
+
+release_file_size() {
+    wc -c <"$1" | tr -d '[:space:]'
+}
+
+release_config_revision() (
+    set -eu
+
+    for release_config_command in mktemp rm; do
+        release_require_command "${release_config_command}"
+    done
+    [ "$#" -gt 0 ] || release_fail "at least one config input is required"
+
+    release_config_temporary=$(mktemp)
+    # shellcheck disable=SC2317
+    cleanup_release_config_revision() {
+        rm -f "${release_config_temporary}"
+    }
+    trap cleanup_release_config_revision EXIT INT TERM
+
+    for release_config_file in "$@"; do
+        release_require_file "${release_config_file}"
+        printf '%s\n' "$(release_sha256 "${release_config_file}")" >>"${release_config_temporary}"
+    done
+
+    printf 'sha256:%s\n' "$(release_sha256 "${release_config_temporary}")"
+)
+
+release_validate_phase_manifest_format() {
+    case "$1" in
+        1|2) ;;
+        *) release_fail "unsupported phase manifest format" ;;
+    esac
+}
+
+release_phase_manifest_expect() {
+    release_phase_file=$1
+    release_phase_key=$2
+    release_phase_expected=$3
+
+    release_phase_actual=$(release_manifest_value "${release_phase_key}" "${release_phase_file}" || true)
+    [ "${release_phase_actual}" = "${release_phase_expected}" ] \
+        || release_fail "phase binding ${release_phase_key} is ${release_phase_actual:-missing}, expected ${release_phase_expected}"
+}
+
+release_phase_manifest_update() (
+    set -eu
+
+    release_phase_file=$1
+    shift
+    release_phase_argument_count=$#
+    [ $((release_phase_argument_count % 2)) -eq 0 ] \
+        || release_fail "phase manifest updates must use key/value pairs"
+    [ "$#" -gt 0 ] || release_fail "phase manifest update is empty"
+
+    for release_phase_command in awk mktemp mv rm; do
+        release_require_command "${release_phase_command}"
+    done
+
+    release_phase_directory=${release_phase_file%/*}
+    release_phase_updates=$(mktemp "${release_phase_directory}/.phase-updates.tmp.XXXXXX")
+    release_phase_output=$(mktemp "${release_phase_directory}/.phase-manifest.tmp.XXXXXX")
+    # shellcheck disable=SC2317
+    cleanup_release_phase_update() {
+        rm -f "${release_phase_updates}" "${release_phase_output}"
+    }
+    trap cleanup_release_phase_update EXIT INT TERM
+
+    while [ "$#" -gt 0 ]; do
+        release_phase_key=$1
+        release_phase_value=$2
+        shift 2
+
+        case "${release_phase_key}" in
+            ''|*[!a-z0-9_]*) release_fail "invalid phase manifest key: ${release_phase_key}" ;;
+        esac
+        case "${release_phase_value}" in
+            *'
+'*|*''*) release_fail "phase manifest values must stay on one line" ;;
+        esac
+        printf '%s=%s\n' "${release_phase_key}" "${release_phase_value}" >>"${release_phase_updates}"
+    done
+
+    release_phase_existing=/dev/null
+    if [ -f "${release_phase_file}" ]; then
+        release_phase_existing=${release_phase_file}
+        release_validate_phase_manifest_format \
+            "$(release_manifest_value phase_manifest_format "${release_phase_file}" || true)"
+    fi
+
+    if ! awk -F= '
+        NR == FNR {
+            if (seen_update[$1]++) {
+                exit 40
+            }
+            update[$1] = $0
+            order[++count] = $1
+            next
+        }
+        {
+            if (seen_existing[$1]++) {
+                exit 41
+            }
+            if (!($1 in update)) {
+                print
+            }
+        }
+        END {
+            for (position = 1; position <= count; position++) {
+                print update[order[position]]
+            }
+        }
+    ' "${release_phase_updates}" "${release_phase_existing}" >"${release_phase_output}"; then
+        release_fail "phase manifest contains duplicate keys"
+    fi
+
+    mv "${release_phase_output}" "${release_phase_file}"
+    rm -f "${release_phase_updates}"
+    trap - EXIT INT TERM
+)
+
+release_acquire_output_lock() {
+    release_lock_file=$1
+    release_lock_operation=$2
+    release_lock_version=$3
+    release_lock_platform=$4
+
+    for release_lock_command in date flock id sed; do
+        release_require_command "${release_lock_command}"
+    done
+
+    # Append mode avoids truncating active-owner evidence before the lock is held.
+    exec 9>>"${release_lock_file}"
+    if ! flock -n 9; then
+        echo "Active release output lock: ${release_lock_file}" >&2
+        sed -n '1,20p' "${release_lock_file}" >&2 || true
+        release_fail "another release operation owns ${release_lock_version} (${release_lock_platform})"
+    fi
+
+    : >"${release_lock_file}"
+    {
+        printf '%s\n' 'lock_format=1'
+        printf 'operation=%s\n' "${release_lock_operation}"
+        printf 'release_version=%s\n' "${release_lock_version}"
+        printf 'platform=%s\n' "${release_lock_platform}"
+        printf 'pid=%s\n' "$$"
+        printf 'actor=%s\n' "$(id -un)"
+        printf 'started_at=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    } >&9
 }
 
 release_validate_platform() {
@@ -168,4 +379,31 @@ release_validate_registry_image() {
 
     release_validate_runtime_image \
         "${release_tagged_image}" "${release_platform}" "${release_version}"
+}
+
+release_validate_remote_registry_image() {
+    release_tagged_image=$1
+    release_exact_image=$2
+
+    case "${release_exact_image}" in
+        *@sha256:*) release_expected_digest=${release_exact_image#*@} ;;
+        *) release_fail "exact remote image must contain a sha256 digest" ;;
+    esac
+    release_validate_digest "${release_expected_digest}"
+
+    release_remote_tag_digest=$(docker buildx imagetools inspect \
+        --format '{{.Manifest.Digest}}' "${release_tagged_image}") \
+        || release_fail "cannot inspect published registry tag: ${release_tagged_image}"
+    release_validate_digest "${release_remote_tag_digest}"
+    [ "${release_remote_tag_digest}" = "${release_expected_digest}" ] \
+        || release_fail "published registry tag resolves to ${release_remote_tag_digest}, expected ${release_expected_digest}"
+
+    release_remote_exact_digest=$(docker buildx imagetools inspect \
+        --format '{{.Manifest.Digest}}' "${release_exact_image}") \
+        || release_fail "cannot inspect published registry digest: ${release_exact_image}"
+    release_validate_digest "${release_remote_exact_digest}"
+    [ "${release_remote_exact_digest}" = "${release_expected_digest}" ] \
+        || release_fail "published exact image resolves to ${release_remote_exact_digest}, expected ${release_expected_digest}"
+
+    echo "Remote registry digest verified: ${release_exact_image}"
 }

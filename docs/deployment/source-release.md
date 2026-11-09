@@ -82,6 +82,20 @@ if git show-ref --verify --quiet "refs/tags/${RELEASE_VERSION}"; then
 fi
 ```
 
+До build выполните read-only plan с теми же inputs:
+
+```shell
+make release-plan \
+  DOCKER_IMAGE_PREFIX=registry.example/namespace/geo-registry \
+  RELEASE_VERSION="${RELEASE_VERSION}" \
+  DOCKER_PLATFORM="${RELEASE_PLATFORM}"
+```
+
+Plan печатает source OID, clean/branch/tag state, current non-secret config
+revision, intended image reference, locked MessageBus OID и доступные Buildx
+capabilities. `status=ready` не создаёт tag, image или artifact. Dirty source,
+другая branch либо существующий tag дают `status=blocked` до любых mutations.
+
 Проверить source и locked dependencies:
 
 ```shell
@@ -152,6 +166,43 @@ make release-publish DOCKER_PLATFORM="${RELEASE_PLATFORM}"
 git push origin main
 git push origin "${RELEASE_VERSION}"
 ```
+
+`release-publish` сначала проверяет local exact image, выполняет `docker push`,
+а затем независимо читает registry через Buildx и требует точного совпадения
+remote platform digest. Только после этого атомарно создаётся ignored
+`docker/data/release/<tag>/phase-manifest.txt` со статусом
+`registry-published`, release/source OID, config revision, image identity,
+actor и UTC verification time. Команда не публикует Git refs: `main` и tag
+отправляются только после успешного registry gate.
+
+Если push завершился, но remote digest не подтвердился, phase manifest не
+создаётся и Git refs не публикуются. Повторите ту же команду после диагностики;
+она обязана подтвердить тот же frozen digest, а не собирать новый image или
+перемещать tag.
+
+Phase manifest имеет накопительный `phase_manifest_format=2`. Build записывает
+`prepared` и `built`, freeze добавляет config checksum, connected publication —
+remote registry evidence. Если `built` либо `registry-published` уже verified,
+повторная команда сначала сверяет весь binding и фактический artifact. При
+полном совпадении image переиспользуется; при расхождении команда завершается и
+не выполняет неявный rebuild или повторный push.
+
+Build, freeze, publication и offline packaging используют один ignored
+output lock на пару release/platform. Параллельная операция завершается до
+изменения artifacts и показывает metadata владельца. Kernel lock снимается при
+завершении процесса, включая аварийное; lock-файл остаётся только как
+диагностическое evidence и не блокирует следующий запуск сам по себе.
+
+Read-only retention preview:
+
+```shell
+make release-candidates
+make release-candidates RELEASE_CANDIDATE_TTL_DAYS=14
+```
+
+Команда показывает состояние, protection, TTL и активный lock. Current release,
+существующие Git tags и actively locked directories всегда защищены. Preview
+не удаляет artifacts; cleanup остаётся отдельной явно подтверждаемой операцией.
 
 Для offline/full-data delivery вместо обязательного registry push собирается
 transport archive по [offline release](offline-release.md).
