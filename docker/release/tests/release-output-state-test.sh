@@ -13,6 +13,20 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
+if invalid_library_output=$(release_library_file .. 2>&1); then
+    echo 'Release output state test failed: an unsafe library name was accepted.' >&2
+    exit 1
+fi
+printf '%s\n' "${invalid_library_output}" \
+    | grep -Fq 'invalid release library name: ..'
+
+if missing_library_output=$(release_library_file missing-lib.sh 2>&1); then
+    echo 'Release output state test failed: a missing library was resolved.' >&2
+    exit 1
+fi
+printf '%s\n' "${missing_library_output}" \
+    | grep -Fq 'cannot resolve the release library: missing-lib.sh'
+
 artifact_root="${temporary_root}/release"
 candidate_dir="${artifact_root}/v9.9.8"
 current_dir="${artifact_root}/v9.9.9"

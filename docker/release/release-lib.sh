@@ -19,7 +19,8 @@ elif [ -n "${project_root:-}" ] \
 else
     release_fail "cannot resolve the shell runtime library"
 fi
-release_state_library="${release_shell_runtime_library%/*}/release-state-lib.sh"
+release_resolved_library_directory=${release_shell_runtime_library%/*}
+release_state_library="${release_resolved_library_directory}/release-state-lib.sh"
 [ -f "${release_state_library}" ] \
     || release_fail "cannot resolve the release state library"
 # shellcheck disable=SC1090
@@ -27,6 +28,25 @@ release_state_library="${release_shell_runtime_library%/*}/release-state-lib.sh"
 # shellcheck disable=SC1090
 . "${release_state_library}"
 unset release_shell_runtime_library release_state_library
+
+release_library_file() (
+    set -eu
+
+    release_library_name=$1
+    case "${release_library_name}" in
+        ''|*[!A-Za-z0-9._-]*)
+            release_fail "invalid release library name: ${release_library_name}"
+            ;;
+    esac
+    case "${release_library_name}" in
+        [A-Za-z0-9]*) ;;
+        *) release_fail "invalid release library name: ${release_library_name}" ;;
+    esac
+    release_library_path="${release_resolved_library_directory}/${release_library_name}"
+    [ -f "${release_library_path}" ] \
+        || release_fail "cannot resolve the release library: ${release_library_name}"
+    printf '%s\n' "${release_library_path}"
+)
 
 release_require_command() {
     command -v "$1" >/dev/null 2>&1 || release_fail "required command is missing: $1"
