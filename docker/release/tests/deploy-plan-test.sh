@@ -23,6 +23,20 @@ printf '%s\n' \
     >"${secrets_file}"
 
 tagged_image=ghcr.io/wolfcharaa/geo-registry/app:v0.2.5-linux-amd64
+cat >"${temporary_root}/release.env" <<EOF
+DOCKER_IMAGE_PREFIX=ghcr.io/wolfcharaa/geo-registry
+APP_IMAGE_TAG=v0.2.5-linux-amd64
+APP_IMAGE_DIGEST=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+RELEASE_VERSION=v0.2.5
+COMPOSE_PROJECT_NAME=geo-registry
+EOF
+
+cat >"${temporary_root}/compose.yaml" <<EOF
+x-app-image: &app-image "${tagged_image}"
+x-app-environment: &app-environment
+  APP_VERSION: v0.2.5
+services: {}
+EOF
 
 run_doctor() {
     test_target=${TEST_DEPLOY_TARGET-moscow-primary}
@@ -30,6 +44,7 @@ run_doctor() {
     test_expected_context=${TEST_EXPECTED_DOCKER_CONTEXT-production}
     test_engine_available=${TEST_DOCKER_ENGINE_AVAILABLE-1}
     test_host_platform=${TEST_DOCKER_HOST_PLATFORM-linux/amd64}
+    test_release_env=${TEST_RELEASE_ENV_FILE-${temporary_root}/release.env}
     PATH="${fixture_dir}:${PATH}" \
     FAKE_DOCKER_STATE="${state_file}" \
     FAKE_DOCKER_LOG="${log_file}" \
@@ -38,6 +53,7 @@ run_doctor() {
     FAKE_DOCKER_ENGINE_AVAILABLE="${test_engine_available}" \
     FAKE_DOCKER_HOST_PLATFORM="${test_host_platform}" \
     COMPOSE_ENV_FILE="${secrets_file}" \
+    RELEASE_ENV_FILE="${test_release_env}" \
     DEPLOY_TARGET="${test_target}" \
     DEPLOY_EXPECTED_DOCKER_CONTEXT="${test_expected_context}" \
         "${project_root}/docker/release/deploy-doctor.sh"
@@ -52,9 +68,9 @@ run_plan() {
     test_data_mode=${TEST_DEPLOY_DATA_MODE-inspect}
     test_service_scope=${TEST_DEPLOY_SERVICE_SCOPE-core}
     test_schema_compatibility=${TEST_SCHEMA_COMPATIBILITY-}
-    test_release_env=${TEST_RELEASE_ENV_FILE-}
+    test_release_env=${TEST_RELEASE_ENV_FILE-${temporary_root}/release.env}
     test_artifact_env=${TEST_RELEASE_ARTIFACT_ENV_FILE-}
-    test_compose_model=${TEST_PRODUCTION_COMPOSE_MODEL-}
+    test_compose_model=${TEST_PRODUCTION_COMPOSE_MODEL-${temporary_root}/compose.yaml}
     test_current_image=${TEST_CURRENT_IMAGE_REFERENCE-${tagged_image}}
     PATH="${fixture_dir}:${PATH}" \
     FAKE_DOCKER_STATE="${state_file}" \

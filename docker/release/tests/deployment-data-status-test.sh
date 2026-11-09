@@ -21,6 +21,25 @@ GEO_REGISTRY_DATABASE_PASSWORD=test-database-password
 GEO_REGISTRY_POSTGRES_ADMIN_PASSWORD=test-admin-password
 EOF
 
+cat >"${temporary_root}/release.env" <<EOF
+DOCKER_IMAGE_PREFIX=registry.example/geo-registry
+APP_IMAGE_TAG=v9.9.9-linux-amd64
+APP_IMAGE_DIGEST=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+RELEASE_VERSION=v9.9.9
+COMPOSE_PROJECT_NAME=geo-registry
+EOF
+
+cat >"${temporary_root}/compose.yaml" <<EOF
+x-app-image: &app-image "registry.example/geo-registry/app:v9.9.9-linux-amd64"
+x-app-environment: &app-environment
+  APP_VERSION: v9.9.9
+services: {}
+EOF
+
+RELEASE_ENV_FILE="${temporary_root}/release.env"
+PRODUCTION_COMPOSE_MODEL="${temporary_root}/compose.yaml"
+export RELEASE_ENV_FILE PRODUCTION_COMPOSE_MODEL
+
 active_output=$(
     PATH="${fixture_dir}:${PATH}" \
     FAKE_DOCKER_STATE="${temporary_root}/docker.state" \

@@ -50,6 +50,21 @@ chmod +x "${fake_bin}/git"
 state_file="${temporary_root}/docker.state"
 log_file="${temporary_root}/docker.log"
 
+cat >"${temporary_root}/release.env" <<EOF
+DOCKER_IMAGE_PREFIX=registry.example/geo-registry
+APP_IMAGE_TAG=v0.2.5-linux-amd64
+APP_IMAGE_DIGEST=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+RELEASE_VERSION=v0.2.5
+COMPOSE_PROJECT_NAME=geo-registry
+EOF
+
+cat >"${temporary_root}/compose.yaml" <<EOF
+x-app-image: &app-image "registry.example/geo-registry/app:v0.2.5-linux-amd64"
+x-app-environment: &app-environment
+  APP_VERSION: v0.2.5
+services: {}
+EOF
+
 run_plan() {
     test_offline_scope=${TEST_OFFLINE_SCOPE-app-update}
     PATH="${fake_bin}:${PATH}" \
@@ -62,6 +77,8 @@ run_plan() {
     DOCKER_IMAGE_PREFIX=registry.example/geo-registry \
     DOCKER_PLATFORM=linux/amd64 \
     RELEASE_OFFLINE_SCOPE="${test_offline_scope}" \
+    RELEASE_SOURCE_ENV_FILE="${temporary_root}/release.env" \
+    RELEASE_COMPOSE_FILE="${temporary_root}/compose.yaml" \
         "${project_root}/docker/release/release-plan.sh"
 }
 
