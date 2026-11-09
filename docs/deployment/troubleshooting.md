@@ -202,6 +202,43 @@ PostgreSQL, workers и volumes эта команда не удаляет. Не �
 недоступен. Используйте точный private/LAN IP и firewall allow-list из
 [руководства сетевого доступа](network-access.md).
 
+## State Manifest Отклонён До Операции
+
+Release phase state и deployment evidence являются machine-owned файлами с
+закрытой schema. Tooling завершится до следующего изменения при сообщениях
+`contains duplicate keys`, `contains invalid key/value lines`, `contains
+unsupported keys` или `must not be a symbolic link`. Это защищает reuse и
+recovery от частично записанного либо подменённого state.
+
+Сначала остановите mutating workflow и сохраните диагностику, не меняя файл.
+Подставьте в `STATE_FILE` exact path из сообщения об ошибке; ниже показан
+пример для release phase state:
+
+```shell
+STATE_FILE='docker/data/release/v0.2.5/phase-manifest.txt'
+ls -ld -- "${STATE_FILE}"
+sed -n '1,160p' -- "${STATE_FILE}"
+git status --short
+```
+
+В `phase-manifest.txt` и deployment evidence не должно быть secrets, однако не
+публикуйте вывод за пределами утверждённого evidence channel. Не удаляйте
+duplicate/unknown строки, не заменяйте symlink обычным файлом и не создавайте
+state заново из имени artifact: это уничтожит доказательство исходной identity.
+
+Если повреждён release phase state, verified artifact нельзя переиспользовать,
+пока manifest не восстановлен из доверенной сохранённой копии с теми же
+source/config OID, platform, digest, image ID и checksums. При отсутствии такой
+копии остановите эту release identity и подготовьте новую; автоматического
+repair сейчас нет.
+
+Если отклонён deployment evidence, сначала определите фактическое состояние
+containers, migrations и data. После возможной mutation сохраняйте target
+lock/evidence и выбирайте recovery только по
+[основному runbook](release-deploy.md#recovery-и-диагностика). Не используйте
+ручную правку как замену `deploy-handover`; если state нельзя классифицировать,
+остановите automation и передайте incident владельцу deployment.
+
 ## `make release-download`: Нет Такого Target
 
 Команды являются частью конкретного Git tag. Не переносите отдельный Makefile

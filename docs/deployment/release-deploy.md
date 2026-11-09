@@ -100,6 +100,13 @@ ignored `docker/data/deployment/<target>/operations/`. Последний усп
 `previous.env`. Файлы содержат identity, actor, UTC timing и статусы gates, но
 не secret values.
 
+Operation evidence использует закрытую schema и публикуется только через
+same-directory temporary file с atomic rename. Duplicate, неизвестный или
+некорректно записанный key, а также symbolic-link target останавливают запись
+fail-closed. Эти файлы являются machine-owned: не редактируйте и не заменяйте
+их вручную; безопасная диагностика описана в
+[troubleshooting](troubleshooting.md#state-manifest-отклонён-до-операции).
+
 Ошибка до изменения application/data фиксируется как `safe-abort` и не
 блокирует повтор. Ошибка после начала изменения создаёт `partial.env`; пока он
 существует, новые mutating operations fail-closed. Не удаляйте этот файл

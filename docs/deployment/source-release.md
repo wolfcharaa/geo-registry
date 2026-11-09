@@ -7,10 +7,11 @@ releases:
 - `romanfedorskij/message-bus-async` — Packagist package;
 - `romanfedorskij/message-bus-async-worker` — Packagist package.
 
-Для первой линии все три проекта выпущены как `v0.1.0`. Library tags и
-Packagist metadata публикуются раньше application tag, потому что
-`app/composer.lock` обязан фиксировать их версии, source references и dist
-archives.
+Историческая первая линия всех трёх проектов начиналась с `v0.1.0`. Последний
+синхронизированный application tag `v0.2.5` фиксирует
+`message-bus-async v0.1.1` и `message-bus-async-worker v0.1.1` вместе с их
+source references и dist archives. Library tags и Packagist metadata всегда
+публикуются раньше зависящего от них application tag.
 
 ## Release Gate Библиотек
 
@@ -25,19 +26,29 @@ git status --short
 ```
 
 Затем проверить обе языковые редакции документации, `CHANGELOG.md`, лицензию,
-package name и GitHub support URLs. Annotated tag ставится только на clean
-`main`:
+package name и GitHub support URLs. В примере ниже `v0.1.2` означает новую,
+заранее выбранную и ещё не занятую версию; существующие tags не перемещаются.
+Annotated tag ставится только на clean `main`:
 
 ```shell
-git tag -a v0.1.0 -m "Release v0.1.0"
+export LIBRARY_VERSION=v0.1.2
+
+test -z "$(git status --porcelain)"
+test "$(git branch --show-current)" = main
+if git show-ref --verify --quiet "refs/tags/${LIBRARY_VERSION}"; then
+  echo "Tag already exists: ${LIBRARY_VERSION}" >&2
+  exit 1
+fi
+
+git tag -a "${LIBRARY_VERSION}" -m "Release ${LIBRARY_VERSION}"
 git push origin main
-git push origin v0.1.0
+git push origin "${LIBRARY_VERSION}"
 ```
 
 После тега package регистрируется в Packagist. Release gate закрыт только после
-того, как официальный P2 endpoint возвращает `v0.1.0`, dist archive и ожидаемый
-source reference. Прямые VCS/path repositories больше не являются installation
-path приложения.
+того, как официальный P2 endpoint возвращает `${LIBRARY_VERSION}`, dist archive
+и ожидаемый source reference. Прямые VCS/path repositories больше не являются
+installation path приложения.
 
 ## Единый Tag-Контракт Приложения
 
@@ -206,6 +217,13 @@ checksum, connected publication — remote registry evidence. Если `built` �
 повторная команда сначала сверяет весь binding и фактический artifact. При
 полном совпадении image переиспользуется; при расхождении команда завершается и
 не выполняет неявный rebuild или повторный push.
+
+`phase-manifest.txt` использует закрытую schema и обновляется через
+same-directory temporary file с atomic rename. Duplicate, неизвестный или
+некорректно записанный key, а также symbolic-link target останавливают reuse
+fail-closed. Не исправляйте и не удаляйте manifest вручную: сохраните его как
+диагностику и следуйте
+[процедуре troubleshooting](troubleshooting.md#state-manifest-отклонён-до-операции).
 
 Build, freeze, publication и offline packaging используют один ignored
 output lock на пару release/platform. Параллельная операция завершается до

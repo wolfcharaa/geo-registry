@@ -26,7 +26,7 @@ production `--no-build --pull never`, атомарные offline archives, annot
 Git bundle, fail-closed restore в отсутствующую БД, migration/GAR gates и
 application-only release switch без удаления persistent volumes.
 
-Открытые ограничения после H5:
+Открытые ограничения после H7:
 
 - полный production-like backup/restore rehearsal ещё не сохранён как recovery
   evidence.
@@ -41,6 +41,7 @@ application-only release switch без удаления persistent volumes.
 | H4 | Явные offline scopes и полный local image identity | `Completed in main` |
 | H5 | Bounded health/business smoke и observation result | `Completed in main` |
 | H6 | Production-like recovery rehearsal и сохранённые RPO/RTO | `In progress; external gate pending` |
+| H7 | Shell runtime и строгий state contract | `Completed in main` |
 
 ## H1 — Manifest И Registry Publication
 
@@ -286,6 +287,33 @@ gate и повторно проверяется самим restore entrypoint. �
 
 Tooling tests не закрывают этот gate. До сохранённого rehearsal evidence
 backup остаётся проверенным artifact, но не доказанным production recovery.
+
+## H7 — Shell Runtime И Строгий State Contract
+
+- [x] Проверять все tracked и unignored POSIX shell-сценарии через единый
+  syntax/ShellCheck gate и отклонять неподдерживаемые shebang.
+- [x] Ввести общий atomic key/value runtime для release phase state и
+  deployment evidence.
+- [x] Fail-closed отклонять duplicate, unknown и malformed keys, multiline
+  values, symbolic-link targets и не-directory state paths.
+- [x] Сохранить публичные entrypoints и форматы, выделив release state и
+  deployment evidence в отдельные capability-библиотеки.
+- [x] Покрыть strict schema, atomic merge, cleanup temporary files и resolver
+  contract failure tests.
+
+`shell-runtime-lib.sh` записывает state во временный файл в том же каталоге и
+публикует его atomic rename. `release-state-lib.sh` и
+`deployment-evidence-lib.sh` владеют своими закрытыми schemas, а прежние
+`release-lib.sh` и `deployment-lib.sh` остаются совместимыми aggregators для
+существующих scripts. Resolver принимает только безопасное имя соседней
+library и не разрешает path traversal либо отсутствующий capability-файл.
+
+Этот slice не меняет operator commands, release identity, recovery branches
+или сохранённые formats. Новое наблюдаемое поведение возникает только для
+повреждённого либо подменённого state: операция останавливается до публикации
+новой версии файла, исходный state остаётся нетронутым, temporary files
+удаляются. Contract подтверждён `make release-check`; live build, push,
+deployment и recovery rehearsal в H7 не выполнялись.
 
 ## Общий Completion Gate
 

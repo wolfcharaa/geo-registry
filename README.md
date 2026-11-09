@@ -41,19 +41,29 @@ geocoding.
 
 ## Production Быстрый Запуск
 
-Новый сервер с готовым backup:
+Новый сервер с готовым backup запускается только из exact release checkout.
+До первой mutating-команды зафиксируйте утверждённую label цели и уже выбранный
+Docker context; третья переменная должна буквально повторять target:
 
 ```shell
+export DEPLOY_TARGET=moscow-primary
+export DEPLOY_EXPECTED_DOCKER_CONTEXT=production
+export DEPLOY_CONFIRM_TARGET="${DEPLOY_TARGET}"
+
 make deploy-init
+make deploy-doctor
 make deploy-image DOCKER_PLATFORM=linux/amd64
 make deploy-port-preflight
 make data-restore
-make deploy-start
+make deploy-start DOCKER_PLATFORM=linux/amd64
 ```
 
 Во время длительного restore команда печатает heartbeat. Из второй сессии
 текущее состояние и безопасный следующий шаг показывает
-`make data-restore-status`.
+`make data-restore-status`. Блок предполагает, что проверенный backup уже
+помещён в `docker/data/backups/`; выбор одного из нескольких каталогов и
+проверка exact release описаны в
+[линейном runbook](docs/deployment/deploy-with-backup.md).
 
 `compose.yaml` содержит production defaults, `compose.override.yaml` —
 необязательные host-specific несекретные изменения, а

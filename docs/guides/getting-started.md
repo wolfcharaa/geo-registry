@@ -16,18 +16,21 @@ PHP и Composer на host не нужны. Не запускайте development
 
 ## 1. Получить Приложение
 
-Geo Registry `v0.1.0` подключает опубликованные библиотеки через Packagist.
-Соседние library checkout больше не требуются:
+Последний синхронизированный release приложения — `v0.2.5`. Он подключает
+опубликованные библиотеки через Packagist; соседние library checkout больше не
+требуются. Для воспроизводимого первого запуска используйте exact application
+tag, а не меняющийся `main`:
 
 ```shell
-git clone --branch v0.1.0 \
+git clone --branch v0.2.5 \
   https://github.com/wolfcharaa/geo-registry.git
 cd geo-registry
 ```
 
-`app/composer.lock` фиксирует `v0.1.0` и source references обеих библиотек.
-`make install` использует эти exact dist packages, поэтому отдельный checkout
-библиотек не участвует ни в development runtime, ни в production build.
+В этом tag `app/composer.lock` фиксирует `v0.1.1` и source references обеих
+MessageBus-библиотек. `make install` использует эти exact dist packages,
+поэтому отдельный checkout библиотек не участвует ни в development runtime,
+ни в production build.
 
 В другом Composer-приложении та же release line устанавливается напрямую из
 Packagist:
@@ -39,7 +42,10 @@ composer require \
 ```
 
 Metadata и доступные версии: [core package][packagist-core] и
-[worker package][packagist-worker].
+[worker package][packagist-worker]. Package family владеет MessageBus API,
+registry и worker lifecycle; создание databases, запуск services, import и
+deployment остаются ответственностью host-приложения и описаны в этом
+repository.
 
 [packagist-core]: https://packagist.org/packages/romanfedorskij/message-bus-async
 [packagist-worker]: https://packagist.org/packages/romanfedorskij/message-bus-async-worker
