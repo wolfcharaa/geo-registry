@@ -68,6 +68,15 @@ record_success() (
         "${operation}" application update "${temporary_root}/release.env"
     deployment_evidence_update \
         artifact_status verified smoke_status passed
+    if [ "${operation}" = evidence-first ]; then
+        if unknown_evidence_output=$(deployment_evidence_update \
+            unexpected_evidence_field value 2>&1); then
+            echo 'Deployment evidence test failed: an unknown evidence key was accepted.' >&2
+            exit 1
+        fi
+        printf '%s\n' "${unknown_evidence_output}" \
+            | grep -Fq 'unsupported deployment evidence key: unexpected_evidence_field'
+    fi
     deployment_evidence_finish desired-active
 )
 

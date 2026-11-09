@@ -5,6 +5,29 @@ release_fail() {
     exit 1
 }
 
+if [ -n "${release_library_dir:-}" ] \
+    && [ -f "${release_library_dir}/shell-runtime-lib.sh" ]; then
+    release_shell_runtime_library="${release_library_dir}/shell-runtime-lib.sh"
+elif [ -n "${script_dir:-}" ] && [ -f "${script_dir}/shell-runtime-lib.sh" ]; then
+    release_shell_runtime_library="${script_dir}/shell-runtime-lib.sh"
+elif [ -n "${default_project_root:-}" ] \
+    && [ -f "${default_project_root}/docker/release/shell-runtime-lib.sh" ]; then
+    release_shell_runtime_library="${default_project_root}/docker/release/shell-runtime-lib.sh"
+elif [ -n "${project_root:-}" ] \
+    && [ -f "${project_root}/docker/release/shell-runtime-lib.sh" ]; then
+    release_shell_runtime_library="${project_root}/docker/release/shell-runtime-lib.sh"
+else
+    release_fail "cannot resolve the shell runtime library"
+fi
+release_state_library="${release_shell_runtime_library%/*}/release-state-lib.sh"
+[ -f "${release_state_library}" ] \
+    || release_fail "cannot resolve the release state library"
+# shellcheck disable=SC1090
+. "${release_shell_runtime_library}"
+# shellcheck disable=SC1090
+. "${release_state_library}"
+unset release_shell_runtime_library release_state_library
+
 release_require_command() {
     command -v "$1" >/dev/null 2>&1 || release_fail "required command is missing: $1"
 }
@@ -289,129 +312,6 @@ release_config_revision() (
 
     printf 'sha256:%s\n' "$(release_sha256 "${release_config_temporary}")"
 )
-
-release_validate_phase_manifest_format() {
-    case "$1" in
-        1|2) ;;
-        *) release_fail "unsupported phase manifest format" ;;
-    esac
-}
-
-release_phase_manifest_expect() {
-    release_phase_file=$1
-    release_phase_key=$2
-    release_phase_expected=$3
-
-    release_phase_actual=$(release_manifest_value "${release_phase_key}" "${release_phase_file}" || true)
-    [ "${release_phase_actual}" = "${release_phase_expected}" ] \
-        || release_fail "phase binding ${release_phase_key} is ${release_phase_actual:-missing}, expected ${release_phase_expected}"
-}
-
-release_phase_manifest_update() (
-    set -eu
-
-    release_phase_file=$1
-    shift
-    release_phase_argument_count=$#
-    [ $((release_phase_argument_count % 2)) -eq 0 ] \
-        || release_fail "phase manifest updates must use key/value pairs"
-    [ "$#" -gt 0 ] || release_fail "phase manifest update is empty"
-
-    for release_phase_command in awk mktemp mv rm; do
-        release_require_command "${release_phase_command}"
-    done
-
-    release_phase_directory=${release_phase_file%/*}
-    release_phase_updates=$(mktemp "${release_phase_directory}/.phase-updates.tmp.XXXXXX")
-    release_phase_output=$(mktemp "${release_phase_directory}/.phase-manifest.tmp.XXXXXX")
-    # shellcheck disable=SC2317
-    cleanup_release_phase_update() {
-        rm -f "${release_phase_updates}" "${release_phase_output}"
-    }
-    trap cleanup_release_phase_update EXIT INT TERM
-
-    while [ "$#" -gt 0 ]; do
-        release_phase_key=$1
-        release_phase_value=$2
-        shift 2
-
-        case "${release_phase_key}" in
-            ''|*[!a-z0-9_]*) release_fail "invalid phase manifest key: ${release_phase_key}" ;;
-        esac
-        case "${release_phase_value}" in
-            *'
-'*|*''*) release_fail "phase manifest values must stay on one line" ;;
-        esac
-        printf '%s=%s\n' "${release_phase_key}" "${release_phase_value}" >>"${release_phase_updates}"
-    done
-
-    release_phase_existing=/dev/null
-    if [ -f "${release_phase_file}" ]; then
-        release_phase_existing=${release_phase_file}
-        release_validate_phase_manifest_format \
-            "$(release_manifest_value phase_manifest_format "${release_phase_file}" || true)"
-    fi
-
-    if ! awk -F= '
-        NR == FNR {
-            if (seen_update[$1]++) {
-                exit 40
-            }
-            update[$1] = $0
-            order[++count] = $1
-            next
-        }
-        {
-            if (seen_existing[$1]++) {
-                exit 41
-            }
-            if (!($1 in update)) {
-                print
-            }
-        }
-        END {
-            for (position = 1; position <= count; position++) {
-                print update[order[position]]
-            }
-        }
-    ' "${release_phase_updates}" "${release_phase_existing}" >"${release_phase_output}"; then
-        release_fail "phase manifest contains duplicate keys"
-    fi
-
-    mv "${release_phase_output}" "${release_phase_file}"
-    rm -f "${release_phase_updates}"
-    trap - EXIT INT TERM
-)
-
-release_acquire_output_lock() {
-    release_lock_file=$1
-    release_lock_operation=$2
-    release_lock_version=$3
-    release_lock_platform=$4
-
-    for release_lock_command in date flock id sed; do
-        release_require_command "${release_lock_command}"
-    done
-
-    # Append mode avoids truncating active-owner evidence before the lock is held.
-    exec 9>>"${release_lock_file}"
-    if ! flock -n 9; then
-        echo "Active release output lock: ${release_lock_file}" >&2
-        sed -n '1,20p' "${release_lock_file}" >&2 || true
-        release_fail "another release operation owns ${release_lock_version} (${release_lock_platform})"
-    fi
-
-    : >"${release_lock_file}"
-    {
-        printf '%s\n' 'lock_format=1'
-        printf 'operation=%s\n' "${release_lock_operation}"
-        printf 'release_version=%s\n' "${release_lock_version}"
-        printf 'platform=%s\n' "${release_lock_platform}"
-        printf 'pid=%s\n' "$$"
-        printf 'actor=%s\n' "$(id -un)"
-        printf 'started_at=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-    } >&9
-}
 
 release_validate_platform() {
     case "$1" in

@@ -297,70 +297,15 @@ deployment_evidence_update() (
         || release_fail "deployment evidence is not active"
     [ -f "${DEPLOY_EVIDENCE_FILE}" ] \
         || release_fail "deployment evidence file is missing: ${DEPLOY_EVIDENCE_FILE}"
-    [ $(( $# % 2 )) -eq 0 ] \
-        || release_fail "deployment evidence updates must use key/value pairs"
-    [ "$#" -gt 0 ] || release_fail "deployment evidence update is empty"
-
-    for deployment_evidence_command in awk mktemp mv rm; do
-        release_require_command "${deployment_evidence_command}"
-    done
-
-    deployment_evidence_directory=${DEPLOY_EVIDENCE_FILE%/*}
-    deployment_evidence_updates=$(mktemp \
-        "${deployment_evidence_directory}/.evidence-updates.XXXXXX")
-    deployment_evidence_output=$(mktemp \
-        "${deployment_evidence_directory}/.evidence-output.XXXXXX")
-    # shellcheck disable=SC2317
-    cleanup_deployment_evidence_update() {
-        rm -f "${deployment_evidence_updates}" "${deployment_evidence_output}"
-    }
-    trap cleanup_deployment_evidence_update EXIT HUP INT TERM
-
-    while [ "$#" -gt 0 ]; do
-        deployment_evidence_key=$1
-        deployment_evidence_value=$2
-        shift 2
-        case "${deployment_evidence_key}" in
-            ''|*[!a-z0-9_]*) release_fail "invalid deployment evidence key: ${deployment_evidence_key}" ;;
-        esac
-        case "${deployment_evidence_value}" in
-            *'
-'*|*''*) release_fail "deployment evidence values must stay on one line" ;;
-        esac
-        printf '%s=%s\n' "${deployment_evidence_key}" \
-            "${deployment_evidence_value}" >>"${deployment_evidence_updates}"
-    done
-
-    if ! awk -F= '
-        NR == FNR {
-            if (seen_update[$1]++) {
-                exit 40
-            }
-            update[$1] = $0
-            order[++count] = $1
-            next
-        }
-        {
-            if (seen_existing[$1]++) {
-                exit 41
-            }
-            if (!($1 in update)) {
-                print
-            }
-        }
-        END {
-            for (position = 1; position <= count; position++) {
-                print update[order[position]]
-            }
-        }
-    ' "${deployment_evidence_updates}" "${DEPLOY_EVIDENCE_FILE}" \
-        >"${deployment_evidence_output}"; then
-        release_fail "deployment evidence contains duplicate keys"
-    fi
-
-    mv "${deployment_evidence_output}" "${DEPLOY_EVIDENCE_FILE}"
-    rm -f "${deployment_evidence_updates}"
-    trap - EXIT HUP INT TERM
+    deployment_evidence_allowed_keys='evidence_format state operation target docker_context compose_project service_scope data_mode actor pid started_at ended_at final_state recovery_branch evidence_file'
+    deployment_evidence_allowed_keys="${deployment_evidence_allowed_keys} desired_release desired_source_oid desired_config_revision desired_platform desired_tagged_image desired_exact_image desired_image_id"
+    deployment_evidence_allowed_keys="${deployment_evidence_allowed_keys} previous_state previous_release previous_source_oid previous_image previous_image_id"
+    deployment_evidence_allowed_keys="${deployment_evidence_allowed_keys} artifact_status backup_status backup_directory backup_created_at backup_application_revision schema_compatibility schema_recovery migration_status data_checks_status activation_status"
+    deployment_evidence_allowed_keys="${deployment_evidence_allowed_keys} smoke_status smoke_endpoint smoke_connect_timeout_seconds smoke_request_timeout_seconds smoke_deadline_seconds smoke_health_status smoke_address_search_status"
+    deployment_evidence_allowed_keys="${deployment_evidence_allowed_keys} exit_code failed_step handover_by handover_at"
+    shell_runtime_key_value_update \
+        release_fail 'deployment evidence' "${DEPLOY_EVIDENCE_FILE}" \
+        evidence "${deployment_evidence_allowed_keys}" "$@"
 )
 
 deployment_evidence_publish() {
