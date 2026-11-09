@@ -68,6 +68,12 @@ make deploy-image DOCKER_PLATFORM=linux/amd64
 image. Частичный offline payload является ошибкой, а не причиной fallback в
 registry.
 
+Для release identity format 2 в том же каталоге обязателен
+`release-artifact.env`, полученный вместе с offline transport или из
+авторизованного connected publication workflow. Он связывает checked-out tag с
+source/config OID и exact image digest/ID. Без него разрешён только read-only
+`make prod-config`; pull, load и production mutation завершаются fail-closed.
+
 Для private registry сначала выполните соответствующий `docker login`.
 
 ## Новый Сервер: Восстановить Готовые Данные

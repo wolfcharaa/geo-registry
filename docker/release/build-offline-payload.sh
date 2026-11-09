@@ -2,7 +2,8 @@
 set -eu
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
+default_project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
+project_root=${RELEASE_PROJECT_ROOT:-${default_project_root}}
 
 # shellcheck disable=SC1091
 . "${script_dir}/release-lib.sh"
@@ -15,22 +16,27 @@ if [ "$(id -u)" -eq 0 ] || [ -n "${SUDO_USER:-}" ]; then
     release_fail "run as the release user, without sudo"
 fi
 
-release_env_file=$(release_resolve_path "${RELEASE_ENV_FILE:-docker/compose/prod/release.env}")
-release_require_file "${release_env_file}"
+source_env_file=$(release_resolve_path "${RELEASE_ENV_FILE:-${RELEASE_SOURCE_ENV_FILE:-docker/compose/prod/release.env}}")
+release_require_file "${source_env_file}"
+compose_file=$(release_resolve_path "${RELEASE_COMPOSE_FILE:-docker/compose/prod/compose.yaml}")
+release_require_file "${compose_file}"
 
-release_version=$(release_env_value RELEASE_VERSION "${release_env_file}" || true)
-image_tag=$(release_env_value APP_IMAGE_TAG "${release_env_file}" || true)
-image_digest=$(release_env_value APP_IMAGE_DIGEST "${release_env_file}" || true)
-image_prefix=$(release_env_value DOCKER_IMAGE_PREFIX "${release_env_file}" || true)
+release_version=$(release_env_value RELEASE_VERSION "${source_env_file}" || true)
 platform=${DOCKER_PLATFORM:-linux/amd64}
 release_branch=${RELEASE_BRANCH:-main}
 
 release_validate_version "${release_version}"
-release_validate_digest "${image_digest}"
-release_validate_prefix "${image_prefix}"
 release_validate_platform "${platform}"
 
 platform_slug=$(printf '%s' "${platform}" | tr / -)
+artifact_dir=$(release_resolve_path "${RELEASE_ARTIFACT_DIR:-docker/data/release/${release_version}}")
+identity_file=$(release_identity_file "${source_env_file}" "${artifact_dir}")
+release_require_file "${identity_file}"
+image_tag=$(release_env_value APP_IMAGE_TAG "${identity_file}" || true)
+image_digest=$(release_env_value APP_IMAGE_DIGEST "${identity_file}" || true)
+image_prefix=$(release_env_value DOCKER_IMAGE_PREFIX "${identity_file}" || true)
+release_validate_digest "${image_digest}"
+release_validate_prefix "${image_prefix}"
 expected_tag="${release_version}-${platform_slug}"
 [ "${image_tag}" = "${expected_tag}" ] \
     || release_fail "APP_IMAGE_TAG is ${image_tag}, expected ${expected_tag}"
@@ -65,7 +71,12 @@ release_validate_image_id "${image_id}"
 
 git -C "${project_root}" cat-file -e "${application_source_commit}^{commit}" 2>/dev/null \
     || release_fail "image source revision is not available in the application repository"
-if [ "${application_source_commit}" != "${release_commit}" ]; then
+source_identity_format=$(release_source_identity_format "${source_env_file}")
+if [ "${source_identity_format}" = 2 ]; then
+    release_validate_prepared_source_files "${source_env_file}" "${compose_file}"
+    [ "${application_source_commit}" = "${release_commit}" ] \
+        || release_fail "prepared release image source must equal the tagged release commit"
+elif [ "${application_source_commit}" != "${release_commit}" ]; then
     release_changed_files=$(git -C "${project_root}" diff --name-only "${application_source_commit}" "${release_commit}")
     expected_release_files=$(printf '%s\n' docker/compose/prod/compose.yaml docker/compose/prod/release.env)
     case "${release_changed_files}" in
@@ -73,8 +84,6 @@ if [ "${application_source_commit}" != "${release_commit}" ]; then
         *) release_fail "release commit differs from image source beyond the frozen release identity" ;;
     esac
 fi
-
-artifact_dir=$(release_resolve_path "${RELEASE_ARTIFACT_DIR:-docker/data/release/${release_version}}")
 archive_name="source-${platform_slug}.tar"
 archive_path="${artifact_dir}/${archive_name}"
 manifest_path="${artifact_dir}/source-manifest.txt"
@@ -85,7 +94,15 @@ release_acquire_output_lock \
     build-offline-payload "${release_version}" "${platform}"
 
 config_revision=$(release_config_revision \
-    "${project_root}/docker/compose/prod/compose.yaml" "${release_env_file}")
+    "${compose_file}" "${source_env_file}")
+if [ "${source_identity_format}" = 2 ]; then
+    manifest_config_revision=${config_revision}
+else
+    manifest_config_revision=${release_commit}
+fi
+release_validate_artifact_identity \
+    "${identity_file}" "${release_version}" "${platform}" \
+    "${release_commit}" "${config_revision}" "${image_id}"
 if [ -f "${phase_manifest_path}" ]; then
     phase_manifest_format=$(release_manifest_value phase_manifest_format "${phase_manifest_path}" || true)
     release_validate_phase_manifest_format "${phase_manifest_format}"
@@ -150,7 +167,7 @@ mv "${archive_temporary}" "${archive_path}"
     printf 'release_tag=%s\n' "${release_version}"
     printf 'release_version=%s\n' "${release_version}"
     printf 'git_commit=%s\n' "${release_commit}"
-    printf 'config_revision=%s\n' "${release_commit}"
+    printf 'config_revision=%s\n' "${manifest_config_revision}"
     printf 'application_source_commit=%s\n' "${application_source_commit}"
     printf 'message_bus_core_commit=%s\n' "${core_commit}"
     printf 'message_bus_worker_commit=%s\n' "${worker_commit}"

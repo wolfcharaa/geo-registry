@@ -2,10 +2,11 @@
 set -eu
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
+default_project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
+project_root=${RELEASE_PROJECT_ROOT:-${default_project_root}}
 
 # shellcheck disable=SC1091
-. "${project_root}/docker/release/release-lib.sh"
+. "${default_project_root}/docker/release/release-lib.sh"
 
 fail() {
     echo "Production image build error: $*" >&2
@@ -30,7 +31,7 @@ if [ "$(id -u)" -eq 0 ] || [ -n "${SUDO_USER:-}" ]; then
     fail "run as the build user, without sudo"
 fi
 
-for command_name in docker git grep mkdir php tr; do
+for command_name in awk docker git grep mkdir php tr; do
     require_command "${command_name}"
 done
 
@@ -38,6 +39,8 @@ image_prefix=${DOCKER_IMAGE_PREFIX:-}
 release_version=${RELEASE_VERSION:-}
 platform=${DOCKER_PLATFORM:-linux/amd64}
 release_branch=${RELEASE_BRANCH:-main}
+source_env_file=$(release_resolve_path "${RELEASE_SOURCE_ENV_FILE:-docker/compose/prod/release.env}")
+compose_file=$(release_resolve_path "${RELEASE_COMPOSE_FILE:-docker/compose/prod/compose.yaml}")
 
 case "${image_prefix}" in
     ''|*' '*|*@*|*/) fail "DOCKER_IMAGE_PREFIX must be a full registry namespace prefix without a tag or trailing slash" ;;
@@ -53,10 +56,47 @@ require_clean_repository "${project_root}" geo-registry
 current_branch=$(git -C "${project_root}" branch --show-current)
 [ "${current_branch}" = "${release_branch}" ] \
     || fail "release image must be built from ${release_branch}, current branch is ${current_branch:-detached}"
-if git -C "${project_root}" show-ref --verify --quiet "refs/tags/${release_version}"; then
-    fail "release tag already exists and must not be reused: ${release_version}"
-fi
+release_require_file "${source_env_file}"
+release_require_file "${compose_file}"
+source_identity_format=$(release_source_identity_format "${source_env_file}")
 platform_slug=$(printf '%s' "${platform}" | tr / -)
+image_tag="${release_version}-${platform_slug}"
+image="${image_prefix}/app:${image_tag}"
+revision=$(git -C "${project_root}" rev-parse HEAD)
+release_validate_git_oid "${revision}"
+
+case "${source_identity_format}" in
+    1)
+        if git -C "${project_root}" show-ref --verify --quiet "refs/tags/${release_version}"; then
+            fail "release tag already exists and must not be reused: ${release_version}"
+        fi
+        config_revision=${revision}
+        ;;
+    2)
+        release_validate_prepared_source_files "${source_env_file}" "${compose_file}"
+        [ "$(release_env_value RELEASE_VERSION "${source_env_file}" || true)" = "${release_version}" ] \
+            || fail "prepared source release version does not match RELEASE_VERSION"
+        [ "$(release_env_value DOCKER_IMAGE_PREFIX "${source_env_file}" || true)" = "${image_prefix}" ] \
+            || fail "prepared source image prefix does not match DOCKER_IMAGE_PREFIX"
+        [ "$(release_env_value APP_IMAGE_TAG "${source_env_file}" || true)" = "${image_tag}" ] \
+            || fail "prepared source image tag does not match release platform"
+        [ "$(release_env_value RELEASE_PLATFORM "${source_env_file}" || true)" = "${platform}" ] \
+            || fail "prepared source platform does not match DOCKER_PLATFORM"
+        [ -z "$(release_env_value APP_IMAGE_DIGEST "${source_env_file}" || true)" ] \
+            || fail "prepared source identity must not contain a post-build image digest"
+        [ "$(awk '$1 == "x-app-image:" {value = $3; gsub(/^"|"$/, "", value); print value; exit}' "${compose_file}")" = "${image}" ] \
+            || fail "prepared Compose image does not match release source identity"
+        [ "$(awk '$1 == "APP_VERSION:" {value = $2; gsub(/^"|"$/, "", value); print value; exit}' "${compose_file}")" = "${release_version}" ] \
+            || fail "prepared Compose version does not match release source identity"
+        tag_commit=$(git -C "${project_root}" rev-parse "refs/tags/${release_version}^{commit}" 2>/dev/null || true)
+        [ "${tag_commit}" = "${revision}" ] \
+            || fail "prepared annotated tag ${release_version} must point to current HEAD before build"
+        [ "$(git -C "${project_root}" cat-file -t "refs/tags/${release_version}" 2>/dev/null || true)" = tag ] \
+            || fail "prepared release ref ${release_version} must be an annotated tag"
+        config_revision=$(release_config_revision "${compose_file}" "${source_env_file}")
+        ;;
+esac
+
 artifact_dir=$(release_resolve_path "${RELEASE_ARTIFACT_DIR:-docker/data/release/${release_version}}")
 mkdir -p "${artifact_dir}"
 release_acquire_output_lock \
@@ -66,10 +106,6 @@ release_acquire_output_lock \
 core_revision=$(release_locked_package_reference romanfedorskij/message-bus-async)
 worker_revision=$(release_locked_package_reference romanfedorskij/message-bus-async-worker)
 
-image_tag="${release_version}-${platform_slug}"
-image="${image_prefix}/app:${image_tag}"
-revision=$(git -C "${project_root}" rev-parse HEAD)
-release_validate_git_oid "${revision}"
 release_validate_git_oid "${core_revision}"
 release_validate_git_oid "${worker_revision}"
 phase_manifest_path="${artifact_dir}/phase-manifest.txt"
@@ -82,6 +118,7 @@ if [ -f "${phase_manifest_path}" ]; then
         release_phase_manifest_expect "${phase_manifest_path}" platform "${platform}"
         if [ "$(release_manifest_value built_state "${phase_manifest_path}" || true)" = verified ]; then
             release_phase_manifest_expect "${phase_manifest_path}" built_source_oid "${revision}"
+            release_phase_manifest_expect "${phase_manifest_path}" built_config_revision "${config_revision}"
             release_phase_manifest_expect "${phase_manifest_path}" built_image_reference "${image}"
             release_phase_manifest_expect "${phase_manifest_path}" built_core_oid "${core_revision}"
             release_phase_manifest_expect "${phase_manifest_path}" built_worker_oid "${worker_revision}"
@@ -135,7 +172,7 @@ release_phase_manifest_update "${phase_manifest_path}" \
     platform "${platform}" \
     prepared_state verified \
     prepared_source_oid "${revision}" \
-    prepared_config_revision "${revision}" \
+    prepared_config_revision "${config_revision}" \
     prepared_image_reference "${image}" \
     prepared_core_oid "${core_revision}" \
     prepared_worker_oid "${worker_revision}" \
@@ -143,6 +180,7 @@ release_phase_manifest_update "${phase_manifest_path}" \
     prepared_by "${phase_actor}" \
     built_state verified \
     built_source_oid "${revision}" \
+    built_config_revision "${config_revision}" \
     built_image_reference "${image}" \
     built_image_digest "${exact_image}" \
     built_image_id "${image_id}" \

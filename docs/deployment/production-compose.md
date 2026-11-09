@@ -1,14 +1,14 @@
 # Production Compose
 
-Production runtime запускается нативной командой:
+Production runtime запускается через защитную Compose-обёртку:
 
 ```shell
-docker compose --env-file config/prod.secrets.env up -d
+make prod-up
 ```
 
-Корневой `compose.yaml` подключает production model и frozen `release.env`.
-Оператор передаёт только ignored secret-файл; обычные настройки не дублируются
-в shell session или env-файле.
+Корневой `compose.yaml` подключает production model. Оператор передаёт ignored
+secret-файл, а обёртка связывает tracked source identity с exact artifact
+identity из `docker/data/release/<tag>/release-artifact.env`.
 
 ## Состав
 
@@ -33,8 +33,11 @@ docker compose --env-file config/prod.secrets.env \
 
 `docker/compose/prod/compose.yaml` хранит non-secret defaults: endpoints,
 feature flags, resource budgets, PostgreSQL tuning, ports, healthchecks и
-volumes. `docker/compose/prod/release.env` содержит только frozen image prefix,
-tag, digest и release version и изменяется release tooling.
+volumes. Для новых releases `docker/compose/prod/release.env` содержит tracked
+source identity: image prefix/tag, version и platform без post-build digest.
+Exact digest, image ID, peeled source OID и config revision находятся в ignored
+`release-artifact.env`. Legacy `v0.2.x` сохраняет digest в tracked
+`release.env` и проверяется своими versioned scripts.
 
 Секреты создаются один раз:
 
@@ -62,8 +65,9 @@ heap. Secrets в override не записываются; `image` и `APP_VERSION
 ## Image Contract
 
 Application reference и `APP_VERSION` зафиксированы непосредственно в tracked
-Compose YAML и сверяются с `release.env`; secret-файл и shell environment не
-могут выбрать другой tag. Image имеет `pull_policy: never`.
+Compose YAML и сверяются с source/artifact identity; secret-файл и shell
+environment не могут выбрать другой tag. Artifact identity дополнительно
+связывает tag с exact digest. Image имеет `pull_policy: never`.
 
 Оператор использует одну команду:
 
@@ -76,9 +80,9 @@ make deploy-image
 `docker compose up` не заменяет application image непроверенным pull.
 
 PostgreSQL и OpenSearch images закреплены digest-ами. Persistent volumes не
-удаляются командами release switch. `docker/compose/prod.sh` остаётся защитной
-обёрткой для release tooling и запрещает `--build` и удаление volumes, но для
-обычного запуска не обязателен.
+удаляются командами release switch. `docker/compose/prod.sh` запрещает
+`--build`, удаление volumes и production mutation без exact artifact identity.
+Read-only `config` разрешён до build, чтобы проверить prepared source model.
 
 ## Data Lifecycle
 

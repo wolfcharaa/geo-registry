@@ -26,6 +26,12 @@ RELEASE.md
 DEPLOY.md
 ```
 
+Для release identity format 2 добавляется шестой файл
+`release-artifact.env`; full-data archive соответственно содержит семь файлов.
+Он связывает prepared source OID/config revision с exact image digest и ID и
+должен лежать рядом с `source-manifest.txt` в
+`docker/data/release/<tag>/` на target.
+
 Рядом создаётся отдельный checksum-файл
 `release-geo-registry-vX.Y.Z-offline.tar.sha256`. Он не вкладывается внутрь
 проверяемого tar и передаётся по согласованному доверенному каналу вместе с
@@ -63,7 +69,21 @@ release commit. Архив содержит production data без пароля:
 
 Release version использует формат `vMAJOR.MINOR.PATCH`. Это должна быть новая,
 ещё не существующая версия. Начинать нужно с clean `main` и актуального
-`app/composer.lock`:
+`app/composer.lock`. Сначала подготовьте source identity:
+
+```shell
+make prepare-release-source \
+  DOCKER_IMAGE_PREFIX=registry.example/namespace/geo-registry \
+  RELEASE_VERSION=v1.0.0 \
+  DOCKER_PLATFORM=linux/amd64
+
+git diff -- docker/compose/prod/compose.yaml docker/compose/prod/release.env
+git add docker/compose/prod/compose.yaml docker/compose/prod/release.env
+git commit -m "CHORE(release): Подготовлен релиз v1.0.0"
+git tag -a v1.0.0 -m "Release v1.0.0"
+```
+
+Только после того как annotated tag указывает на текущий HEAD, соберите image:
 
 ```shell
 make build-production \
@@ -72,8 +92,8 @@ make build-production \
   DOCKER_PLATFORM=linux/amd64
 ```
 
-Команда печатает `APP_IMAGE_DIGEST`. Этот digest и registry prefix фиксируются
-в tracked release identity:
+Команда печатает `APP_IMAGE_DIGEST`. Freeze фиксирует digest в ignored artifact
+identity, не меняя tracked source или tag:
 
 ```shell
 make freeze-release \
@@ -83,24 +103,19 @@ make freeze-release \
   DOCKER_PLATFORM=linux/amd64
 ```
 
-Freeze проверяет exact local image, platform, runtime extensions, autoload и
-совпадение image source revision с текущим HEAD. Он атомарно фиксирует exact
-image/version в production Compose и дублирует проверяемую identity в tracked
-`docker/compose/prod/release.env`. После review создаётся отдельный release
-commit и новый annotated tag:
+Freeze проверяет exact local image, platform, runtime extensions, autoload,
+совпадение image source revision с peeled tag OID и атомарно создаёт
+`docker/data/release/v1.0.0/release-artifact.env`. После него tracked tree и refs
+должны остаться неизменными:
 
 ```shell
 git status --short
-git diff -- docker/compose/prod/compose.yaml docker/compose/prod/release.env
-git add docker/compose/prod/compose.yaml docker/compose/prod/release.env
-git commit -m "CHORE(release): Зафиксирован релиз v1.0.0"
-git tag -a v1.0.0 -m "Release v1.0.0"
+test -f docker/data/release/v1.0.0/release-artifact.env
 ```
 
-Release commit не должен содержать никаких других изменений: image уже
-построен из его родительского source commit, а manifest проверяет эту границу.
-Существующий tag, включая source-only tag с `RELEASE_VERSION=unreleased`,
-перемещать или переиспользовать запрещено. Полный tag gate находится в
+Image строится непосредственно из final tagged commit; post-build release
+commit отсутствует. Существующий tag перемещать или переиспользовать запрещено.
+Полный tag gate находится в
 `docs/deployment/source-release.md` в repository checkout.
 
 После commit/tag:

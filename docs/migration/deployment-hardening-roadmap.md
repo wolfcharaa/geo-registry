@@ -26,12 +26,8 @@ production `--no-build --pull never`, атомарные offline archives, annot
 Git bundle, fail-closed restore в отсутствующую БД, migration/GAR gates и
 application-only release switch без удаления persistent volumes.
 
-Открытые ограничения:
+Открытые ограничения после H1/H2:
 
-- application image строится до final release commit/tag, поэтому image source
-  OID и release OID различаются;
-- connected publication должна сохранять resumable phase state и проверять
-  registry удалённо;
 - production target, Docker context и service scope не объединены одним
   read-only plan, отсутствует общий per-target mutation lock;
 - deployment не сохраняет единое current/previous/result evidence;
@@ -46,7 +42,7 @@ application-only release switch без удаления persistent volumes.
 | Этап | Результат | Статус |
 | --- | --- | --- |
 | H1 | Immutable manifest и удалённо проверяемая публикация | `Completed in main` |
-| H2 | Source preparation до build и единый final tag OID | `In progress` |
+| H2 | Source preparation до build и единый final tag OID | `Completed in main` |
 | H3 | Target plan, capabilities, lock и deployment evidence | `Planned` |
 | H4 | Явные offline scopes и полный local image identity | `Planned` |
 | H5 | Bounded health/business smoke и observation result | `Planned` |
@@ -121,17 +117,27 @@ release window.
 
 - [x] Добавить read-only `release-plan` с version, platform, intended image
   reference, source OID и config revision.
-- [ ] Отделить локальную подготовку final release commit/tag от artifact build;
+- [x] Отделить локальную подготовку final release commit/tag от artifact build;
   preparation не строит и не публикует artifacts.
-- [ ] Строить image только из существующего prepared OID/tag; build не создаёт,
+- [x] Строить image только из существующего prepared OID/tag; build не создаёт,
   не двигает и не публикует refs.
-- [ ] Убрать необходимость post-build release commit, не ослабляя проверку
+- [x] Убрать необходимость post-build release commit, не ослабляя проверку
   exact runtime image.
-- [ ] Обновить source/offline runbooks и failure tests для нового tag-контракта.
+- [x] Обновить source/offline runbooks и failure tests для нового tag-контракта.
 
-До миграции `v0.2.x` сохраняет текущую допустимую границу: image source commit
-является родителем release commit, который меняет только frozen Compose и
-`release.env`. Существующие tags никогда не перемещаются.
+`prepare-release-source` атомарно готовит tracked source identity format 2 без
+ещё не существующего digest и оставляет commit/tag оператору для review.
+`build-production` принимает этот формат только когда annotated tag указывает
+на текущий clean HEAD. `freeze-release` записывает exact digest, image ID,
+source OID и config revision в ignored `release-artifact.env`, не меняя source
+или refs. Connected и offline production проверяют этот binding; offline
+transport переносит artifact identity отдельным файлом.
+
+Contract test проходит success path от source preparation до build, freeze,
+fake-registry publication и offline export, а также отклоняет dirty source и
+tag OID mismatch до Docker build. Реальный tag, image, push и transport archive
+в этом slice не создавались. Legacy `v0.2.x` сохраняет прежнюю допустимую
+границу в своих versioned scripts; существующие tags никогда не перемещаются.
 
 ## H3 — Target Plan, Lock И Evidence
 

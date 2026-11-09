@@ -2,7 +2,8 @@
 set -eu
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
+default_project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
+project_root=${RELEASE_PROJECT_ROOT:-${default_project_root}}
 
 # shellcheck disable=SC1091
 . "${script_dir}/release-lib.sh"
@@ -19,6 +20,8 @@ release_version=${RELEASE_VERSION:-${1:-}}
 image_prefix=${DOCKER_IMAGE_PREFIX:-}
 platform=${DOCKER_PLATFORM:-linux/amd64}
 release_branch=${RELEASE_BRANCH:-main}
+source_env_file=$(release_resolve_path "${RELEASE_SOURCE_ENV_FILE:-docker/compose/prod/release.env}")
+compose_file=$(release_resolve_path "${RELEASE_COMPOSE_FILE:-docker/compose/prod/compose.yaml}")
 
 release_validate_version "${release_version}"
 release_validate_prefix "${image_prefix}"
@@ -35,9 +38,20 @@ if [ -n "$(git -C "${project_root}" status --porcelain)" ]; then
     source_state=dirty
 fi
 
+source_identity_format=$(release_source_identity_format "${source_env_file}")
+if [ "${source_identity_format}" = 2 ]; then
+    release_validate_prepared_source_files "${source_env_file}" "${compose_file}"
+fi
 tag_state=absent
 if git -C "${project_root}" show-ref --verify --quiet "refs/tags/${release_version}"; then
     tag_state=existing
+    tag_commit=$(git -C "${project_root}" rev-parse "refs/tags/${release_version}^{commit}" 2>/dev/null || true)
+    tag_type=$(git -C "${project_root}" cat-file -t "refs/tags/${release_version}" 2>/dev/null || true)
+    if [ "${source_identity_format}" = 2 ] \
+        && [ "${tag_commit}" = "${source_oid}" ] \
+        && [ "${tag_type}" = tag ]; then
+        tag_state=prepared
+    fi
 fi
 
 buildx_version=$(docker buildx version 2>/dev/null) \
@@ -54,13 +68,14 @@ worker_revision=$(release_locked_package_reference romanfedorskij/message-bus-as
 release_validate_git_oid "${core_revision}"
 release_validate_git_oid "${worker_revision}"
 config_revision=$(release_config_revision \
-    "${project_root}/docker/compose/prod/compose.yaml" \
-    "${project_root}/docker/compose/prod/release.env")
+    "${compose_file}" \
+    "${source_env_file}")
 
 plan_status=ready
 if [ "${source_state}" != clean ] \
     || [ "${current_branch}" != "${release_branch}" ] \
-    || [ "${tag_state}" != absent ]; then
+    || { [ "${source_identity_format}" = 1 ] && [ "${tag_state}" != absent ]; } \
+    || { [ "${source_identity_format}" = 2 ] && [ "${tag_state}" != prepared ]; }; then
     plan_status=blocked
 fi
 
@@ -71,6 +86,7 @@ printf 'release_branch=%s\n' "${release_branch}"
 printf 'current_branch=%s\n' "${current_branch:-detached}"
 printf 'source_state=%s\n' "${source_state}"
 printf 'source_oid=%s\n' "${source_oid}"
+printf 'source_identity_format=%s\n' "${source_identity_format}"
 printf 'tag_state=%s\n' "${tag_state}"
 printf 'platform=%s\n' "${platform}"
 printf 'image_reference=%s\n' "${image_reference}"
@@ -79,7 +95,11 @@ printf 'message_bus_core_oid=%s\n' "${core_revision}"
 printf 'message_bus_worker_oid=%s\n' "${worker_revision}"
 printf 'buildx=%s\n' "${buildx_version}"
 printf '%s\n' 'external_mutations=none'
-printf '%s\n' 'next_action=review-before-build'
+if [ "${source_identity_format}" = 2 ]; then
+    printf '%s\n' 'next_action=build-prepared-source'
+else
+    printf '%s\n' 'next_action=prepare-release-source'
+fi
 printf '%s\n' 'last_safe_abort=before-build'
 
 [ "${plan_status}" = ready ] \

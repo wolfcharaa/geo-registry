@@ -37,6 +37,10 @@ release_require_file "${release_env_file}"
 release_version=$(release_env_value RELEASE_VERSION "${release_env_file}" || true)
 release_validate_version "${release_version}"
 platform=${DOCKER_PLATFORM:-linux/amd64}
+release_validate_platform "${platform}"
+artifact_dir=$(release_resolve_path "${RELEASE_ARTIFACT_DIR:-docker/data/release/${release_version}}")
+identity_file=$(release_identity_file "${release_env_file}" "${artifact_dir}")
+release_require_file "${identity_file}"
 
 database_name=geo_registry
 database_user=geo_registry
@@ -44,7 +48,7 @@ admin_user=postgres
 
 echo "Checking the configured HTTP host port before changing the running deployment."
 COMPOSE_ENV_FILE="${secrets_file}" \
-    RELEASE_ENV_FILE="${release_env_file}" \
+    RELEASE_ENV_FILE="${identity_file}" \
     DEPLOY_PORT_NEXT_COMMAND="make deploy-update DOCKER_PLATFORM=${platform}" \
     "${script_dir}/deployment-port-preflight.sh"
 
@@ -55,7 +59,7 @@ COMPOSE_ENV_FILE="${secrets_file}" \
     RELEASE_ARTIFACT_DIR="${RELEASE_ARTIFACT_DIR:-}" \
     "${script_dir}/change-release.sh"
 
-container=$(COMPOSE_ENV_FILE="${secrets_file}" RELEASE_ENV_FILE="${release_env_file}" \
+container=$(COMPOSE_ENV_FILE="${secrets_file}" RELEASE_ENV_FILE="${identity_file}" \
     "${project_root}/docker/compose/prod.sh" ps --quiet postgres)
 backup_validate_container "${container}"
 
@@ -96,7 +100,7 @@ if [ "${assume_yes}" -ne 1 ]; then
 fi
 
 compose() {
-    COMPOSE_ENV_FILE="${secrets_file}" RELEASE_ENV_FILE="${release_env_file}" \
+    COMPOSE_ENV_FILE="${secrets_file}" RELEASE_ENV_FILE="${identity_file}" \
         "${project_root}/docker/compose/prod.sh" "$@"
 }
 

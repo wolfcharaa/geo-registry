@@ -2,7 +2,8 @@
 set -eu
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
+default_project_root=$(CDPATH='' cd -- "${script_dir}/../.." && pwd)
+project_root=${RELEASE_PROJECT_ROOT:-${default_project_root}}
 
 # shellcheck disable=SC1091
 . "${script_dir}/release-lib.sh"
@@ -15,13 +16,15 @@ if [ "$(id -u)" -eq 0 ] || [ -n "${SUDO_USER:-}" ]; then
     release_fail "run as the release user, without sudo"
 fi
 
-release_env_file=$(release_resolve_path "${RELEASE_ENV_FILE:-docker/compose/prod/release.env}")
-release_require_file "${release_env_file}"
+source_env_file=$(release_resolve_path "${RELEASE_ENV_FILE:-${RELEASE_SOURCE_ENV_FILE:-docker/compose/prod/release.env}}")
+release_require_file "${source_env_file}"
+compose_file=$(release_resolve_path "${RELEASE_COMPOSE_FILE:-docker/compose/prod/compose.yaml}")
+release_require_file "${compose_file}"
 quick_guide_path="${project_root}/docs/deployment/offline-release.md"
 deploy_guide_path="${project_root}/docs/deployment/release-deploy.md"
 release_require_file "${quick_guide_path}"
 release_require_file "${deploy_guide_path}"
-release_version=$(release_env_value RELEASE_VERSION "${release_env_file}" || true)
+release_version=$(release_env_value RELEASE_VERSION "${source_env_file}" || true)
 release_validate_version "${release_version}"
 platform=${DOCKER_PLATFORM:-linux/amd64}
 release_validate_platform "${platform}"
@@ -68,7 +71,20 @@ case "${include_application_data}" in
 esac
 
 config_revision=$(release_config_revision \
-    "${project_root}/docker/compose/prod/compose.yaml" "${release_env_file}")
+    "${compose_file}" "${source_env_file}")
+source_identity_format=$(release_source_identity_format "${source_env_file}")
+identity_file=$(release_identity_file "${source_env_file}" "${artifact_dir}")
+if [ "${source_identity_format}" = 2 ]; then
+    release_validate_prepared_source_files "${source_env_file}" "${compose_file}"
+    manifest_config_revision=${config_revision}
+    release_validate_artifact_identity \
+        "${identity_file}" "${release_version}" "${platform}" \
+        "${release_commit}" "${config_revision}"
+    artifact_identity_sha256=$(release_sha256 "${identity_file}")
+else
+    manifest_config_revision=${release_commit}
+    artifact_identity_sha256=legacy-tracked-release-env
+fi
 if [ -f "${phase_manifest_path}" ]; then
     phase_manifest_format=$(release_manifest_value phase_manifest_format "${phase_manifest_path}" || true)
     release_validate_phase_manifest_format "${phase_manifest_format}"
@@ -84,6 +100,7 @@ if [ -f "${phase_manifest_path}" ]; then
             release_phase_manifest_expect "${phase_manifest_path}" offline_export_release_oid "${release_commit}"
             release_phase_manifest_expect "${phase_manifest_path}" offline_export_config_revision "${config_revision}"
             release_phase_manifest_expect "${phase_manifest_path}" offline_export_data_bundle "${requested_data_bundle}"
+            release_phase_manifest_expect "${phase_manifest_path}" offline_export_artifact_identity_sha256 "${artifact_identity_sha256}"
             release_phase_manifest_expect "${phase_manifest_path}" offline_export_path "${outer_path}"
             release_phase_manifest_expect "${phase_manifest_path}" offline_export_checksum_path "${checksum_path}"
             release_require_file "${outer_path}"
@@ -123,8 +140,8 @@ release_validate_manifest_format "${manifest_format}"
 if [ "${manifest_format}" = 3 ]; then
     [ "$(release_manifest_value release_tag "${manifest_path}" || true)" = "${release_version}" ] \
         || release_fail "manifest release tag does not match"
-    [ "$(release_manifest_value config_revision "${manifest_path}" || true)" = "${release_commit}" ] \
-        || release_fail "manifest config revision does not match release commit"
+    [ "$(release_manifest_value config_revision "${manifest_path}" || true)" = "${manifest_config_revision}" ] \
+        || release_fail "manifest config revision does not match prepared source"
     [ "$(release_manifest_value image_count "${manifest_path}" || true)" = 1 ] \
         || release_fail "manifest image count must be one"
     [ "$(release_manifest_value image_1_reference "${manifest_path}" || true)" = \
@@ -137,6 +154,20 @@ if [ "${manifest_format}" = 3 ]; then
         "$(release_manifest_value image_1_id "${manifest_path}" || true)"
     [ "$(release_manifest_value assurance "${manifest_path}" || true)" = integrity-only ] \
         || release_fail "manifest assurance must be integrity-only"
+    if [ "${source_identity_format}" = 2 ]; then
+        [ "$(release_env_value APP_IMAGE_TAG "${identity_file}" || true)" = \
+            "${release_version}-${platform_slug}" ] \
+            || release_fail "artifact identity image tag does not match release"
+        [ "$(release_manifest_value image_1_reference "${manifest_path}" || true)" = \
+            "$(release_env_value DOCKER_IMAGE_PREFIX "${identity_file}" || true)/app:$(release_env_value APP_IMAGE_TAG "${identity_file}" || true)" ] \
+            || release_fail "artifact identity image reference does not match manifest"
+        [ "$(release_manifest_value image_1_digest "${manifest_path}" || true)" = \
+            "$(release_env_value DOCKER_IMAGE_PREFIX "${identity_file}" || true)/app@$(release_env_value APP_IMAGE_DIGEST "${identity_file}" || true)" ] \
+            || release_fail "artifact identity image digest does not match manifest"
+        [ "$(release_manifest_value image_1_id "${manifest_path}" || true)" = \
+            "$(release_env_value APP_IMAGE_ID "${identity_file}" || true)" ] \
+            || release_fail "artifact identity image ID does not match manifest"
+    fi
     expected_archive_size=$(release_manifest_value archive_size "${manifest_path}" || true)
     release_validate_size "${expected_archive_size}"
     [ "$(release_file_size "${archive_path}")" = "${expected_archive_size}" ] \
@@ -249,6 +280,9 @@ mv "${manifest_temporary}" "${manifest_path}"
 ln "${archive_path}" "${stage_dir}/${archive_name}"
 ln "${manifest_path}" "${stage_dir}/source-manifest.txt"
 ln "${bundle_path}" "${stage_dir}/${bundle_name}"
+if [ "${source_identity_format}" = 2 ]; then
+    ln "${identity_file}" "${stage_dir}/release-artifact.env"
+fi
 cp "${quick_guide_path}" "${stage_dir}/RELEASE.md"
 cp "${deploy_guide_path}" "${stage_dir}/DEPLOY.md"
 
@@ -256,40 +290,19 @@ if [ "${include_application_data}" = 1 ]; then
     ln "${data_archive_path}" "${stage_dir}/${data_archive_name}"
 fi
 
+set -- "${bundle_name}" "${archive_name}"
 if [ "${include_application_data}" = 1 ]; then
-    tar -cf "${outer_temporary}" -C "${stage_dir}" \
-        "${bundle_name}" \
-        "${archive_name}" \
-        "${data_archive_name}" \
-        source-manifest.txt \
-        RELEASE.md \
-        DEPLOY.md
-else
-    tar -cf "${outer_temporary}" -C "${stage_dir}" \
-        "${bundle_name}" \
-        "${archive_name}" \
-        source-manifest.txt \
-        RELEASE.md \
-        DEPLOY.md
+    set -- "$@" "${data_archive_name}"
 fi
+set -- "$@" source-manifest.txt
+if [ "${source_identity_format}" = 2 ]; then
+    set -- "$@" release-artifact.env
+fi
+set -- "$@" RELEASE.md DEPLOY.md
+tar -cf "${outer_temporary}" -C "${stage_dir}" "$@"
 
 actual_members=$(tar -tf "${outer_temporary}")
-if [ "${include_application_data}" = 1 ]; then
-    expected_members=$(printf '%s\n' \
-        "${bundle_name}" \
-        "${archive_name}" \
-        "${data_archive_name}" \
-        source-manifest.txt \
-        RELEASE.md \
-        DEPLOY.md)
-else
-    expected_members=$(printf '%s\n' \
-        "${bundle_name}" \
-        "${archive_name}" \
-        source-manifest.txt \
-        RELEASE.md \
-        DEPLOY.md)
-fi
+expected_members=$(printf '%s\n' "$@")
 [ "${actual_members}" = "${expected_members}" ] \
     || release_fail "offline archive contains an unexpected member list"
 
@@ -321,6 +334,7 @@ release_phase_manifest_update "${phase_manifest_path}" \
     offline_export_bundle "${bundle_name}" \
     offline_export_bundle_sha256 "${bundle_sha256}" \
     offline_export_manifest_sha256 "$(release_sha256 "${manifest_path}")" \
+    offline_export_artifact_identity_sha256 "${artifact_identity_sha256}" \
     offline_export_verified_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
     offline_export_verified_by "$(id -un)"
 

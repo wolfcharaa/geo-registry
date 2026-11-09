@@ -40,10 +40,13 @@ case "${command_name}" in
         case "${format}" in
             '') ;;
             '{{range .RepoDigests}}{{println .}}{{end}}') printf '%s\n' "${FAKE_DOCKER_EXACT_IMAGE:-}" ;;
+            '{{index .RepoDigests 0}}') printf '%s\n' "${FAKE_DOCKER_EXACT_IMAGE:-}" ;;
             '{{.Os}}/{{.Architecture}}') printf '%s\n' "${FAKE_DOCKER_PLATFORM:-linux/amd64}" ;;
             '{{.Id}}') printf '%s\n' "${FAKE_DOCKER_IMAGE_ID:-sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}" ;;
             '{{index .Config.Labels "org.opencontainers.image.version"}}') printf '%s\n' "${FAKE_DOCKER_VERSION:-v0.2.0}" ;;
             '{{index .Config.Labels "org.opencontainers.image.revision"}}') printf '%s\n' "${FAKE_DOCKER_SOURCE_REVISION:-}" ;;
+            '{{index .Config.Labels "org.geo-registry.message-bus-core.revision"}}') printf '%s\n' "${FAKE_DOCKER_CORE_REVISION:-}" ;;
+            '{{index .Config.Labels "org.geo-registry.message-bus-worker.revision"}}') printf '%s\n' "${FAKE_DOCKER_WORKER_REVISION:-}" ;;
             *) exit 65 ;;
         esac
         ;;
@@ -57,15 +60,22 @@ case "${command_name}" in
     push)
         printf 'Pushed image: %s\n' "${1:-}"
         ;;
+    save)
+        [ "${1:-}" = --output ] || exit 64
+        printf '%s\n' 'fake-docker-image-archive' >"${2:?}"
+        ;;
     buildx)
         case "${1:-}" in
             version)
                 printf '%s\n' 'github.com/docker/buildx v0.37.1 test'
                 ;;
             build)
-                [ "${2:-}" = --help ] || exit 64
-                printf '%s\n' '      --load              Shorthand for --output=type=docker'
-                printf '%s\n' '      --platform string   Set target platform'
+                if [ "${2:-}" = --help ]; then
+                    printf '%s\n' '      --load              Shorthand for --output=type=docker'
+                    printf '%s\n' '      --platform string   Set target platform'
+                elif [ "${FAKE_DOCKER_BUILDX_BUILD_SUPPORTED:-0}" != 1 ]; then
+                    exit 64
+                fi
                 ;;
             imagetools)
                 [ "${2:-}" = inspect ] || exit 64

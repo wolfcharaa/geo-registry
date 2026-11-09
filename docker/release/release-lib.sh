@@ -49,6 +49,78 @@ release_manifest_value() {
     release_env_value "${release_key}" "${release_file}"
 }
 
+release_source_identity_format() {
+    release_source_file=$1
+    release_source_format=$(release_env_value RELEASE_IDENTITY_FORMAT "${release_source_file}" || true)
+
+    case "${release_source_format}" in
+        '') printf '%s\n' 1 ;;
+        2) printf '%s\n' 2 ;;
+        *) release_fail "unsupported release identity format: ${release_source_format}" ;;
+    esac
+}
+
+release_validate_prepared_source_files() {
+    release_prepared_source_file=$1
+    release_prepared_compose_file=$2
+
+    # project_root is defined by every executable before this library is sourced.
+    # shellcheck disable=SC2154
+    [ "${release_prepared_source_file}" = "${project_root}/docker/compose/prod/release.env" ] \
+        || release_fail "prepared source identity must come from the tagged project checkout"
+    [ "${release_prepared_compose_file}" = "${project_root}/docker/compose/prod/compose.yaml" ] \
+        || release_fail "prepared Compose model must come from the tagged project checkout"
+}
+
+release_identity_file() {
+    release_source_file=$1
+    release_artifact_directory=$2
+
+    if [ -n "${RELEASE_ARTIFACT_ENV_FILE:-}" ]; then
+        release_resolve_path "${RELEASE_ARTIFACT_ENV_FILE}"
+        return
+    fi
+
+    if [ -n "$(release_env_value APP_IMAGE_DIGEST "${release_source_file}" || true)" ]; then
+        printf '%s\n' "${release_source_file}"
+        return
+    fi
+
+    printf '%s\n' "${release_artifact_directory}/release-artifact.env"
+}
+
+release_validate_artifact_identity() {
+    release_identity_path=$1
+    release_expected_version=$2
+    release_expected_platform=$3
+    release_expected_source_oid=$4
+    release_expected_config_revision=$5
+    release_actual_image_id=${6:-}
+
+    release_require_file "${release_identity_path}"
+    release_artifact_format=$(release_env_value RELEASE_ARTIFACT_FORMAT "${release_identity_path}" || true)
+    if [ -z "${release_artifact_format}" ]; then
+        return
+    fi
+    [ "${release_artifact_format}" = 1 ] \
+        || release_fail "unsupported release artifact format: ${release_artifact_format}"
+
+    [ "$(release_env_value RELEASE_VERSION "${release_identity_path}" || true)" = "${release_expected_version}" ] \
+        || release_fail "artifact release version does not match prepared source"
+    [ "$(release_env_value DOCKER_PLATFORM "${release_identity_path}" || true)" = "${release_expected_platform}" ] \
+        || release_fail "artifact platform does not match prepared source"
+    [ "$(release_env_value RELEASE_SOURCE_OID "${release_identity_path}" || true)" = "${release_expected_source_oid}" ] \
+        || release_fail "artifact source OID does not match prepared source"
+    [ "$(release_env_value RELEASE_CONFIG_REVISION "${release_identity_path}" || true)" = "${release_expected_config_revision}" ] \
+        || release_fail "artifact config revision does not match prepared source"
+    release_expected_image_id=$(release_env_value APP_IMAGE_ID "${release_identity_path}" || true)
+    release_validate_image_id "${release_expected_image_id}"
+    if [ -n "${release_actual_image_id}" ]; then
+        [ "${release_actual_image_id}" = "${release_expected_image_id}" ] \
+            || release_fail "artifact image ID does not match the verified local image"
+    fi
+}
+
 release_locked_package_reference() {
     release_package_name=$1
     release_require_command php

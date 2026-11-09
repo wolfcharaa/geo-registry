@@ -57,7 +57,13 @@ release-plan: guard-user ## Show immutable source, config and artifact inputs wi
 		docker/release/release-plan.sh
 .PHONY: release-plan
 
-freeze-release: guard-user ## Freeze the tracked production release identity for an already built image
+prepare-release-source: guard-user ## Prepare tracked source identity for review before commit and tag
+	DOCKER_IMAGE_PREFIX="$(DOCKER_IMAGE_PREFIX)" RELEASE_VERSION="$(RELEASE_VERSION)" \
+		DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_BRANCH="$(RELEASE_BRANCH)" \
+		docker/release/prepare-release-source.sh
+.PHONY: prepare-release-source
+
+freeze-release: guard-user ## Freeze exact artifact identity without changing tracked source or refs
 	DOCKER_IMAGE_PREFIX="$(DOCKER_IMAGE_PREFIX)" RELEASE_VERSION="$(RELEASE_VERSION)" APP_IMAGE_DIGEST="$(APP_IMAGE_DIGEST)" \
 		DOCKER_PLATFORM="$(DOCKER_PLATFORM)" RELEASE_BRANCH="$(RELEASE_BRANCH)" \
 		docker/release/freeze-release.sh
@@ -92,6 +98,7 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/release/publish-release-image.sh \
 		docker/release/release-candidates.sh \
 		docker/release/release-plan.sh \
+		docker/release/prepare-release-source.sh \
 		docker/release/pull-release-image.sh \
 		docker/release/change-release.sh \
 		docker/release/extract-release-data.sh \
@@ -122,6 +129,7 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 		docker/release/tests/publish-release-image-test.sh \
 		docker/release/tests/release-output-state-test.sh \
 		docker/release/tests/release-plan-test.sh \
+		docker/release/tests/release-source-preparation-test.sh \
 		docker/release/tests/update-deployment-test.sh \
 		docker/release/tests/init-deployment-test.sh \
 		docker/release/tests/restore-progress-test.sh \
@@ -135,6 +143,7 @@ release-check: guard-user ## Validate release, backup and production wrapper she
 	docker/release/tests/publish-release-image-test.sh
 	docker/release/tests/release-output-state-test.sh
 	docker/release/tests/release-plan-test.sh
+	docker/release/tests/release-source-preparation-test.sh
 	docker/release/tests/init-deployment-test.sh
 	docker/release/tests/restore-progress-test.sh
 	docker/release/tests/update-deployment-test.sh
