@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-09
+
 - Release workflow разделён на reviewable source preparation, повторяемую
   сборку, фиксацию exact image identity и отдельно разрешаемую публикацию с
   проверкой registry digest и возобновляемым phase state.
@@ -121,5 +123,6 @@
 [0.2.3]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.2...v0.2.3
 [0.2.4]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.3...v0.2.4
 [0.2.5]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.4...v0.2.5
+[0.3.0]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.5...v0.3.0
 [0.2.1]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.0...v0.2.1
-[Unreleased]: https://github.com/wolfcharaa/geo-registry/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/wolfcharaa/geo-registry/compare/v0.3.0...HEAD
