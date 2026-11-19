@@ -47,14 +47,14 @@ final class OpenSearchBulkPayloadTest
             aliases: [new AddressAlias('Москва, Тестовая, 1', 'alternative_address', 'osm', 'way', 55, 2)],
         )]);
 
-        $lines = explode("\n", trim($payload->ndjson));
+        $lines = \explode("\n", \trim($payload->ndjson));
         Assert::same($payload->documents, 1);
-        Assert::same(count($lines), 2);
+        Assert::same(\count($lines), 2);
         Assert::same(
-            json_decode($lines[0], true, flags: JSON_THROW_ON_ERROR),
+            \json_decode($lines[0], true, flags: JSON_THROW_ON_ERROR),
             ['index' => ['_id' => '77:adm:123']],
         );
-        $source = self::object(json_decode(
+        $source = self::object(\json_decode(
             $lines[1] ?? throw new LogicException('Missing bulk source.'),
             true,
             flags: JSON_THROW_ON_ERROR,
@@ -84,7 +84,7 @@ final class OpenSearchBulkPayloadTest
     /** @return array<array-key, mixed> */
     private static function object(mixed $value): array
     {
-        if (!is_array($value) || array_is_list($value)) {
+        if (!\is_array($value) || \array_is_list($value)) {
             throw new LogicException('Expected a JSON object.');
         }
 
@@ -94,7 +94,7 @@ final class OpenSearchBulkPayloadTest
     /** @return list<mixed> */
     private static function list(mixed $value): array
     {
-        if (!is_array($value) || !array_is_list($value)) {
+        if (!\is_array($value) || !\array_is_list($value)) {
             throw new LogicException('Expected a JSON list.');
         }
 

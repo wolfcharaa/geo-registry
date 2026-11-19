@@ -17,16 +17,16 @@ final class MigrationHistoryContractTest
 {
     public function testItPreservesAllLegacyHistoryIdentifiers(): void
     {
-        $files = glob(dirname(__DIR__, 4) . '/src/Database/Migration/M[0-9]*.php');
+        $files = \glob(\dirname(__DIR__, 4) . '/src/Database/Migration/M[0-9]*.php');
         if ($files === false) {
             throw new RuntimeException('Unable to read migration source directory.');
         }
 
-        $actual = array_map(
-            static fn(string $file): string => 'App\\Database\\Migration\\' . pathinfo($file, PATHINFO_FILENAME),
+        $actual = \array_map(
+            static fn(string $file): string => 'App\\Database\\Migration\\' . \pathinfo($file, PATHINFO_FILENAME),
             $files,
         );
-        sort($actual);
+        \sort($actual);
 
         Assert::same($actual, MigrationHistoryContract::CLASSES);
 
@@ -42,6 +42,6 @@ final class MigrationHistoryContractTest
             }
         }
 
-        Assert::same($transactional, 23);
+        Assert::same($transactional, 30);
     }
 }

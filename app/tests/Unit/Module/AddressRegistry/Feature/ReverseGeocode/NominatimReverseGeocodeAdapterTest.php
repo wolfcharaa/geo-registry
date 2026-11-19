@@ -30,7 +30,7 @@ final class NominatimReverseGeocodeAdapterTest
 {
     public function testItMapsTheRawPayloadAndBuildsTheReverseRequest(): void
     {
-        $http = new FakeNominatimHttpClient(body: json_encode([
+        $http = new FakeNominatimHttpClient(body: \json_encode([
             'display_name' => 'Регион Альфа, Тестоград, Общая улица, 10',
             'lat' => '55.750001',
             'lon' => '37.610001',
@@ -57,7 +57,7 @@ final class NominatimReverseGeocodeAdapterTest
         Assert::same($location->address->route, 'Общая улица');
         Assert::same($location->address->houseNumber, '10к2');
         Assert::notNull($http->request);
-        Assert::true(str_contains(
+        Assert::true(\str_contains(
             (string) $http->request->getUri(),
             '/reverse?addressdetails=1&format=jsonv2&lat=55.750001&lon=37.610001&zoom=18',
         ));

@@ -23,8 +23,8 @@ final class WorkerRuntimeModuleTest
         $services = Dic::run(
             new WorkerRuntimeModule(
                 new EnvironmentSnapshot([]),
-                MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_registry.php'),
-                MessageCodecRegistryLoader::fromFile(dirname(__DIR__, 4) . '/config/message_bus_codecs.php'),
+                MessageBusRegistrySource::fromFile(\dirname(__DIR__, 4) . '/config/message_bus_registry.php'),
+                MessageCodecRegistryLoader::fromFile(\dirname(__DIR__, 4) . '/config/message_bus_codecs.php'),
             ),
             static fn(WorkerRuntime $runtime): array => [
                 $runtime::class,

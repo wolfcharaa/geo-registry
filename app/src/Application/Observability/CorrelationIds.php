@@ -16,8 +16,8 @@ final readonly class CorrelationIds
         public ?string $jobId = null,
     ) {
         foreach ($this->toArray() as $name => $value) {
-            if (preg_match('/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/D', $value) !== 1) {
-                throw new InvalidArgumentException(sprintf('%s has an invalid correlation identifier.', $name));
+            if (\preg_match('/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/D', $value) !== 1) {
+                throw new InvalidArgumentException(\sprintf('%s has an invalid correlation identifier.', $name));
             }
         }
     }
@@ -25,7 +25,7 @@ final readonly class CorrelationIds
     /** @return array<string, string> */
     public function toArray(): array
     {
-        return array_filter([
+        return \array_filter([
             'request_id' => $this->requestId,
             'message_id' => $this->messageId,
             'correlation_id' => $this->correlationId,

@@ -30,7 +30,7 @@ final readonly class HttpRuntime
     public function run(): void
     {
         $eventLoopDriver = EventLoop::getDriver()::class;
-        if (str_ends_with($eventLoopDriver, '\\EvDriver') && !extension_loaded('pq')) {
+        if (\str_ends_with($eventLoopDriver, '\\EvDriver') && !\extension_loaded('pq')) {
             throw new RuntimeException('ext-pq is required when the Revolt event loop uses ext-ev.');
         }
 
@@ -47,16 +47,16 @@ final readonly class HttpRuntime
             $this->logger->info('HTTP server started', [
                 'event' => 'http.server.started',
                 'listen' => $this->config->listen,
-                'pid' => getmypid(),
+                'pid' => \getmypid(),
                 'worker_id' => Cluster::getContextId(),
                 'event_loop_driver' => $eventLoopDriver,
-                'postgres_driver' => extension_loaded('pq') ? 'pq' : 'pgsql',
+                'postgres_driver' => \extension_loaded('pq') ? 'pq' : 'pgsql',
             ]);
             $heartbeatWatcher = $this->startHeartbeatPublisher();
             Cluster::awaitTermination();
             $this->logger->info('Stopping HTTP server', [
                 'event' => 'http.server.stopping',
-                'pid' => getmypid(),
+                'pid' => \getmypid(),
                 'worker_id' => Cluster::getContextId(),
             ]);
         } finally {
@@ -127,7 +127,7 @@ final readonly class HttpRuntime
 
     private static function processId(): int
     {
-        $pid = getmypid();
+        $pid = \getmypid();
         if ($pid === false) {
             throw new RuntimeException('Unable to read the current HTTP worker process ID.');
         }

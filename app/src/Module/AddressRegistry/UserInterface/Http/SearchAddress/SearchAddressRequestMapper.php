@@ -13,9 +13,9 @@ final readonly class SearchAddressRequestMapper
 
     public function map(Request $request): SearchAddressRequest
     {
-        parse_str($request->getUri()->getQuery(), $parameters);
+        \parse_str($request->getUri()->getQuery(), $parameters);
         $query = $parameters['q'] ?? null;
-        if ($query === null || (is_string($query) && trim($query) === '')) {
+        if ($query === null || (\is_string($query) && \trim($query) === '')) {
             throw new InvalidSearchAddressRequest(
                 'missing_query',
                 'Missing required parameter: q',
@@ -62,12 +62,12 @@ final readonly class SearchAddressRequestMapper
         $profile = $parameters['profile'] ?? null;
         $limit = $parameters['limit'] ?? null;
         $query = [
-            'q' => is_string($q) ? trim($q) : '',
-            'hierarchy' => is_string($hierarchy) ? $hierarchy : 'adm',
-            'limit' => is_string($limit) && ctype_digit($limit) ? (int) $limit : 10,
-            'profile' => is_string($profile) ? $profile : 'search',
+            'q' => \is_string($q) ? \trim($q) : '',
+            'hierarchy' => \is_string($hierarchy) ? $hierarchy : 'adm',
+            'limit' => \is_string($limit) && \ctype_digit($limit) ? (int) $limit : 10,
+            'profile' => \is_string($profile) ? $profile : 'search',
         ];
-        if (is_string($parameters['region_code'] ?? null) && ctype_digit($parameters['region_code'])) {
+        if (\is_string($parameters['region_code'] ?? null) && \ctype_digit($parameters['region_code'])) {
             $query['region_code'] = (int) $parameters['region_code'];
         }
 

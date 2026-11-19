@@ -21,7 +21,7 @@ final class OpenSearchAddressSearchResultMapper
     {
         $hitsEnvelope = self::object($response['hits'] ?? null, 'hits');
         $hits = $hitsEnvelope['hits'] ?? null;
-        if (!is_array($hits) || !array_is_list($hits)) {
+        if (!\is_array($hits) || !\array_is_list($hits)) {
             throw new OpenSearchException('OpenSearch address hits must be a list.');
         }
 
@@ -52,7 +52,7 @@ final class OpenSearchAddressSearchResultMapper
                     dataMosDistrict: self::nullableString($source, 'datamos_district'),
                     cadastralNumbers: self::stringList($source['cadastral_numbers'] ?? []),
                     landCadastralNumbers: self::stringList($source['land_cadastral_numbers'] ?? []),
-                    aliasCount: self::optionalInteger($source, 'alias_count', count($aliases)),
+                    aliasCount: self::optionalInteger($source, 'alias_count', \count($aliases)),
                     regionCode: self::integer($source, 'region_code'),
                 ),
                 score: self::score($hit['_score'] ?? null),
@@ -69,7 +69,7 @@ final class OpenSearchAddressSearchResultMapper
     /** @return list<AddressAlias> */
     private function aliases(mixed $value): array
     {
-        if (!is_array($value) || !array_is_list($value)) {
+        if (!\is_array($value) || !\array_is_list($value)) {
             throw new OpenSearchException('OpenSearch address aliases must be a list.');
         }
 
@@ -92,7 +92,7 @@ final class OpenSearchAddressSearchResultMapper
     /** @return array<array-key, mixed> */
     private static function object(mixed $value, string $field): array
     {
-        if (!is_array($value) || array_is_list($value)) {
+        if (!\is_array($value) || \array_is_list($value)) {
             throw new OpenSearchException("OpenSearch field `{$field}` must be an object.");
         }
 
@@ -103,7 +103,7 @@ final class OpenSearchAddressSearchResultMapper
     private static function string(array $values, string $field): string
     {
         $value = $values[$field] ?? null;
-        if (!is_string($value)) {
+        if (!\is_string($value)) {
             throw new OpenSearchException("OpenSearch field `{$field}` must be a string.");
         }
 
@@ -120,10 +120,10 @@ final class OpenSearchAddressSearchResultMapper
     private static function integer(array $values, string $field): int
     {
         $value = $values[$field] ?? null;
-        if (is_int($value)) {
+        if (\is_int($value)) {
             return $value;
         }
-        if (is_string($value) && preg_match('/^-?\d+$/D', $value) === 1) {
+        if (\is_string($value) && \preg_match('/^-?\d+$/D', $value) === 1) {
             return (int) $value;
         }
 
@@ -139,7 +139,7 @@ final class OpenSearchAddressSearchResultMapper
     /** @param array<array-key, mixed> $values */
     private static function optionalInteger(array $values, string $field, int $default): int
     {
-        return array_key_exists($field, $values) ? self::integer($values, $field) : $default;
+        return \array_key_exists($field, $values) ? self::integer($values, $field) : $default;
     }
 
     /** @param array<array-key, mixed> $values */
@@ -149,10 +149,10 @@ final class OpenSearchAddressSearchResultMapper
         if ($value === null) {
             return null;
         }
-        if (is_int($value) || is_float($value)) {
+        if (\is_int($value) || \is_float($value)) {
             return (float) $value;
         }
-        if (is_string($value) && is_numeric($value)) {
+        if (\is_string($value) && \is_numeric($value)) {
             return (float) $value;
         }
 
@@ -166,10 +166,10 @@ final class OpenSearchAddressSearchResultMapper
         if ($value === null) {
             return null;
         }
-        if (is_string($value)) {
+        if (\is_string($value)) {
             return $value;
         }
-        if (is_int($value)) {
+        if (\is_int($value)) {
             return (string) $value;
         }
 
@@ -179,11 +179,11 @@ final class OpenSearchAddressSearchResultMapper
     /** @return list<string> */
     private static function stringList(mixed $value): array
     {
-        if (!is_array($value) || !array_is_list($value)) {
+        if (!\is_array($value) || !\array_is_list($value)) {
             throw new OpenSearchException('OpenSearch string collection must be a list.');
         }
         foreach ($value as $item) {
-            if (!is_string($item)) {
+            if (!\is_string($item)) {
                 throw new OpenSearchException('OpenSearch string collection must contain only strings.');
             }
         }
@@ -193,7 +193,7 @@ final class OpenSearchAddressSearchResultMapper
 
     private static function score(mixed $value): float
     {
-        if (is_int($value) || is_float($value)) {
+        if (\is_int($value) || \is_float($value)) {
             return (float) $value;
         }
 

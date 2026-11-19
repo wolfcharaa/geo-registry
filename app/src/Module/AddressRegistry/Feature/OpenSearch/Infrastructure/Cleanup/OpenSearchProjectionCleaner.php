@@ -19,12 +19,12 @@ final readonly class OpenSearchProjectionCleaner implements CleanupOpenSearchInd
 
     public function cleanup(CleanupOpenSearchIndex $command): CleanupOpenSearchIndexResult
     {
-        if (!str_starts_with($command->index, $this->alias . '-v')) {
+        if (!\str_starts_with($command->index, $this->alias . '-v')) {
             throw new OpenSearchProjectionFailed(
                 "Cleanup is restricted to versioned indexes of alias `{$this->alias}`.",
             );
         }
-        if (in_array($command->index, $this->openSearch->aliasTargets($this->alias), true)) {
+        if (\in_array($command->index, $this->openSearch->aliasTargets($this->alias), true)) {
             throw new OpenSearchProjectionFailed(
                 "OpenSearch index `{$command->index}` is active for alias `{$this->alias}` and cannot be deleted.",
             );

@@ -31,8 +31,8 @@ final readonly class OpenSearchConfig
         }
         self::assertHttpUrl($this->url);
         if (
-            strlen($this->index) > 235
-            || preg_match('/^[a-z0-9][a-z0-9._-]*$/D', $this->index) !== 1
+            \strlen($this->index) > 235
+            || \preg_match('/^[a-z0-9][a-z0-9._-]*$/D', $this->index) !== 1
         ) {
             throw new InvalidArgumentException(
                 'OPENSEARCH_INDEX must be a lowercase index alias of at most 235 bytes.',
@@ -55,7 +55,7 @@ final readonly class OpenSearchConfig
         }
         self::assertInterval($this->refreshInterval, 'OPENSEARCH_REFRESH_INTERVAL');
         self::assertInterval($this->bulkRefreshInterval, 'OPENSEARCH_BULK_REFRESH_INTERVAL');
-        if (preg_match('/^(?:-1|[1-9][0-9]*[KMG])$/Di', $this->reindexMemoryLimit) !== 1) {
+        if (\preg_match('/^(?:-1|[1-9][0-9]*[KMG])$/Di', $this->reindexMemoryLimit) !== 1) {
             throw new InvalidArgumentException(
                 'OPENSEARCH_REINDEX_MEMORY_LIMIT must be -1 or a positive PHP memory limit with K, M or G suffix.',
             );
@@ -89,8 +89,8 @@ final readonly class OpenSearchConfig
             return $default;
         }
 
-        $integer = filter_var($value, FILTER_VALIDATE_INT);
-        if (!is_int($integer)) {
+        $integer = \filter_var($value, FILTER_VALIDATE_INT);
+        if (!\is_int($integer)) {
             throw new InvalidArgumentException("{$name} must be an integer.");
         }
 
@@ -99,18 +99,18 @@ final readonly class OpenSearchConfig
 
     private static function assertInterval(string $value, string $name): void
     {
-        if ($value !== '-1' && preg_match('/^\d+(?:ms|s|m|h|d)$/D', $value) !== 1) {
+        if ($value !== '-1' && \preg_match('/^\d+(?:ms|s|m|h|d)$/D', $value) !== 1) {
             throw new InvalidArgumentException("{$name} must be -1 or a positive OpenSearch duration.");
         }
     }
 
     private static function assertHttpUrl(string $url): void
     {
-        $parts = parse_url($url);
-        $scheme = is_array($parts) ? $parts['scheme'] ?? null : null;
-        $host = is_array($parts) ? $parts['host'] ?? null : null;
+        $parts = \parse_url($url);
+        $scheme = \is_array($parts) ? $parts['scheme'] ?? null : null;
+        $host = \is_array($parts) ? $parts['host'] ?? null : null;
 
-        if (!in_array($scheme, ['http', 'https'], true) || !is_string($host) || $host === '') {
+        if (!\in_array($scheme, ['http', 'https'], true) || !\is_string($host) || $host === '') {
             throw new InvalidArgumentException('OPENSEARCH_URL must be an absolute HTTP(S) URL.');
         }
     }

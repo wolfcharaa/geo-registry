@@ -12,6 +12,7 @@ use Amp\Postgres\PostgresConnectionPool;
 use App\Infrastructure\Postgres\PostgresPoolFactory;
 use App\Module\AddressRegistry\Capability\Activity\PostgresStatementActivity;
 use App\Module\AddressRegistry\Infrastructure\Postgres\PostgresGarActivityReader;
+use App\Module\AddressRegistry\Infrastructure\Postgres\PostgresGarStatusReader;
 use App\Tests\Support\Database\IntegrationDatabase;
 use Testo\Assert;
 use Testo\Test;
@@ -36,25 +37,37 @@ final class GarActivityIntegrationTest
             ));
             delay(0.05);
             $snapshot = (new PostgresGarActivityReader($pool))->read(20);
+            $status = (new PostgresGarStatusReader($pool))->read([50, 77], false);
 
-            Assert::same(count($snapshot->operations), 2);
+            Assert::same(\count($snapshot->operations), 2);
             $import = $snapshot->operations[0] ?? null;
             $rebuild = $snapshot->operations[1] ?? null;
             Assert::notNull($import);
             Assert::notNull($rebuild);
             Assert::same($import->type, 'gar_import');
+            Assert::same($import->mode, 'initial-load');
+            Assert::same($import->phase, 'import');
+            Assert::same($import->writeMode, 'direct-copy');
+            Assert::same($import->attempt, 1);
+            Assert::same($import->batchSize, 50000);
+            Assert::same($import->pipelineState, 'waiting-for-gap');
+            Assert::same($import->pipelinePendingRanges, 1);
+            Assert::notNull($status->import);
+            Assert::same($status->import->pipelineState, 'waiting-for-gap');
+            Assert::same($status->import->pipelinePendingRows, 10);
+            Assert::same($status->import->progressAge === '', false);
             Assert::same($rebuild->type, 'address_search_rebuild');
-            Assert::same(count($snapshot->workers), 1);
+            Assert::same(\count($snapshot->workers), 1);
             $worker = $snapshot->workers[0] ?? null;
             Assert::notNull($worker);
             Assert::same($worker->instanceId, 'worker-integration');
-            Assert::same(count($snapshot->queues), 1);
+            Assert::same(\count($snapshot->queues), 1);
             $queue = $snapshot->queues[0] ?? null;
             Assert::notNull($queue);
             Assert::same($queue->bindingId, 'gar.address_coordinates.update');
-            Assert::true(array_any(
+            Assert::true(\array_any(
                 $snapshot->statements,
-                static fn(PostgresStatementActivity $statement): bool => str_contains(
+                static fn(PostgresStatementActivity $statement): bool => \str_contains(
                     $statement->query,
                     'gar-activity-integration',
                 ),
@@ -71,11 +84,34 @@ final class GarActivityIntegrationTest
         $pool->query(<<<'SQL'
 INSERT INTO gar_import_operations (
     source_key, source_path, manifest_hash, status, batch_size,
-    files_total, files_completed, rows_processed, rows_merged
+    files_total, files_completed, rows_processed, rows_merged,
+    mode, write_mode, pipeline_file_key, pipeline_writers,
+    pipeline_batches, pipeline_bytes,
+    pipeline_peak_in_flight_batches, pipeline_peak_in_flight_bytes
 ) VALUES (
     repeat('a', 64), '/fixture/gar', repeat('b', 64), 'running', 50000,
-    2, 1, 100, 90
+    2, 1, 100, 90,
+    'initial-load', 'direct-copy', repeat('c', 64), 2,
+    5, 1000, 2, 500
 )
+SQL);
+        $pool->query(<<<'SQL'
+INSERT INTO gar_import_files (
+    operation_id, file_key, relative_path, descriptor_key, table_name,
+    file_size, file_mtime, status, processed_rows, merged_rows, pipeline_enabled
+)
+SELECT id, repeat('c', 64), '77/AS_HOUSES_PARAMS.XML', 'object-parameters', 'object_params',
+       1000, 1, 'running', 80, 80, true
+FROM gar_import_operations
+ORDER BY id DESC
+LIMIT 1
+SQL);
+        $pool->query(<<<'SQL'
+INSERT INTO gar_import_file_batches (operation_id, file_key, first_row, last_row, encoded_bytes)
+SELECT id, repeat('c', 64), 91, 100, 200
+FROM gar_import_operations
+ORDER BY id DESC
+LIMIT 1
 SQL);
         $pool->query(<<<'SQL'
 INSERT INTO address_search_rebuild_operations (

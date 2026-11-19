@@ -62,15 +62,15 @@ final class PostgresSearchAddressReaderIntegrationTest
             ), $cancellation);
 
             Assert::true($region77 !== []);
-            Assert::true(array_all(
+            Assert::true(\array_all(
                 $region77,
-                static fn(SearchAddressMatch $match): bool => str_starts_with((string) $match->document->objectId, '77'),
+                static fn(SearchAddressMatch $match): bool => \str_starts_with((string) $match->document->objectId, '77'),
             ));
-            Assert::same(array_map(
+            Assert::same(\array_map(
                 static fn(SearchAddressMatch $match): int => $match->document->objectId,
                 $region78,
             ), [780005]);
-            Assert::same(array_map(
+            Assert::same(\array_map(
                 static fn(SearchAddressMatch $match): int => $match->document->objectId,
                 $nationwide,
             ), [770005, 780005]);
@@ -127,7 +127,7 @@ SQL);
                 regionCode: 77,
             ), new NullCancellation());
 
-            Assert::same(array_map(
+            Assert::same(\array_map(
                 static fn(SearchAddressMatch $match): array => [
                     $match->document->objectId,
                     $match->document->aliasCount,

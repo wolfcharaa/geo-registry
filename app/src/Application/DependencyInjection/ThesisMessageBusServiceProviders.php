@@ -35,7 +35,7 @@ final readonly class ThesisMessageBusServiceProviders
     {
         $providers = [];
         foreach ($this->services->types as $id => $serviceType) {
-            if (!is_string($id)) {
+            if (!\is_string($id)) {
                 throw new UnexpectedValueException('MessageBus service IDs must be non-numeric strings.');
             }
             $service = $this->overrides[$id] ?? match ($serviceType) {

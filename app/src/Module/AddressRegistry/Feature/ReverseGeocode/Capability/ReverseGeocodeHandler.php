@@ -59,7 +59,7 @@ final readonly class ReverseGeocodeHandler
             profile: SearchProfile::Search,
             limit: $query->limit,
         ))->matches;
-        $matches = array_values(array_filter(
+        $matches = \array_values(\array_filter(
             $matches,
             static fn(SearchAddressMatch $match): bool => self::matchesAddress(
                 $match,
@@ -88,10 +88,10 @@ final readonly class ReverseGeocodeHandler
 
     private static function hasExactHouseNumber(string $value, string $houseNumber): bool
     {
-        $houseNumber = preg_quote(self::normalizeHouseNumber($houseNumber), '/');
-        $houseNumber = str_replace(' ', '\\s*', $houseNumber);
+        $houseNumber = \preg_quote(self::normalizeHouseNumber($houseNumber), '/');
+        $houseNumber = \str_replace(' ', '\\s*', $houseNumber);
 
-        return preg_match(
+        return \preg_match(
             '/(?:^|[,\s])(?:д|дом)\.?\s*' . $houseNumber
             . '(?=$|[, ]|\s+(?:к|корп|корпус|стр|строение|с|вл|владение|помещ|помещение)\.?)/iu',
             $value,
@@ -100,13 +100,13 @@ final readonly class ReverseGeocodeHandler
 
     private static function containsRoute(string $value, string $route): bool
     {
-        if (trim($route) === '') {
+        if (\trim($route) === '') {
             return false;
         }
 
         foreach (self::routeVariants($route) as $variant) {
-            $pattern = str_replace(' ', '\\s+', preg_quote($variant, '/'));
-            if (preg_match('/(?:^|[,\s])' . $pattern . '(?=$|[,])/iu', $value) === 1) {
+            $pattern = \str_replace(' ', '\\s+', \preg_quote($variant, '/'));
+            if (\preg_match('/(?:^|[,\s])' . $pattern . '(?=$|[,])/iu', $value) === 1) {
                 return true;
             }
         }
@@ -117,20 +117,20 @@ final readonly class ReverseGeocodeHandler
     /** @return non-empty-list<string> */
     private static function routeVariants(string $route): array
     {
-        $route = trim((string) preg_replace('/\s+/u', ' ', $route));
-        $parts = explode(' ', $route);
-        if (count($parts) < 2) {
+        $route = \trim((string) \preg_replace('/\s+/u', ' ', $route));
+        $parts = \explode(' ', $route);
+        if (\count($parts) < 2) {
             return [$route];
         }
 
-        $first = mb_strtolower($parts[0]);
-        $lastIndex = count($parts) - 1;
-        $last = mb_strtolower($parts[$lastIndex]);
-        if (in_array($first, self::ROUTE_TYPES, true)) {
-            return [$route, implode(' ', [...array_slice($parts, 1), $parts[0]])];
+        $first = \mb_strtolower($parts[0]);
+        $lastIndex = \count($parts) - 1;
+        $last = \mb_strtolower($parts[$lastIndex]);
+        if (\in_array($first, self::ROUTE_TYPES, true)) {
+            return [$route, \implode(' ', [...\array_slice($parts, 1), $parts[0]])];
         }
-        if (in_array($last, self::ROUTE_TYPES, true)) {
-            return [$route, implode(' ', [$parts[$lastIndex], ...array_slice($parts, 0, $lastIndex)])];
+        if (\in_array($last, self::ROUTE_TYPES, true)) {
+            return [$route, \implode(' ', [$parts[$lastIndex], ...\array_slice($parts, 0, $lastIndex)])];
         }
 
         return [$route];
@@ -138,8 +138,8 @@ final readonly class ReverseGeocodeHandler
 
     private static function normalizeHouseNumber(string $houseNumber): string
     {
-        $houseNumber = (string) preg_replace('/([а-яА-Яa-zA-Z])(\d)/u', '$1 $2', $houseNumber);
+        $houseNumber = (string) \preg_replace('/([а-яА-Яa-zA-Z])(\d)/u', '$1 $2', $houseNumber);
 
-        return (string) preg_replace('/(\d)([а-яА-Яa-zA-Z])/u', '$1 $2', $houseNumber);
+        return (string) \preg_replace('/(\d)([а-яА-Яa-zA-Z])/u', '$1 $2', $houseNumber);
     }
 }

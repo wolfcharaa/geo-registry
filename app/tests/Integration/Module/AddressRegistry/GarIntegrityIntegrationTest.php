@@ -33,9 +33,29 @@ final class GarIntegrityIntegrationTest
             $deep = $checker->check([77, 78], true);
 
             Assert::true($deep->isValid());
-            Assert::same(count($deep->checks), 13);
+            Assert::same(\count($deep->checks), 16);
             Assert::same($deep->failedChecks(), 0);
             Assert::same($deep->unavailableChecks(), 0);
+
+            $pool->query(<<<'SQL'
+UPDATE gar_import_operations
+SET mode = 'initial-load', write_mode = 'direct-copy',
+    pipeline_file_key = repeat('c', 64), pipeline_writers = 1
+WHERE id = (SELECT id FROM gar_import_operations ORDER BY id DESC LIMIT 1)
+SQL);
+            $pool->query(<<<'SQL'
+INSERT INTO gar_import_file_batches (
+    operation_id, file_key, first_row, last_row, encoded_bytes
+)
+SELECT id, repeat('c', 64), 21, 22, 100
+FROM gar_import_operations
+ORDER BY id DESC
+LIMIT 1
+SQL);
+            $pipelineBacklog = $checker->check([77, 78], false);
+            Assert::false($pipelineBacklog->isValid());
+            Assert::same($pipelineBacklog->failedChecks(), 1);
+            $pool->query('DELETE FROM gar_import_file_batches');
 
             $pool->query(<<<'SQL'
 UPDATE address_search_rebuild_operations
@@ -82,7 +102,7 @@ INSERT INTO gar_import_operations (
 RETURNING id
 SQL)->fetchRow();
         $operationId = $operation['id'] ?? null;
-        Assert::true(is_int($operationId) || is_string($operationId));
+        Assert::true(\is_int($operationId) || \is_string($operationId));
 
         $pool->execute(<<<'SQL'
 INSERT INTO gar_import_files (

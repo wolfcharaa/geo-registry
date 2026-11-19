@@ -40,7 +40,7 @@ final class GarStatusCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $regions = $input->getOption('regions');
-        if (!is_string($regions)) {
+        if (!\is_string($regions)) {
             $output->writeln('<error>Option --regions must be a comma-separated list.</error>');
 
             return self::INVALID;
@@ -62,22 +62,28 @@ final class GarStatusCommand extends Command
             return self::FAILURE;
         }
 
-        $output->writeln(sprintf(
+        $output->writeln(\sprintf(
             'gar_version=%s gar_version_date=%s exact=%s',
             $snapshot->garVersion ?? 'unknown',
             $snapshot->garVersionDate ?? 'unknown',
             $snapshot->exact ? 'yes' : 'no',
         ));
         $import = $snapshot->import;
-        $output->writeln($import === null ? 'import=missing' : sprintf(
-            'import=%s operation=%d source=%s manifest=%s files=%d/%d file_states=%s rows=%d merged=%d updated_at=%s',
+        $output->writeln($import === null ? 'import=missing' : \sprintf(
+            'import=%s operation=%d mode=%s phase=%s write=%s attempt=%d batch_size=%d source=%s manifest=%s '
+                . 'files=%d/%d file_states=%s rows=%d merged=%d updated_at=%s progress_age=%s',
             $import->status,
             $import->operationId,
+            $import->mode,
+            $import->phase,
+            $import->writeMode,
+            $import->attempt,
+            $import->batchSize,
             $import->sourcePath,
             $import->manifestHash,
             $import->filesCompleted,
             $import->filesTotal,
-            sprintf(
+            \sprintf(
                 'pending:%d,running:%d,completed:%d,failed:%d',
                 $import->pendingFiles,
                 $import->runningFiles,
@@ -87,9 +93,32 @@ final class GarStatusCommand extends Command
             $import->rowsProcessed,
             $import->rowsMerged,
             $import->updatedAt,
+            $import->progressAge,
         ));
+        if ($import !== null) {
+            $output->writeln(\sprintf(
+                'pipeline=%s target=%s writers=%s batches=%d bytes=%d peak_batches=%d peak_bytes=%d '
+                    . 'pending_ranges=%d pending_rows=%d progress_age=%s',
+                $import->pipelineState,
+                $import->pipelineFile ?? 'off',
+                $import->pipelineWriters === null ? 'off' : (string) $import->pipelineWriters,
+                $import->pipelineBatches,
+                $import->pipelineBytes,
+                $import->pipelinePeakInFlightBatches,
+                $import->pipelinePeakInFlightBytes,
+                $import->pipelinePendingRanges,
+                $import->pipelinePendingRows,
+                $import->pipelineProgressAge ?? 'none',
+            ));
+            $output->writeln(\sprintf(
+                'foreign_keys=%s completed=%d/%d',
+                $import->deferForeignKeys ? 'deferred' : 'active',
+                $import->foreignKeysCompleted,
+                $import->foreignKeysTotal,
+            ));
+        }
         $rebuild = $snapshot->rebuild;
-        $output->writeln($rebuild === null ? 'rebuild=missing' : sprintf(
+        $output->writeln($rebuild === null ? 'rebuild=missing' : \sprintf(
             'rebuild=%s phase=%s operation=%d tasks=%d/%d scanned=%d written=%d rows=%d updated_at=%s',
             $rebuild->status,
             $rebuild->phase,
@@ -112,21 +141,21 @@ final class GarStatusCommand extends Command
     private static function regions(string $value): array
     {
         $regions = [];
-        foreach (explode(',', $value) as $part) {
-            $part = trim($part);
-            if (preg_match('/^[0-9]{1,2}$/D', $part) !== 1 || (int) $part < 1 || (int) $part > 99) {
+        foreach (\explode(',', $value) as $part) {
+            $part = \trim($part);
+            if (\preg_match('/^[0-9]{1,2}$/D', $part) !== 1 || (int) $part < 1 || (int) $part > 99) {
                 throw new InvalidArgumentException('Option --regions accepts unique codes from 1 to 99.');
             }
             $regions[(int) $part] = (int) $part;
         }
-        ksort($regions);
+        \ksort($regions);
 
-        return array_values($regions);
+        return \array_values($regions);
     }
 
     private static function regionLine(GarRegionStatus $region): string
     {
-        return sprintf(
+        return \sprintf(
             'region=%d hierarchy=%s checkpoint=%s checkpoint_rows=%d projection_rows=%s geocoded=%s datamos=%s aliases=%s',
             $region->regionCode,
             $region->hierarchy,

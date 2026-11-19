@@ -258,7 +258,7 @@ SQL;
 
         try {
             $result = $this->postgres->execute(
-                str_replace(self::REGION_CONDITION, $regionCondition, self::SELECT),
+                \str_replace(self::REGION_CONDITION, $regionCondition, self::SELECT),
                 $parameters,
             );
             $matches = [];
@@ -296,7 +296,7 @@ SQL;
 
     private function containsPattern(string $query): string
     {
-        return '%' . str_replace(
+        return '%' . \str_replace(
             ['\\', '%', '_'],
             ['\\\\', '\\%', '\\_'],
             $query,
@@ -306,16 +306,16 @@ SQL;
     /** @return list<AddressAlias> */
     private function aliases(mixed $value): array
     {
-        if (is_string($value)) {
-            $value = json_decode($value, true, flags: JSON_THROW_ON_ERROR);
+        if (\is_string($value)) {
+            $value = \json_decode($value, true, flags: JSON_THROW_ON_ERROR);
         }
-        if (!is_array($value)) {
+        if (!\is_array($value)) {
             throw new RuntimeException('PostgreSQL field `address_aliases` must be a JSON list.');
         }
 
         $aliases = [];
         foreach ($value as $alias) {
-            if (!is_array($alias)) {
+            if (!\is_array($alias)) {
                 throw new RuntimeException('PostgreSQL address alias must be a JSON object.');
             }
             $aliases[] = new AddressAlias(
@@ -335,7 +335,7 @@ SQL;
     private function string(array $row, string $field): string
     {
         $value = $row[$field] ?? null;
-        if (!is_string($value)) {
+        if (!\is_string($value)) {
             throw new RuntimeException("PostgreSQL field `{$field}` must be a string.");
         }
 

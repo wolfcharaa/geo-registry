@@ -24,7 +24,7 @@ final class DataMosSnapshotDownloaderTest
     {
         $transport = new DataMosApiResponseHttpClient();
         $downloader = new DataMosSnapshotDownloader(new HttpClient($transport, []), 'geo-registry/test');
-        $directory = sys_get_temp_dir() . '/geo-registry-datamos-' . bin2hex(random_bytes(8));
+        $directory = \sys_get_temp_dir() . '/geo-registry-datamos-' . \bin2hex(\random_bytes(8));
         $destination = $directory . '/addressreestr.jsonl.gz';
 
         try {
@@ -38,20 +38,20 @@ final class DataMosSnapshotDownloaderTest
             Assert::same($result->dataset->versionNumber, 3);
             Assert::same($result->dataset->releaseNumber, 165);
             Assert::same(
-                file_get_contents('compress.zlib://' . $destination),
+                \file_get_contents('compress.zlib://' . $destination),
                 "{\"Cells\":{\"ADDRESS\":\"Москва, Тестовая, 1\"}}\n"
                 . "{\"Cells\":{\"ADDRESS\":\"Москва, Тестовая, 2\"}}\n",
             );
 
-            $manifest = file_get_contents($result->manifestPath);
-            Assert::true(is_string($manifest));
-            Assert::true(str_contains($manifest, 'geo-registry-datamos-snapshot-v1'));
-            Assert::true(str_contains($manifest, '"version_number": 3'));
-            Assert::false(str_contains($manifest, 'secret-api-key'));
+            $manifest = \file_get_contents($result->manifestPath);
+            Assert::true(\is_string($manifest));
+            Assert::true(\str_contains($manifest, 'geo-registry-datamos-snapshot-v1'));
+            Assert::true(\str_contains($manifest, '"version_number": 3'));
+            Assert::false(\str_contains($manifest, 'secret-api-key'));
 
             $rowsRequest = $transport->requests[2] ?? null;
             Assert::notNull($rowsRequest);
-            parse_str($rowsRequest->getUri()->getQuery(), $query);
+            \parse_str($rowsRequest->getUri()->getQuery(), $query);
             Assert::same($query['$top'] ?? null, '2');
             Assert::same($query['$skip'] ?? null, '0');
             Assert::same($query['versionNumber'] ?? null, '3');
@@ -66,9 +66,9 @@ final class DataMosSnapshotDownloaderTest
             Assert::same($import->readRows, 2);
             Assert::same($import->writtenRows, 2);
         } finally {
-            @unlink($destination . '.manifest.json');
-            @unlink($destination);
-            @rmdir($directory);
+            @\unlink($destination . '.manifest.json');
+            @\unlink($destination);
+            @\rmdir($directory);
         }
     }
 }
@@ -84,9 +84,9 @@ final class DataMosApiResponseHttpClient implements DelegateHttpClient
         $cancellation->throwIfRequested();
         $path = $request->getUri()->getPath();
         $body = match (true) {
-            str_ends_with($path, '/version') => '[{"VersionNumber":3,"ReleaseNumber":165}]',
-            str_ends_with($path, '/count') => '2',
-            str_ends_with($path, '/rows') => '[{"Cells":{"ADDRESS":"Москва, Тестовая, 1"}},{"Cells":{"ADDRESS":"Москва, Тестовая, 2"}}]',
+            \str_ends_with($path, '/version') => '[{"VersionNumber":3,"ReleaseNumber":165}]',
+            \str_ends_with($path, '/count') => '2',
+            \str_ends_with($path, '/rows') => '[{"Cells":{"ADDRESS":"Москва, Тестовая, 1"}},{"Cells":{"ADDRESS":"Москва, Тестовая, 2"}}]',
             default => 'null',
         };
 

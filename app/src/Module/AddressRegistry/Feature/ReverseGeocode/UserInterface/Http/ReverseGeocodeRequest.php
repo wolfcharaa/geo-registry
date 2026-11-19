@@ -40,7 +40,7 @@ final readonly class ReverseGeocodeRequest
 
     public function normalizedHierarchy(): AddressHierarchy
     {
-        if (!is_string($this->hierarchy)) {
+        if (!\is_string($this->hierarchy)) {
             throw new LogicException('ReverseGeocodeRequest must be validated before normalization.');
         }
 
@@ -49,10 +49,10 @@ final readonly class ReverseGeocodeRequest
 
     public function normalizedLimit(): int
     {
-        if (is_int($this->limit)) {
+        if (\is_int($this->limit)) {
             return $this->limit;
         }
-        if (is_string($this->limit) && ctype_digit($this->limit)) {
+        if (\is_string($this->limit) && \ctype_digit($this->limit)) {
             return (int) $this->limit;
         }
 
@@ -72,7 +72,7 @@ final readonly class ReverseGeocodeRequest
 
     private function coordinate(mixed $value): float
     {
-        if ((!is_int($value) && !is_float($value) && !is_string($value)) || !is_numeric($value)) {
+        if ((!\is_int($value) && !\is_float($value) && !\is_string($value)) || !\is_numeric($value)) {
             throw new LogicException('ReverseGeocodeRequest must be validated before normalization.');
         }
 

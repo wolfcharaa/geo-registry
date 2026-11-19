@@ -21,17 +21,17 @@ final readonly class OpenSearchBulkPayload
         $ndjson = '';
         $components = new OpenSearchAddressComponentParser();
         foreach ($documents as $document) {
-            $ndjson .= json_encode(
+            $ndjson .= \json_encode(
                 ['index' => ['_id' => $document->id()]],
                 JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
             ) . "\n";
-            $ndjson .= json_encode(
+            $ndjson .= \json_encode(
                 self::source($document, $components),
                 JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
             ) . "\n";
         }
 
-        return new self($ndjson, count($documents));
+        return new self($ndjson, \count($documents));
     }
 
     /** @return array<string, mixed> */
@@ -42,7 +42,7 @@ final readonly class OpenSearchBulkPayload
         $document = $projection->document;
         $componentSets = $components->componentSets([
             $document->address,
-            ...array_map(static fn(AddressAlias $alias): string => $alias->value, $projection->aliases),
+            ...\array_map(static fn(AddressAlias $alias): string => $alias->value, $projection->aliases),
         ]);
 
         return [
@@ -71,7 +71,7 @@ final readonly class OpenSearchBulkPayload
             'address_house_key' => $componentSets['house_key'],
             'address_building_key' => $componentSets['building_key'],
             'address_structure_key' => $componentSets['structure_key'],
-            'aliases' => array_map(self::alias(...), $projection->aliases),
+            'aliases' => \array_map(self::alias(...), $projection->aliases),
         ];
     }
 

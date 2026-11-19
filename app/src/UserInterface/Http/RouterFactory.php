@@ -163,16 +163,16 @@ final readonly class RouterFactory
 
     private static function queryParameter(Request $request, string $name): ?string
     {
-        parse_str($request->getUri()->getQuery(), $parameters);
+        \parse_str($request->getUri()->getQuery(), $parameters);
         $value = $parameters[$name] ?? null;
 
-        return is_string($value) && trim($value) !== '' ? trim($value) : null;
+        return \is_string($value) && \trim($value) !== '' ? \trim($value) : null;
     }
 
     private static function limit(Request $request): int
     {
         $value = self::queryParameter($request, 'limit');
 
-        return $value !== null && ctype_digit($value) ? max(1, min(50, (int) $value)) : 5;
+        return $value !== null && \ctype_digit($value) ? \max(1, \min(50, (int) $value)) : 5;
     }
 }

@@ -19,7 +19,7 @@ final class OpenSearchIndexInventoryTest
 {
     public function testItReturnsOnlySortedConcreteIndexesWithTheRequestedPrefix(): void
     {
-        $http = new IndexInventoryHttpClient(json_encode([
+        $http = new IndexInventoryHttpClient(\json_encode([
             ['index' => 'other-v1'],
             ['index' => 'places-v2'],
             ['index' => 'places-v1'],

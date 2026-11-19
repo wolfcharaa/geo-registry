@@ -76,7 +76,7 @@ final class ApplicationMessageBusModuleTest
                 Assert::same($trace->disposedError, null);
                 Assert::same($correlationContext->current(), null);
                 $records = $logHandler->getRecords();
-                Assert::same(array_map(
+                Assert::same(\array_map(
                     static fn(LogRecord $record): mixed => $record->context['event'] ?? null,
                     $records,
                 ), [
@@ -86,7 +86,7 @@ final class ApplicationMessageBusModuleTest
                     'message.execution.completed',
                 ]);
                 foreach ($records as $record) {
-                    Assert::false(array_key_exists('message', $record->context));
+                    Assert::false(\array_key_exists('message', $record->context));
                 }
             },
         );

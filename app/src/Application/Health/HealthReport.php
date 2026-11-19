@@ -22,7 +22,7 @@ final readonly class HealthReport
 
         return [
             'status' => $this->status->value,
-            'components' => array_map(
+            'components' => \array_map(
                 static fn(HealthComponentResult $component): array => $component->toArray(),
                 $this->components,
             ),

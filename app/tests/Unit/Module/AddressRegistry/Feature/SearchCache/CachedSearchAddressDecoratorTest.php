@@ -143,7 +143,7 @@ final class CachedSearchAddressDecoratorTest
         }
 
         Assert::instanceOf($error, RuntimeException::class);
-        Assert::same(count($decorator->search($this->criteria(), new NullCancellation())), 1);
+        Assert::same(\count($decorator->search($this->criteria(), new NullCancellation())), 1);
         Assert::same($reader->calls, 2);
 
         $callsBeforeCancellation = $reader->calls;
@@ -188,7 +188,7 @@ final class RecordingCache implements Cache
 
     public function set(string $key, mixed $value, ?int $ttl = null): void
     {
-        if (!is_array($value) || !array_is_list($value)) {
+        if (!\is_array($value) || !\array_is_list($value)) {
             throw new RuntimeException('Expected a match list.');
         }
         foreach ($value as $match) {
@@ -232,7 +232,7 @@ final class RecordingSearchAddressReader implements SearchAddressPort
             --$this->failures;
             throw new RuntimeException('Search failed.');
         }
-        if (in_array($criteria->query, $this->emptyQueries, true)) {
+        if (\in_array($criteria->query, $this->emptyQueries, true)) {
             return [];
         }
 

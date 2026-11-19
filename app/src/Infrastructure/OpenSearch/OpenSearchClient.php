@@ -23,7 +23,7 @@ final readonly class OpenSearchClient
             'wait_for_status' => 'yellow',
         ], cancellation: $cancellation);
 
-        if (array_is_list($response)) {
+        if (\array_is_list($response)) {
             throw new OpenSearchException('OpenSearch returned an unexpected health response.');
         }
 
@@ -45,19 +45,19 @@ final readonly class OpenSearchClient
     ): array {
         $body = [
             'query' => $query,
-            'size' => max(1, min(100, $size)),
+            'size' => \max(1, \min(100, $size)),
         ];
         if ($sort !== []) {
             $body['sort'] = $sort;
         }
         $response = $this->request(
             'POST',
-            '/' . rawurlencode($index) . '/_search',
+            '/' . \rawurlencode($index) . '/_search',
             body: $body,
             cancellation: $cancellation,
         );
 
-        if (array_is_list($response)) {
+        if (\array_is_list($response)) {
             throw new OpenSearchException('OpenSearch returned an unexpected search response.');
         }
 
@@ -70,7 +70,7 @@ final readonly class OpenSearchClient
     {
         $response = $this->request(
             'PUT',
-            '/' . rawurlencode($index),
+            '/' . \rawurlencode($index),
             body: $definition,
             cancellation: $cancellation,
         );
@@ -83,7 +83,7 @@ final readonly class OpenSearchClient
     {
         $response = $this->request(
             'DELETE',
-            '/' . rawurlencode($index),
+            '/' . \rawurlencode($index),
             cancellation: $cancellation,
         );
         if (($response['acknowledged'] ?? null) !== true) {
@@ -94,7 +94,7 @@ final readonly class OpenSearchClient
     public function indexExists(string $index, ?Cancellation $cancellation = null): bool
     {
         try {
-            $this->request('GET', '/' . rawurlencode($index), cancellation: $cancellation);
+            $this->request('GET', '/' . \rawurlencode($index), cancellation: $cancellation);
 
             return true;
         } catch (OpenSearchException $exception) {
@@ -111,7 +111,7 @@ final readonly class OpenSearchClient
         try {
             $response = $this->request(
                 'GET',
-                '/_cat/indices/' . rawurlencode($index),
+                '/_cat/indices/' . \rawurlencode($index),
                 ['format' => 'json'],
                 cancellation: $cancellation,
             );
@@ -124,7 +124,7 @@ final readonly class OpenSearchClient
         }
 
         foreach ($response as $row) {
-            if (is_array($row) && ($row['index'] ?? null) === $index) {
+            if (\is_array($row) && ($row['index'] ?? null) === $index) {
                 return true;
             }
         }
@@ -147,17 +147,17 @@ final readonly class OpenSearchClient
         );
         $indexes = [];
         foreach ($response as $row) {
-            $index = is_array($row) ? $row['index'] ?? null : null;
-            if (!is_string($index)) {
+            $index = \is_array($row) ? $row['index'] ?? null : null;
+            if (!\is_string($index)) {
                 throw new OpenSearchException('OpenSearch returned an invalid index inventory.');
             }
-            if (str_starts_with($index, $prefix)) {
+            if (\str_starts_with($index, $prefix)) {
                 $indexes[$index] = $index;
             }
         }
-        ksort($indexes);
+        \ksort($indexes);
 
-        return array_values($indexes);
+        return \array_values($indexes);
     }
 
     /** @param array<string, mixed> $document */
@@ -169,11 +169,11 @@ final readonly class OpenSearchClient
     ): void {
         $response = $this->request(
             'PUT',
-            '/' . rawurlencode($index) . '/_doc/' . rawurlencode($id),
+            '/' . \rawurlencode($index) . '/_doc/' . \rawurlencode($id),
             body: $document,
             cancellation: $cancellation,
         );
-        if (!in_array($response['result'] ?? null, ['created', 'updated'], true)) {
+        if (!\in_array($response['result'] ?? null, ['created', 'updated'], true)) {
             throw new OpenSearchException('OpenSearch did not index the document.');
         }
     }
@@ -191,7 +191,7 @@ final readonly class OpenSearchClient
     ): int {
         $response = $this->request(
             'POST',
-            '/' . rawurlencode($index) . '/_update_by_query',
+            '/' . \rawurlencode($index) . '/_update_by_query',
             ['conflicts' => 'proceed', 'refresh' => $refresh],
             ['query' => $query, 'script' => $script],
             cancellation: $cancellation,
@@ -200,10 +200,10 @@ final readonly class OpenSearchClient
         $versionConflicts = $response['version_conflicts'] ?? null;
         $failures = $response['failures'] ?? null;
         if (
-            !is_int($updated)
+            !\is_int($updated)
             || $updated < 0
             || $versionConflicts !== 0
-            || !is_array($failures)
+            || !\is_array($failures)
             || $failures !== []
             || ($response['timed_out'] ?? null) !== false
         ) {
@@ -217,7 +217,7 @@ final readonly class OpenSearchClient
     {
         $this->request(
             'POST',
-            '/' . rawurlencode($index) . '/_refresh',
+            '/' . \rawurlencode($index) . '/_refresh',
             cancellation: $cancellation,
         );
     }
@@ -230,7 +230,7 @@ final readonly class OpenSearchClient
     ): void {
         $response = $this->request(
             'PUT',
-            '/' . rawurlencode($index) . '/_settings',
+            '/' . \rawurlencode($index) . '/_settings',
             body: ['index' => $settings],
             cancellation: $cancellation,
         );
@@ -243,11 +243,11 @@ final readonly class OpenSearchClient
     {
         $response = $this->request(
             'GET',
-            '/' . rawurlencode($index) . '/_count',
+            '/' . \rawurlencode($index) . '/_count',
             cancellation: $cancellation,
         );
         $count = $response['count'] ?? null;
-        if (!is_int($count) || $count < 0) {
+        if (!\is_int($count) || $count < 0) {
             throw new OpenSearchException('OpenSearch returned an invalid document count.');
         }
 
@@ -260,19 +260,19 @@ final readonly class OpenSearchClient
         int $expectedDocuments,
         ?Cancellation $cancellation = null,
     ): int {
-        if ($expectedDocuments <= 0 || $ndjson === '' || !str_ends_with($ndjson, "\n")) {
+        if ($expectedDocuments <= 0 || $ndjson === '' || !\str_ends_with($ndjson, "\n")) {
             throw new OpenSearchException('OpenSearch bulk request must contain newline-terminated documents.');
         }
 
         $response = $this->request(
             'POST',
-            '/' . rawurlencode($index) . '/_bulk',
+            '/' . \rawurlencode($index) . '/_bulk',
             body: $ndjson,
             contentType: 'application/x-ndjson',
             cancellation: $cancellation,
         );
         $items = $response['items'] ?? null;
-        if (!is_array($items) || !array_is_list($items) || count($items) !== $expectedDocuments) {
+        if (!\is_array($items) || !\array_is_list($items) || \count($items) !== $expectedDocuments) {
             throw new OpenSearchException('OpenSearch bulk response contains an unexpected item count.');
         }
 
@@ -286,10 +286,10 @@ final readonly class OpenSearchClient
         if (($response['errors'] ?? false) === true || $failures !== []) {
             $first = $failures[0] ?? [null, null, null, null];
 
-            throw new OpenSearchBulkException($failures === [] ? 1 : count($failures), ...$first);
+            throw new OpenSearchBulkException($failures === [] ? 1 : \count($failures), ...$first);
         }
 
-        return count($items);
+        return \count($items);
     }
 
     /** @return list<string> */
@@ -298,7 +298,7 @@ final readonly class OpenSearchClient
         try {
             $response = $this->request(
                 'GET',
-                '/_alias/' . rawurlencode($alias),
+                '/_alias/' . \rawurlencode($alias),
                 cancellation: $cancellation,
             );
         } catch (OpenSearchException $exception) {
@@ -311,15 +311,15 @@ final readonly class OpenSearchClient
 
         $targets = [];
         foreach ($response as $index => $definition) {
-            if (!is_string($index) || !is_array($definition)) {
+            if (!\is_string($index) || !\is_array($definition)) {
                 continue;
             }
             $aliases = $definition['aliases'] ?? null;
-            if (is_array($aliases) && array_key_exists($alias, $aliases)) {
+            if (\is_array($aliases) && \array_key_exists($alias, $aliases)) {
                 $targets[] = $index;
             }
         }
-        sort($targets);
+        \sort($targets);
 
         return $targets;
     }
@@ -358,26 +358,26 @@ final readonly class OpenSearchClient
     /** @return array{?string, ?int, ?string, ?string}|null */
     private static function bulkItemFailure(mixed $item): ?array
     {
-        if (!is_array($item) || array_is_list($item) || count($item) !== 1) {
+        if (!\is_array($item) || \array_is_list($item) || \count($item) !== 1) {
             return [null, null, 'malformed_response', 'Bulk item must contain exactly one operation.'];
         }
-        $operation = reset($item);
-        if (!is_array($operation)) {
+        $operation = \reset($item);
+        if (!\is_array($operation)) {
             return [null, null, 'malformed_response', 'Bulk operation result must be an object.'];
         }
 
         $status = $operation['status'] ?? null;
-        $status = is_int($status) ? $status : null;
+        $status = \is_int($status) ? $status : null;
         $error = $operation['error'] ?? null;
         if ($error === null && $status !== null && $status >= 200 && $status < 300) {
             return null;
         }
 
         return [
-            is_string($operation['_id'] ?? null) ? $operation['_id'] : null,
+            \is_string($operation['_id'] ?? null) ? $operation['_id'] : null,
             $status,
-            is_array($error) && is_string($error['type'] ?? null) ? $error['type'] : null,
-            is_array($error) && is_string($error['reason'] ?? null) ? $error['reason'] : null,
+            \is_array($error) && \is_string($error['type'] ?? null) ? $error['type'] : null,
+            \is_array($error) && \is_string($error['reason'] ?? null) ? $error['reason'] : null,
         ];
     }
 
@@ -399,7 +399,7 @@ final readonly class OpenSearchClient
         $rawBody = $response->getBody()->buffer();
 
         try {
-            $payload = $rawBody === '' ? [] : json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
+            $payload = $rawBody === '' ? [] : \json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
             throw new OpenSearchException(
                 'OpenSearch returned invalid JSON.',
@@ -411,13 +411,13 @@ final readonly class OpenSearchClient
 
         if ($response->getStatus() < 200 || $response->getStatus() >= 300) {
             throw new OpenSearchException(
-                sprintf('OpenSearch returned HTTP %d.', $response->getStatus()),
+                \sprintf('OpenSearch returned HTTP %d.', $response->getStatus()),
                 $response->getStatus(),
-                is_array($payload) ? $payload : $rawBody,
+                \is_array($payload) ? $payload : $rawBody,
             );
         }
 
-        if (!is_array($payload)) {
+        if (!\is_array($payload)) {
             throw new OpenSearchException(
                 'OpenSearch returned an unexpected JSON value.',
                 $response->getStatus(),

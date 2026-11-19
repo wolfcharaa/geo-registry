@@ -52,7 +52,7 @@ final class ReverseGeocodeScenarioTest
         Assert::same($port->searchCriteria->query, 'Регион Альфа Тестоград Общая улица д 10');
         Assert::same($port->searchCriteria->hierarchy, AddressHierarchy::Municipal);
         Assert::same($port->searchCriteria->limit, 3);
-        Assert::same(count($result->matches), 1);
+        Assert::same(\count($result->matches), 1);
         Assert::same($result->fallbackLocation, null);
         Assert::same($port->publishedObjectIds, [770005]);
     }
@@ -107,7 +107,7 @@ final class ReverseGeocodeScenarioTest
             )),
         );
 
-        Assert::same(array_map(
+        Assert::same(\array_map(
             static fn(SearchAddressMatch $match): int => $match->document->objectId,
             $result->matches,
         ), [770005, 770006]);
@@ -133,7 +133,7 @@ final class ReverseGeocodeScenarioTest
             )),
         );
 
-        Assert::same(array_map(
+        Assert::same(\array_map(
             static fn(SearchAddressMatch $match): int => $match->document->objectId,
             $result->matches,
         ), [770006]);
@@ -163,7 +163,7 @@ final readonly class ReverseGeocodeScenarioModule implements Module
 
         return $dic->import(new ApplicationMessageBusModule(
             new MessageBusRegistrySource(
-                classes: array_keys($services),
+                classes: \array_keys($services),
                 services: [
                     ReverseGeocodeHandler::class => ReverseGeocodeHandler::class,
                     SearchAddressHandler::class => SearchAddressHandler::class,
@@ -209,13 +209,13 @@ final class RecordingReverseGeocodePort implements
         $this->coordinates[] = [$latitude, $longitude];
 
         return new ReverseGeocodeLocation(
-            displayName: sprintf('Регион Альфа, Тестоград, %s, 10', $this->route),
+            displayName: \sprintf('Регион Альфа, Тестоград, %s, 10', $this->route),
             latitude: 55.750001,
             longitude: 37.610001,
             sourceType: 'way',
             sourceId: 770005,
             address: new ReverseGeocodeAddress(
-                query: sprintf('Регион Альфа Тестоград %s д 10', $this->route),
+                query: \sprintf('Регион Альфа Тестоград %s д 10', $this->route),
                 route: $this->route,
                 houseNumber: '10',
             ),
@@ -269,7 +269,7 @@ final class RecordingReverseGeocodePort implements
         return new SearchAddressMatch(
             document: new AddressDocument(
                 objectId: $objectId,
-                objectGuid: sprintf('00000000-0000-4000-8000-%012d', $objectId),
+                objectGuid: \sprintf('00000000-0000-4000-8000-%012d', $objectId),
                 address: $address,
                 hierarchy: $hierarchy,
                 level: 8,

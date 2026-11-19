@@ -39,7 +39,7 @@ final class GarIntegrityCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $regions = $input->getOption('regions');
-        if (!is_string($regions)) {
+        if (!\is_string($regions)) {
             $output->writeln('<error>Option --regions must be a comma-separated list.</error>');
 
             return self::INVALID;
@@ -54,10 +54,10 @@ final class GarIntegrityCommand extends Command
 
         $report = $this->checker->check($regions, $input->getOption('deep') === true);
         $onlyFailed = $input->getOption('only-failed') === true;
-        $output->writeln(sprintf(
+        $output->writeln(\sprintf(
             'mode=%s regions=%s',
             $report->deep ? 'deep' : 'quick',
-            implode(',', $report->regions),
+            \implode(',', $report->regions),
         ));
         foreach ($report->checks as $check) {
             if ($onlyFailed && $check->isValid()) {
@@ -69,9 +69,9 @@ final class GarIntegrityCommand extends Command
                 default => "OK check=\"{$check->name}\" issues=0",
             });
         }
-        $output->writeln(sprintf(
+        $output->writeln(\sprintf(
             'summary checks=%d failed=%d unavailable=%d status=%s',
-            count($report->checks),
+            \count($report->checks),
             $report->failedChecks(),
             $report->unavailableChecks(),
             $report->isValid() ? 'ok' : 'failed',
@@ -84,15 +84,15 @@ final class GarIntegrityCommand extends Command
     private static function regions(string $value): array
     {
         $regions = [];
-        foreach (explode(',', $value) as $part) {
-            $part = trim($part);
-            if (preg_match('/^[0-9]{1,2}$/D', $part) !== 1 || (int) $part < 1 || (int) $part > 99) {
+        foreach (\explode(',', $value) as $part) {
+            $part = \trim($part);
+            if (\preg_match('/^[0-9]{1,2}$/D', $part) !== 1 || (int) $part < 1 || (int) $part > 99) {
                 throw new InvalidArgumentException('Option --regions accepts unique codes from 1 to 99.');
             }
             $regions[(int) $part] = (int) $part;
         }
-        ksort($regions);
+        \ksort($regions);
 
-        return array_values($regions);
+        return \array_values($regions);
     }
 }

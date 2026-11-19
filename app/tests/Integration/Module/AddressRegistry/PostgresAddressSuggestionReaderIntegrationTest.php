@@ -140,7 +140,7 @@ SQL);
      */
     private static function ids(array $suggestions): array
     {
-        return array_map(
+        return \array_map(
             static fn(ProgressiveAddressSuggestion $suggestion): int => $suggestion->objectId,
             $suggestions,
         );

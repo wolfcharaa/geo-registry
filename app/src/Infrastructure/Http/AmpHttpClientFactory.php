@@ -12,7 +12,7 @@ final class AmpHttpClientFactory
 {
     public static function create(float $timeoutSeconds): HttpClient
     {
-        $connectTimeout = min(5.0, $timeoutSeconds);
+        $connectTimeout = \min(5.0, $timeoutSeconds);
 
         return (new HttpClientBuilder())
             ->followRedirects(0)

@@ -30,7 +30,7 @@ final class SafeWorkerControlCommandTest
         ]);
 
         Assert::same($exitCode, 2);
-        Assert::true(str_contains($output, 'require an exact --worker-instance-id'));
+        Assert::true(\str_contains($output, 'require an exact --worker-instance-id'));
     }
 
     public function testGenericCommandRejectsABroadOneShotTargetBeforeBootstrapping(): void
@@ -45,7 +45,7 @@ final class SafeWorkerControlCommandTest
         );
 
         Assert::same($exitCode, 2);
-        Assert::true(str_contains($output, 'require an exact --worker-instance-id'));
+        Assert::true(\str_contains($output, 'require an exact --worker-instance-id'));
     }
 
     /**

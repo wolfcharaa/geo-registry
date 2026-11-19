@@ -36,8 +36,8 @@ SQL);
 
             [$exitCode, $output] = self::runRebuild($dsn, true);
             Assert::same($exitCode, 0);
-            Assert::true(str_contains($output, 'status=ready'));
-            Assert::true(str_contains($output, 'tasks=4/4'));
+            Assert::true(\str_contains($output, 'status=ready'));
+            Assert::true(\str_contains($output, 'tasks=4/4'));
 
             $ready = $pool->query(<<<'SQL'
 SELECT
@@ -56,8 +56,8 @@ SQL)->fetchRow();
 
             [$exitCode, $output] = self::runRebuild($dsn, false);
             Assert::same($exitCode, 0);
-            Assert::true(str_contains($output, 'status=completed'));
-            Assert::true(str_contains($output, 'resumed=yes'));
+            Assert::true(\str_contains($output, 'status=completed'));
+            Assert::true(\str_contains($output, 'resumed=yes'));
 
             $completed = $pool->query(<<<'SQL'
 SELECT
@@ -87,12 +87,12 @@ WHERE region_code = 77 AND hierarchy_type = 'adm'
 SQL);
             while (($row = $result->fetchRow()) !== null) {
                 $line = $row['QUERY PLAN'] ?? null;
-                if (is_string($line)) {
+                if (\is_string($line)) {
                     $plan .= $line;
                 }
             }
-            Assert::true(str_contains($plan, 'address_search_build_1_r77'));
-            Assert::false(str_contains($plan, 'address_search_build_1_r78'));
+            Assert::true(\str_contains($plan, 'address_search_build_1_r77'));
+            Assert::false(\str_contains($plan, 'address_search_build_1_r78'));
         } finally {
             IntegrationDatabase::resetSchema($pool);
             $pool->close();

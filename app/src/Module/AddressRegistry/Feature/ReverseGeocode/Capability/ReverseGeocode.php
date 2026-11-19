@@ -18,6 +18,6 @@ final readonly class ReverseGeocode implements Query
         public AddressHierarchy $hierarchy = AddressHierarchy::Administrative,
         int $limit = 1,
     ) {
-        $this->limit = max(1, min(20, $limit));
+        $this->limit = \max(1, \min(20, $limit));
     }
 }

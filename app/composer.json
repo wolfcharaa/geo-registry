@@ -19,7 +19,10 @@
         "amphp/http-server": "^3.4",
         "amphp/http-server-router": "^2.0",
         "amphp/log": "^2.0",
+        "amphp/parallel": "^2.4",
+        "amphp/pipeline": "^1.2",
         "amphp/postgres": "^2.2",
+        "fedor/work-orchestrator": "^0.4.1",
         "monolog/monolog": "^3.0",
         "romanfedorskij/message-bus-async": "^0.1",
         "romanfedorskij/message-bus-async-worker": "^0.1",
@@ -55,6 +58,14 @@
         "sort-packages": true
     },
     "scripts": {
+        "benchmark:gar-xml-parser-comparison": "php -d memory_limit=-1 benchmarks/gar-xml-parser-comparison.php",
+        "benchmark:gar-xml-copy-pipeline": "php -d memory_limit=-1 benchmarks/gar-xml-copy-pipeline.php",
+        "benchmark:gar-xml-range-cost": "php -d memory_limit=-1 benchmarks/gar-xml-range-cost.php",
+        "benchmark:gar-range-transport-profile": "php -d memory_limit=-1 benchmarks/gar-range-transport-profile.php",
+        "benchmark:gar-xml-transport-alternatives": "php -d memory_limit=-1 benchmarks/gar-xml-transport-alternatives.php",
+        "benchmark:native-functions": "php benchmarks/php-native-function-resolution.php",
+        "benchmark:pgsql-copy-iterable": "php -d memory_limit=-1 benchmarks/pgsql-copy-iterable.php",
+        "benchmark:pgsql-copy-nonblocking": "php -d memory_limit=-1 benchmarks/pgsql-copy-nonblocking.php",
         "check": [
             "@cs-check",
             "@phpstan",

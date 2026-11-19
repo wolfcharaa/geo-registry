@@ -14,10 +14,10 @@ final readonly class AddressSourceConfig
         public string $osmAddressAliasesSource,
         public int $moscowRegionCode,
     ) {
-        if (trim($this->dataMosAddressRegistrySource) === '') {
+        if (\trim($this->dataMosAddressRegistrySource) === '') {
             throw new InvalidArgumentException('DATAMOS_ADDRESS_REGISTRY_SOURCE must be a non-empty string.');
         }
-        if (trim($this->osmAddressAliasesSource) === '') {
+        if (\trim($this->osmAddressAliasesSource) === '') {
             throw new InvalidArgumentException('OSM_ADDRESS_ALIASES_SOURCE must be a non-empty string.');
         }
         if ($this->moscowRegionCode < 1 || $this->moscowRegionCode > 99) {

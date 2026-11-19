@@ -56,7 +56,7 @@ final class SearchAddressScenarioTest
         Assert::same($reader->criteria->limit, 50);
         Assert::same($reader->criteria->regionCode, 77);
         Assert::same($reader->cancellation, $deferredCancellation->getCancellation());
-        Assert::same(array_map(
+        Assert::same(\array_map(
             static fn(SearchAddressMatch $match): int => $match->document->objectId,
             $result->matches,
         ), [770005]);

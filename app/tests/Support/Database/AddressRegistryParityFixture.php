@@ -21,7 +21,7 @@ final class AddressRegistryParityFixture
         $transaction = $pool->beginTransaction();
 
         try {
-            foreach (explode(self::STATEMENT_SEPARATOR, trim($sql)) as $statement) {
+            foreach (\explode(self::STATEMENT_SEPARATOR, \trim($sql)) as $statement) {
                 $transaction->query($statement);
             }
 
@@ -53,17 +53,17 @@ SQL);
 
     public static function checksum(): string
     {
-        return hash('sha256', self::source());
+        return \hash('sha256', self::source());
     }
 
     private static function source(): string
     {
-        $sql = file_get_contents(dirname(__DIR__, 2) . '/Fixture/Database/address-registry-v3.sql');
-        if (!is_string($sql)) {
+        $sql = \file_get_contents(\dirname(__DIR__, 2) . '/Fixture/Database/address-registry-v3.sql');
+        if (!\is_string($sql)) {
             throw new RuntimeException('Unable to read the address registry parity fixture.');
         }
 
-        $checksum = hash('sha256', $sql);
+        $checksum = \hash('sha256', $sql);
         if ($checksum !== self::CHECKSUM) {
             throw new RuntimeException("Parity fixture checksum mismatch: {$checksum}.");
         }

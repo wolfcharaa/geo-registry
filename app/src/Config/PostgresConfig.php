@@ -12,7 +12,7 @@ final readonly class PostgresConfig
         public string $dsn,
         public int $poolSize,
     ) {
-        if (trim($this->dsn) === '') {
+        if (\trim($this->dsn) === '') {
             throw new InvalidArgumentException('DATABASE_DSN must be a non-empty string.');
         }
         if ($this->poolSize <= 0) {

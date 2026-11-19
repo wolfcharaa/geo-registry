@@ -29,7 +29,7 @@ final readonly class GarIntegrityReport
 
     public function failedChecks(): int
     {
-        return count(array_filter(
+        return \count(\array_filter(
             $this->checks,
             static fn(GarIntegrityCheckResult $check): bool => $check->issues !== null && $check->issues > 0,
         ));
@@ -37,7 +37,7 @@ final readonly class GarIntegrityReport
 
     public function unavailableChecks(): int
     {
-        return count(array_filter(
+        return \count(\array_filter(
             $this->checks,
             static fn(GarIntegrityCheckResult $check): bool => !$check->isAvailable(),
         ));

@@ -25,9 +25,9 @@ final readonly class OpenSearchProjectionStatusReport
 
     public function isHealthy(): bool
     {
-        return in_array($this->clusterStatus, ['green', 'yellow'], true)
+        return \in_array($this->clusterStatus, ['green', 'yellow'], true)
             && !$this->clusterTimedOut
-            && count($this->aliasTargets) === 1
+            && \count($this->aliasTargets) === 1
             && $this->invalidRegionDocuments === 0
             && $this->targetDocuments === $this->sourceDocuments;
     }

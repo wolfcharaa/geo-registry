@@ -42,7 +42,7 @@ final readonly class AddressSuggestionPresenter
                 'datamos_global_id' => $document->dataMosGlobalId,
                 'unom' => $document->dataMosUnom,
                 'nreg' => $document->dataMosNreg,
-                'aliases' => array_map(self::alias(...), $aliases),
+                'aliases' => \array_map(self::alias(...), $aliases),
                 'alias_count' => $document->aliasCount,
                 'matched_alias' => $matchedAlias,
                 'adm_area' => $document->dataMosAdministrativeArea,

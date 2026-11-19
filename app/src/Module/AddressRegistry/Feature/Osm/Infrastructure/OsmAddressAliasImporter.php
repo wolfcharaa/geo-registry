@@ -4,51 +4,14 @@ declare(strict_types=1);
 
 namespace App\Module\AddressRegistry\Feature\Osm\Infrastructure;
 
-use function array_key_exists;
-use function count;
-use function fclose;
-use function fgets;
-use function fopen;
-use function gzclose;
-use function gzgets;
-use function gzopen;
-use function hash;
-use function implode;
-use function in_array;
-use function is_array;
-use function is_file;
-use function is_int;
-use function is_numeric;
-use function is_scalar;
-use function is_string;
-use function json_decode;
-use function json_encode;
-
 use const JSON_THROW_ON_ERROR;
 use const JSON_UNESCAPED_UNICODE;
 
 use JsonException;
-
-use function max;
-use function mb_strtolower;
-use function microtime;
-
 use PDO;
 use PDOStatement;
-
-use function preg_match;
-use function preg_replace;
-
 use RuntimeException;
-
-use function sprintf;
-use function str_ends_with;
-use function str_replace;
-use function strtolower;
-
 use Throwable;
-
-use function trim;
 
 /**
  * @phpstan-type CanonicalAddress array{city: string, street: string, housenumber: string, postcode: string}
@@ -93,17 +56,17 @@ final class OsmAddressAliasImporter
         bool $dryRun = false,
         ?callable $progress = null,
     ): OsmAddressAliasImportResult {
-        $source = trim($source);
+        $source = \trim($source);
         if ($source === '') {
             throw new RuntimeException('OSM alias source is required.');
         }
 
-        if (!is_file($source)) {
-            throw new RuntimeException(sprintf('OSM alias source file not found: %s', $source));
+        if (!\is_file($source)) {
+            throw new RuntimeException(\sprintf('OSM alias source file not found: %s', $source));
         }
 
-        $batchSize = max(1, $batchSize);
-        $startedAt = microtime(true);
+        $batchSize = \max(1, $batchSize);
+        $startedAt = \microtime(true);
         $readRows = 0;
         $matchedRows = 0;
         $writtenRows = 0;
@@ -129,11 +92,11 @@ final class OsmAddressAliasImporter
             $matchedRows++;
             foreach ($rows as $row) {
                 $batch[] = $row;
-                if (count($batch) < $batchSize) {
+                if (\count($batch) < $batchSize) {
                     continue;
                 }
 
-                $writtenRows += $dryRun ? count($batch) : $this->writeBatch($batch);
+                $writtenRows += $dryRun ? \count($batch) : $this->writeBatch($batch);
                 $batch = [];
 
                 if ($progress !== null) {
@@ -143,7 +106,7 @@ final class OsmAddressAliasImporter
         }
 
         if ($batch !== []) {
-            $writtenRows += $dryRun ? count($batch) : $this->writeBatch($batch);
+            $writtenRows += $dryRun ? \count($batch) : $this->writeBatch($batch);
             if ($progress !== null) {
                 $progress($readRows, $matchedRows, $writtenRows, $skippedRows);
             }
@@ -155,7 +118,7 @@ final class OsmAddressAliasImporter
             matchedRows: $matchedRows,
             writtenRows: $writtenRows,
             skippedRows: $skippedRows,
-            duration: microtime(true) - $startedAt,
+            duration: \microtime(true) - $startedAt,
             dryRun: $dryRun,
         );
     }
@@ -165,40 +128,40 @@ final class OsmAddressAliasImporter
      */
     private function items(string $source): iterable
     {
-        if (str_ends_with(strtolower($source), '.gz')) {
-            $handle = gzopen($source, 'rb');
+        if (\str_ends_with(\strtolower($source), '.gz')) {
+            $handle = \gzopen($source, 'rb');
             if ($handle === false) {
-                throw new RuntimeException(sprintf('Unable to open OSM alias JSONL.GZ file: %s', $source));
+                throw new RuntimeException(\sprintf('Unable to open OSM alias JSONL.GZ file: %s', $source));
             }
 
             try {
-                while (($line = gzgets($handle)) !== false) {
+                while (($line = \gzgets($handle)) !== false) {
                     $item = $this->decodeLine($line, $source);
                     if ($item !== null) {
                         yield $item;
                     }
                 }
             } finally {
-                gzclose($handle);
+                \gzclose($handle);
             }
 
             return;
         }
 
-        $handle = fopen($source, 'rb');
+        $handle = \fopen($source, 'rb');
         if ($handle === false) {
-            throw new RuntimeException(sprintf('Unable to open OSM alias JSONL file: %s', $source));
+            throw new RuntimeException(\sprintf('Unable to open OSM alias JSONL file: %s', $source));
         }
 
         try {
-            while (($line = fgets($handle)) !== false) {
+            while (($line = \fgets($handle)) !== false) {
                 $item = $this->decodeLine($line, $source);
                 if ($item !== null) {
                     yield $item;
                 }
             }
         } finally {
-            fclose($handle);
+            \fclose($handle);
         }
     }
 
@@ -207,18 +170,18 @@ final class OsmAddressAliasImporter
      */
     private function decodeLine(string $line, string $source): ?array
     {
-        $line = trim($line);
+        $line = \trim($line);
         if ($line === '') {
             return null;
         }
 
         try {
-            $decoded = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
+            $decoded = \json_decode($line, true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException $e) {
-            throw new RuntimeException(sprintf('Invalid JSONL in %s: %s', $source, $e->getMessage()), 0, $e);
+            throw new RuntimeException(\sprintf('Invalid JSONL in %s: %s', $source, $e->getMessage()), 0, $e);
         }
 
-        if (!is_array($decoded)) {
+        if (!\is_array($decoded)) {
             return null;
         }
 
@@ -268,7 +231,7 @@ final class OsmAddressAliasImporter
                         'hierarchy_type' => $canonicalRow['hierarchy_type'],
                         'canonical_address_string' => $canonicalRow['address_string'],
                         'alias_string' => $aliasString,
-                        'alias_hash' => hash('md5', mb_strtolower($aliasString, 'UTF-8')),
+                        'alias_hash' => \hash('md5', \mb_strtolower($aliasString, 'UTF-8')),
                         'alias_kind' => self::ALIAS_KIND,
                         'source' => self::SOURCE,
                         'source_object_type' => $sourceObjectType,
@@ -277,10 +240,10 @@ final class OsmAddressAliasImporter
                         'source_name' => $sourceName,
                         'geo_lat' => $geoLat,
                         'geo_lon' => $geoLon,
-                        'source_payload' => json_encode([
+                        'source_payload' => \json_encode([
                             'canonical' => $canonical,
                             'alias' => $alias,
-                            'tags' => is_array($item['tags'] ?? null) ? $item['tags'] : [],
+                            'tags' => \is_array($item['tags'] ?? null) ? $item['tags'] : [],
                         ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
                     ];
                 }
@@ -296,8 +259,8 @@ final class OsmAddressAliasImporter
      */
     private function canonicalAddress(array $item): array
     {
-        $canonical = is_array($item['canonical'] ?? null) ? $item['canonical'] : [];
-        $tags = is_array($item['tags'] ?? null) ? $item['tags'] : [];
+        $canonical = \is_array($item['canonical'] ?? null) ? $item['canonical'] : [];
+        $tags = \is_array($item['tags'] ?? null) ? $item['tags'] : [];
         /** @var array<string, mixed> $canonical */
         /** @var array<string, mixed> $tags */
 
@@ -319,15 +282,15 @@ final class OsmAddressAliasImporter
         /** @var list<AliasAddress> $aliases */
         $aliases = [];
 
-        if (is_array($item['aliases'] ?? null)) {
+        if (\is_array($item['aliases'] ?? null)) {
             foreach ($item['aliases'] as $alias) {
-                if (!is_array($alias)) {
+                if (!\is_array($alias)) {
                     continue;
                 }
 
                 /** @var array<string, mixed> $alias */
                 $rawRank = $alias['rank'] ?? 2;
-                $rank = is_numeric($rawRank) ? (int) $rawRank : 2;
+                $rank = \is_numeric($rawRank) ? (int) $rawRank : 2;
                 $normalized = $this->normalizeAliasAddress($alias, $canonical, $rank);
                 if ($normalized !== null) {
                     $aliases[] = $normalized;
@@ -335,7 +298,7 @@ final class OsmAddressAliasImporter
             }
         }
 
-        $tags = is_array($item['tags'] ?? null) ? $item['tags'] : [];
+        $tags = \is_array($item['tags'] ?? null) ? $item['tags'] : [];
         /** @var array<string, mixed> $tags */
         for ($rank = 2; $rank <= 9; $rank++) {
             $prefix = 'addr' . $rank . ':';
@@ -384,7 +347,7 @@ final class OsmAddressAliasImporter
         }
 
         return [
-            'rank' => max(1, $rank),
+            'rank' => \max(1, $rank),
             'city' => $this->normalizeText($city),
             'street' => $this->normalizeText($street),
             'housenumber' => $this->normalizeText($house),
@@ -402,14 +365,14 @@ final class OsmAddressAliasImporter
         $seen = [];
 
         foreach ($aliases as $alias) {
-            $key = mb_strtolower(implode('|', [
+            $key = \mb_strtolower(\implode('|', [
                 (string) $alias['rank'],
                 $alias['city'],
                 $alias['street'],
                 $alias['housenumber'],
                 $alias['postcode'],
             ]), 'UTF-8');
-            if (array_key_exists($key, $seen)) {
+            if (\array_key_exists($key, $seen)) {
                 continue;
             }
 
@@ -436,25 +399,25 @@ final class OsmAddressAliasImporter
 
         $strings = [];
         if ($city !== '') {
-            $strings[] = sprintf('%s, %s, %s', $city, $street, $house);
-            $strings[] = sprintf('%s, %s, дом %s', $city, $street, $house);
-            $strings[] = sprintf('%s %s %s', $city, $street, $house);
+            $strings[] = \sprintf('%s, %s, %s', $city, $street, $house);
+            $strings[] = \sprintf('%s, %s, дом %s', $city, $street, $house);
+            $strings[] = \sprintf('%s %s %s', $city, $street, $house);
 
-            if (preg_match('/^(?:г\.?|город)\s+/iu', $city) !== 1) {
-                $strings[] = sprintf('город %s, %s, дом %s', $city, $street, $house);
+            if (\preg_match('/^(?:г\.?|город)\s+/iu', $city) !== 1) {
+                $strings[] = \sprintf('город %s, %s, дом %s', $city, $street, $house);
             }
         } else {
-            $strings[] = sprintf('%s, %s', $street, $house);
-            $strings[] = sprintf('%s, дом %s', $street, $house);
-            $strings[] = sprintf('%s %s', $street, $house);
+            $strings[] = \sprintf('%s, %s', $street, $house);
+            $strings[] = \sprintf('%s, дом %s', $street, $house);
+            $strings[] = \sprintf('%s %s', $street, $house);
         }
 
         $result = [];
         $seen = [];
         foreach ($strings as $string) {
             $string = $this->normalizeAddressString($string);
-            $key = mb_strtolower($string, 'UTF-8');
-            if ($string === '' || array_key_exists($key, $seen)) {
+            $key = \mb_strtolower($string, 'UTF-8');
+            if ($string === '' || \array_key_exists($key, $seen)) {
                 continue;
             }
 
@@ -483,7 +446,7 @@ final class OsmAddressAliasImporter
             $buildingOrder = "CASE WHEN s.address_string ~* :building_regex THEN 0 ELSE 1 END,";
         }
 
-        $statement = $this->prepare(sprintf(
+        $statement = $this->prepare(\sprintf(
             <<<'SQL'
 SELECT s.object_id
 FROM address_search s
@@ -508,7 +471,7 @@ SQL,
         }
         $statement->execute();
         $objectId = $statement->fetchColumn();
-        if (!is_numeric($objectId)) {
+        if (!\is_numeric($objectId)) {
             return [];
         }
 
@@ -535,10 +498,10 @@ SQL);
             $addressString = $row['address_string'] ?? null;
             $hierarchyType = $row['hierarchy_type'] ?? null;
             if (
-                !is_numeric($rowObjectId)
-                || ($objectGuid !== null && !is_string($objectGuid))
-                || !is_string($addressString)
-                || !is_string($hierarchyType)
+                !\is_numeric($rowObjectId)
+                || ($objectGuid !== null && !\is_string($objectGuid))
+                || !\is_string($addressString)
+                || !\is_string($hierarchyType)
             ) {
                 continue;
             }
@@ -557,8 +520,8 @@ SQL);
     private function streetCore(string $street): string
     {
         $street = $this->normalizeText($street);
-        $street = (string) preg_replace('/[.,]/u', ' ', $street);
-        $street = (string) preg_replace(
+        $street = (string) \preg_replace('/[.,]/u', ' ', $street);
+        $street = (string) \preg_replace(
             '/\b(?:улица|ул|проспект|пр-т|пр|переулок|пер|площадь|пл|шоссе|ш|бульвар|бул|наб(?:ережная)?|проезд|аллея|тупик)\b\.?/iu',
             ' ',
             $street,
@@ -569,7 +532,7 @@ SQL);
 
     private function houseMain(string $house): string
     {
-        if (preg_match('/^\s*(\d+(?:[\/-]\d+)?(?:[а-яa-z])?)/iu', $house, $match) !== 1) {
+        if (\preg_match('/^\s*(\d+(?:[\/-]\d+)?(?:[а-яa-z])?)/iu', $house, $match) !== 1) {
             return $this->normalizeText($house);
         }
 
@@ -578,7 +541,7 @@ SQL);
 
     private function houseBuilding(string $house): string
     {
-        if (preg_match('/(?:^|\s)(?:с|стр|строение)\.?\s*(\d+[а-яa-z]?)/iu', $house, $match) !== 1) {
+        if (\preg_match('/(?:^|\s)(?:с|стр|строение)\.?\s*(\d+[а-яa-z]?)/iu', $house, $match) !== 1) {
             return '';
         }
 
@@ -595,7 +558,7 @@ SQL);
         $seen = [];
 
         foreach ($rows as $row) {
-            $key = implode('|', [
+            $key = \implode('|', [
                 $row['source'],
                 $row['source_object_type'],
                 (string) $row['source_object_id'],
@@ -603,7 +566,7 @@ SQL);
                 $row['hierarchy_type'],
                 $row['alias_hash'],
             ]);
-            if (array_key_exists($key, $seen)) {
+            if (\array_key_exists($key, $seen)) {
                 continue;
             }
 
@@ -636,7 +599,7 @@ SQL);
             throw $e;
         }
 
-        return count($rows);
+        return \count($rows);
     }
 
     private function insertStatement(PDO $pdo): PDOStatement
@@ -713,7 +676,7 @@ SQL);
                 continue;
             }
 
-            if (is_int($value)) {
+            if (\is_int($value)) {
                 $statement->bindValue($parameter, $value, PDO::PARAM_INT);
                 continue;
             }
@@ -738,20 +701,20 @@ SQL);
      */
     private function stringField(array $item, string $name): string
     {
-        if (array_key_exists($name, $item)) {
+        if (\array_key_exists($name, $item)) {
             $value = $item[$name];
         } else {
             $value = null;
-            $lowerName = strtolower($name);
+            $lowerName = \strtolower($name);
             foreach ($item as $key => $candidate) {
-                if (is_string($key) && strtolower($key) === $lowerName) {
+                if (\is_string($key) && \strtolower($key) === $lowerName) {
                     $value = $candidate;
                     break;
                 }
             }
         }
 
-        if ($value === null || !is_scalar($value)) {
+        if ($value === null || !\is_scalar($value)) {
             return '';
         }
 
@@ -764,7 +727,7 @@ SQL);
     private function intField(array $item, string $name): ?int
     {
         $value = $this->stringField($item, $name);
-        if ($value === '' || !is_numeric($value)) {
+        if ($value === '' || !\is_numeric($value)) {
             return null;
         }
 
@@ -777,7 +740,7 @@ SQL);
     private function floatField(array $item, string $name): ?float
     {
         $value = $this->stringField($item, $name);
-        if ($value === '' || !is_numeric($value)) {
+        if ($value === '' || !\is_numeric($value)) {
             return null;
         }
 
@@ -803,7 +766,7 @@ SQL);
             return $sourceName;
         }
 
-        $tags = is_array($item['tags'] ?? null) ? $item['tags'] : [];
+        $tags = \is_array($item['tags'] ?? null) ? $item['tags'] : [];
         /** @var array<string, mixed> $tags */
         $name = $this->stringField($tags, 'name');
 
@@ -812,33 +775,33 @@ SQL);
 
     private function sourceObjectType(string $type): string
     {
-        $type = strtolower(trim($type));
+        $type = \strtolower(\trim($type));
 
-        return in_array($type, ['node', 'way', 'relation'], true) ? $type : 'unknown';
+        return \in_array($type, ['node', 'way', 'relation'], true) ? $type : 'unknown';
     }
 
     private function normalizeAddressString(string $value): string
     {
         $value = $this->normalizeText($value);
-        $value = (string) preg_replace('/\s+,/u', ',', $value);
-        $value = (string) preg_replace('/,\s*/u', ', ', $value);
+        $value = (string) \preg_replace('/\s+,/u', ',', $value);
+        $value = (string) \preg_replace('/,\s*/u', ', ', $value);
 
         return $this->normalizeText($value);
     }
 
     private function normalizeText(string $value): string
     {
-        return trim((string) preg_replace('/\s+/u', ' ', $value));
+        return \trim((string) \preg_replace('/\s+/u', ' ', $value));
     }
 
     private function escapeLike(string $value): string
     {
-        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
+        return \str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
     }
 
     private function regexQuote(string $value): string
     {
-        return str_replace(
+        return \str_replace(
             ['\\', '.', '+', '*', '?', '[', '^', ']', '$', '(', ')', '{', '}', '=', '!', '<', '>', '|', ':', '-'],
             ['\\\\', '\.', '\+', '\*', '\?', '\[', '\^', '\]', '\$', '\(', '\)', '\{', '\}', '\=', '\!', '\<', '\>', '\|', '\:', '\-'],
             $value,

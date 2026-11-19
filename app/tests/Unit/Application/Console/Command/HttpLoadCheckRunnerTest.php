@@ -58,7 +58,7 @@ final class ConcurrentLoadCheckClient implements DelegateHttpClient
     {
         $requestNumber = $this->requestNumber++;
         ++$this->activeRequests;
-        $this->maxConcurrency = max($this->maxConcurrency, $this->activeRequests);
+        $this->maxConcurrency = \max($this->maxConcurrency, $this->activeRequests);
 
         try {
             delay(0.001, cancellation: $cancellation);

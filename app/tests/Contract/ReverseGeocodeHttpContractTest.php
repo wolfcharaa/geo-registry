@@ -81,8 +81,8 @@ final class ReverseGeocodeHttpContractTest
 
         Assert::same($response->getStatus(), 200);
         Assert::same($payload['count'] ?? null, 1);
-        Assert::true(array_key_exists('object_id', $data));
-        Assert::true(array_key_exists('object_guid', $data));
+        Assert::true(\array_key_exists('object_id', $data));
+        Assert::true(\array_key_exists('object_guid', $data));
         Assert::same($data['object_id'], null);
         Assert::same($data['object_guid'], null);
         Assert::same($data['source'] ?? null, 'nominatim');
@@ -147,7 +147,7 @@ final class ReverseGeocodeHttpContractTest
     /** @param array<string, string> $parameters */
     private function request(array $parameters): Request
     {
-        $query = http_build_query($parameters);
+        $query = \http_build_query($parameters);
 
         return new Request(
             new TestClient(),
@@ -159,13 +159,13 @@ final class ReverseGeocodeHttpContractTest
     /** @return array<array-key, mixed> */
     private function payload(Response $response): array
     {
-        return $this->array(json_decode(buffer($response->getBody()), true, flags: JSON_THROW_ON_ERROR));
+        return $this->array(\json_decode(buffer($response->getBody()), true, flags: JSON_THROW_ON_ERROR));
     }
 
     /** @return array<array-key, mixed> */
     private function array(mixed $value): array
     {
-        if (!is_array($value)) {
+        if (!\is_array($value)) {
             throw new \LogicException('Expected a JSON object or list.');
         }
 
@@ -195,7 +195,7 @@ final readonly class ContractReverseGeocodeModule implements Module
 
         return $dic->import(new ApplicationMessageBusModule(
             new MessageBusRegistrySource(
-                classes: array_keys($services),
+                classes: \array_keys($services),
                 services: [
                     ReverseGeocodeHandler::class => ReverseGeocodeHandler::class,
                     SearchAddressHandler::class => SearchAddressHandler::class,

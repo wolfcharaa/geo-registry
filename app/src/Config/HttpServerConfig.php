@@ -31,10 +31,10 @@ final readonly class HttpServerConfig
         public int $backlog,
         public bool $compressionEnabled,
     ) {
-        if (trim($this->listen) === '') {
+        if (\trim($this->listen) === '') {
             throw new InvalidArgumentException('APP_LISTEN must be a non-empty string.');
         }
-        if (trim($this->userAgent) === '') {
+        if (\trim($this->userAgent) === '') {
             throw new InvalidArgumentException('APP_USER_AGENT must be a non-empty string.');
         }
         if ($this->timeoutSeconds <= 0) {
@@ -52,7 +52,7 @@ final readonly class HttpServerConfig
         if ($this->workerMaxMemoryMegabytes < 0) {
             throw new InvalidArgumentException('APP_HTTP_WORKER_MAX_MEMORY_MB must be non-negative.');
         }
-        if ($this->workerMaxMemoryMegabytes > intdiv(PHP_INT_MAX, self::BYTES_PER_MEBIBYTE)) {
+        if ($this->workerMaxMemoryMegabytes > \intdiv(PHP_INT_MAX, self::BYTES_PER_MEBIBYTE)) {
             throw new InvalidArgumentException('APP_HTTP_WORKER_MAX_MEMORY_MB is too large.');
         }
         if ($this->workerRestartBurst < 0 || $this->workerRestartBurst > 1000) {

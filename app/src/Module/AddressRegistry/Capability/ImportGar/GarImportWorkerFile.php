@@ -12,10 +12,10 @@ final readonly class GarImportWorkerFile
         public string $relativePath,
         public string $fileKey,
     ) {
-        if (trim($this->relativePath) === '') {
+        if (\trim($this->relativePath) === '') {
             throw new InvalidArgumentException('GAR import worker relative path must not be empty.');
         }
-        if (preg_match('/^[a-f0-9]{64}$/D', $this->fileKey) !== 1) {
+        if (\preg_match('/^[a-f0-9]{64}$/D', $this->fileKey) !== 1) {
             throw new InvalidArgumentException('GAR import worker file key must be a SHA-256 hash.');
         }
     }

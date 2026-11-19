@@ -32,7 +32,7 @@ final class PostgresFindAddressByIdReaderIntegrationTest
             $byGuid = $reader->find('00000000-0000-4000-8000-000000770005', 20, $cancellation);
             $byObjectId = $reader->find('770005', 1, $cancellation);
 
-            Assert::same(array_map(
+            Assert::same(\array_map(
                 static fn(AddressDocument $document): array => [
                     $document->objectId,
                     $document->hierarchy->value,
@@ -43,7 +43,7 @@ final class PostgresFindAddressByIdReaderIntegrationTest
                 [770005, 'adm', 'Регион Альфа, р-н Центральный, г. Тестоград, ул. Общая, д. 10'],
                 [770005, 'mun', 'Регион Альфа, муниципальный округ Центральный, г. Тестоград, ул. Общая, д. 10'],
             ]);
-            Assert::same(array_map(
+            Assert::same(\array_map(
                 static fn(AddressDocument $document): array => [
                     $document->postalCode,
                     $document->latitude,

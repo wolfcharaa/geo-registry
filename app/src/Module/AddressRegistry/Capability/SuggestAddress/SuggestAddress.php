@@ -25,13 +25,13 @@ final readonly class SuggestAddress implements Query
     ) {
         $this->exact = self::normalize($exact);
         $this->suggest = self::normalize($suggest);
-        $this->count = max(1, min(7, $count));
+        $this->count = \max(1, \min(7, $count));
     }
 
     private static function normalize(string $value): string
     {
-        $normalized = preg_replace('/\s+/u', ' ', trim($value));
+        $normalized = \preg_replace('/\s+/u', ' ', \trim($value));
 
-        return $normalized ?? trim($value);
+        return $normalized ?? \trim($value);
     }
 }

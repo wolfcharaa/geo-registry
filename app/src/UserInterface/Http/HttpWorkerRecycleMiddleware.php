@@ -53,7 +53,7 @@ final class HttpWorkerRecycleMiddleware implements Middleware
             'handled_requests' => $this->policy->handledRequests(),
             'max_requests' => $this->maxRequests,
             'max_resident_memory_bytes' => $this->maxResidentMemoryBytes,
-            'pid' => getmypid(),
+            'pid' => \getmypid(),
             'reason' => $reason->value,
             'resident_memory_bytes' => $residentMemoryBytes,
             'worker_id' => Cluster::getContextId(),
@@ -66,11 +66,11 @@ final class HttpWorkerRecycleMiddleware implements Middleware
 
     private static function residentMemoryBytes(): int
     {
-        $status = is_readable('/proc/self/status') ? file_get_contents('/proc/self/status') : false;
-        if (is_string($status) && preg_match('/^VmRSS:\s+([0-9]+)\s+kB$/m', $status, $matches) === 1) {
+        $status = \is_readable('/proc/self/status') ? \file_get_contents('/proc/self/status') : false;
+        if (\is_string($status) && \preg_match('/^VmRSS:\s+([0-9]+)\s+kB$/m', $status, $matches) === 1) {
             return (int) $matches[1] * 1024;
         }
 
-        return memory_get_usage(true);
+        return \memory_get_usage(true);
     }
 }

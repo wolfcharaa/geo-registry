@@ -40,7 +40,7 @@ final class M260902100000RelaxGarVersionLinks implements RevertibleMigrationInte
 
     public function down(MigrationBuilder $b): void
     {
-        foreach (array_keys(self::TABLES) as $table) {
+        foreach (\array_keys(self::TABLES) as $table) {
             $b->execute(
                 "ALTER TABLE {$table} ADD CONSTRAINT {$table}_prev_id_fkey FOREIGN KEY (prev_id) REFERENCES {$table}(id) ON DELETE SET NULL",
             );

@@ -104,7 +104,7 @@ SQL);
                 $objectId = $row['object_id'] ?? null;
                 $hierarchyType = $row['hierarchy_type'] ?? null;
                 $address = $row['address_string'] ?? null;
-                if (!is_int($objectId) || !is_string($hierarchyType) || !is_string($address)) {
+                if (!\is_int($objectId) || !\is_string($hierarchyType) || !\is_string($address)) {
                     throw new RuntimeException('Parity fixture returned an invalid search document.');
                 }
 
@@ -128,7 +128,7 @@ SQL);
             while (($row = $result->fetchRow()) !== null) {
                 $objectId = $row['object_id'] ?? null;
                 $hierarchyType = $row['hierarchy_type'] ?? null;
-                if (!is_int($objectId) || !is_string($hierarchyType)) {
+                if (!\is_int($objectId) || !\is_string($hierarchyType)) {
                     throw new RuntimeException('Parity fixture returned an invalid find-by-id document.');
                 }
 
@@ -168,13 +168,13 @@ SQL)->fetchRow();
     /** @return list<int> */
     private static function integerList(mixed $value): array
     {
-        if (!is_array($value)) {
+        if (!\is_array($value)) {
             throw new RuntimeException('Parity fixture returned an invalid hierarchy path.');
         }
 
         $result = [];
         foreach ($value as $item) {
-            if (!is_int($item)) {
+            if (!\is_int($item)) {
                 throw new RuntimeException('Parity fixture hierarchy path must contain integers.');
             }
             $result[] = $item;

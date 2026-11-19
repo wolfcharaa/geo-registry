@@ -70,11 +70,11 @@ HELP);
     {
         try {
             $source = $input->getArgument('source');
-            if (!is_string($source) || trim($source) === '') {
+            if (!\is_string($source) || \trim($source) === '') {
                 throw new InvalidArgumentException('Argument source must be a non-empty path or URL.');
             }
 
-            $lastProgressAt = microtime(true);
+            $lastProgressAt = \microtime(true);
             $result = $this->importer->import(
                 source: $source,
                 batchSize: self::integerOption($input, 'batch-size', 1, 50000),
@@ -88,27 +88,27 @@ HELP);
                     int $writtenRows,
                     int $skippedRows,
                 ) use ($output, &$lastProgressAt): void {
-                    if (microtime(true) - $lastProgressAt < 5.0) {
+                    if (\microtime(true) - $lastProgressAt < 5.0) {
                         return;
                     }
 
-                    $output->writeln(sprintf(
+                    $output->writeln(\sprintf(
                         'phase=import read=%d written=%d skipped=%d',
                         $readRows,
                         $writtenRows,
                         $skippedRows,
                     ));
-                    $lastProgressAt = microtime(true);
+                    $lastProgressAt = \microtime(true);
                 },
             );
 
-            $output->writeln(sprintf(
+            $output->writeln(\sprintf(
                 'status=imported source=%s read=%d written=%d skipped=%d elapsed_ms=%d dry_run=%s',
                 $result->source,
                 $result->readRows,
                 $result->writtenRows,
                 $result->skippedRows,
-                (int) round($result->duration * 1000),
+                (int) \round($result->duration * 1000),
                 $result->dryRun ? 'yes' : 'no',
             ));
 
@@ -117,11 +117,11 @@ HELP);
             }
 
             $enrichment = $this->enricher->enrich($input->getOption('no-insert-missing') !== true);
-            $output->writeln(sprintf(
+            $output->writeln(\sprintf(
                 'status=enriched updated=%d inserted=%d elapsed_ms=%d',
                 $enrichment->updatedSearchRows,
                 $enrichment->insertedSearchRows,
-                (int) round($enrichment->duration * 1000),
+                (int) \round($enrichment->duration * 1000),
             ));
 
             return self::SUCCESS;
@@ -148,7 +148,7 @@ HELP);
         if ($value === null) {
             return null;
         }
-        if (!is_string($value) || !ctype_digit($value)) {
+        if (!\is_string($value) || !\ctype_digit($value)) {
             throw new InvalidArgumentException("Option --{$name} must be a positive integer.");
         }
 

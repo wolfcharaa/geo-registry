@@ -310,13 +310,13 @@ SQL;
 
     private function executeStatements(MigrationBuilder $b, string $sql): void
     {
-        $statements = preg_split('/;\s*(?:\r?\n|$)/', $sql);
+        $statements = \preg_split('/;\s*(?:\r?\n|$)/', $sql);
         if ($statements === false) {
             throw new RuntimeException('Unable to split the MessageBus schema into SQL statements.');
         }
 
         foreach ($statements as $statement) {
-            $statement = trim($statement);
+            $statement = \trim($statement);
             if ($statement !== '') {
                 $b->execute($statement);
             }

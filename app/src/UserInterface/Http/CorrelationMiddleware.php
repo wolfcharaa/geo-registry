@@ -24,7 +24,7 @@ final readonly class CorrelationMiddleware implements Middleware
     {
         $requestId = self::headerId($request, 'X-Request-ID') ?? self::generateId();
         $correlationId = self::headerId($request, 'X-Correlation-ID') ?? $requestId;
-        $startedAt = hrtime(true);
+        $startedAt = \hrtime(true);
 
         return $this->context->run(
             new CorrelationIds(requestId: $requestId, correlationId: $correlationId),
@@ -49,7 +49,7 @@ final readonly class CorrelationMiddleware implements Middleware
                     throw $exception;
                 } finally {
                     $this->logger->info('HTTP request completed', [
-                        'duration_ms' => (hrtime(true) - $startedAt) / 1_000_000,
+                        'duration_ms' => (\hrtime(true) - $startedAt) / 1_000_000,
                         'event' => 'http.request.completed',
                         'method' => $request->getMethod(),
                         'path' => $request->getUri()->getPath(),
@@ -64,13 +64,13 @@ final readonly class CorrelationMiddleware implements Middleware
     {
         $value = $request->getHeader($name);
 
-        return is_string($value) && preg_match('/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/D', $value) === 1
+        return \is_string($value) && \preg_match('/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/D', $value) === 1
             ? $value
             : null;
     }
 
     private static function generateId(): string
     {
-        return bin2hex(random_bytes(16));
+        return \bin2hex(\random_bytes(16));
     }
 }

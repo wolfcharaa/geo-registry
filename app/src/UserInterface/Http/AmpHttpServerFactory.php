@@ -44,7 +44,7 @@ final readonly class AmpHttpServerFactory
             'event' => 'http.server.admission.configured',
             'limit' => $this->config->concurrencyLimit,
         ]);
-        if ($this->config->compressionEnabled && extension_loaded('zlib')) {
+        if ($this->config->compressionEnabled && \extension_loaded('zlib')) {
             $middleware[] = new CompressionMiddleware();
         }
         if ($this->config->workerMaxRequests > 0 || $this->config->workerMaxMemoryMegabytes > 0) {

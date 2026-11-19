@@ -29,7 +29,7 @@ final class AddressRegistryDataFlowSmokeIntegrationTest
     {
         $dsn = IntegrationDatabase::dsn();
         $pool = PostgresPoolFactory::create($dsn, 1);
-        $source = dirname(__DIR__, 3) . '/Fixture/Gar/representative';
+        $source = \dirname(__DIR__, 3) . '/Fixture/Gar/representative';
 
         try {
             IntegrationDatabase::resetSchema($pool);
@@ -43,8 +43,8 @@ final class AddressRegistryDataFlowSmokeIntegrationTest
                 '--no-ansi' => true,
             ]);
             Assert::same($importExitCode, 0);
-            Assert::true(str_contains($importOutput, 'status=completed'));
-            Assert::true(str_contains($importOutput, 'rows=9'));
+            Assert::true(\str_contains($importOutput, 'status=completed'));
+            Assert::true(\str_contains($importOutput, 'rows=9'));
 
             [$rebuildExitCode, $rebuildOutput] = self::runCli($dsn, [
                 'command' => 'gar:address-search:rebuild',
@@ -52,7 +52,7 @@ final class AddressRegistryDataFlowSmokeIntegrationTest
                 '--no-ansi' => true,
             ]);
             Assert::same($rebuildExitCode, 0);
-            Assert::true(str_contains($rebuildOutput, 'status=completed'));
+            Assert::true(\str_contains($rebuildOutput, 'status=completed'));
 
             $matches = (new PostgresSearchAddressReader(
                 $pool,
@@ -65,7 +65,7 @@ final class AddressRegistryDataFlowSmokeIntegrationTest
                 regionCode: 77,
             ), new NullCancellation());
 
-            Assert::same(array_map(
+            Assert::same(\array_map(
                 static fn(SearchAddressMatch $match): int => $match->document->objectId,
                 $matches,
             ), [770001]);

@@ -49,7 +49,7 @@ SQL,
             default => throw new InvalidArgumentException('Address search hierarchy must be "adm" or "mun".'),
         };
 
-        return sprintf(
+        return \sprintf(
             <<<'SQL'
 WITH selected AS MATERIALIZED (
 %s

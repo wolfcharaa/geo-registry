@@ -108,13 +108,13 @@ final class FindAddressByIdHttpContractTest
     /** @return array<array-key, mixed> */
     private function payload(\Amp\Http\Server\Response $response): array
     {
-        return $this->array(json_decode(buffer($response->getBody()), true, flags: JSON_THROW_ON_ERROR));
+        return $this->array(\json_decode(buffer($response->getBody()), true, flags: JSON_THROW_ON_ERROR));
     }
 
     /** @return array<array-key, mixed> */
     private function array(mixed $value): array
     {
-        if (!is_array($value)) {
+        if (!\is_array($value)) {
             throw new \LogicException('Expected a JSON object or list.');
         }
 

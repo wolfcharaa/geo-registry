@@ -48,6 +48,12 @@ return static function (DeptracConfig $config): void {
             $sharedKernel = Layer::withName('SharedKernel')->collectors(
                 ClassLikeConfig::create('^App\\SharedKernel\\'),
             ),
+            $workOrchestrator = Layer::withName('Work Orchestrator')->collectors(
+                ClassLikeConfig::create('^Fedor\\WorkOrchestrator\\'),
+            ),
+            $psrContainer = Layer::withName('PSR Container')->collectors(
+                ClassLikeConfig::create('^Psr\\Container\\'),
+            ),
             $messageBusCore = Layer::withName('MessageBus Core')->collectors(
                 ClassLikeConfig::create('^Fedor\\MessageBus\\(?!Worker\\)'),
             ),
@@ -62,14 +68,14 @@ return static function (DeptracConfig $config): void {
             ),
             $ampCore = Layer::withName('AMPHP Core')->collectors(
                 ClassLikeConfig::create(
-                    '^Amp\\(?:Cancellation|CancelledException|CompositeCancellation|DeferredCancellation|Future|NullCancellation|TimeoutCancellation)$',
+                    '^Amp\\(?:Cancellation|CancelledException|CompositeCancellation|DeferredCancellation|DeferredFuture|Future|NullCancellation|TimeoutCancellation)$',
                 ),
             ),
             $ampCache = Layer::withName('AMPHP Cache')->collectors(
                 ClassLikeConfig::create('^Amp\\Cache\\'),
             ),
             $ampRuntime = Layer::withName('AMPHP Runtime')->collectors(
-                ClassLikeConfig::create('^Amp\\(?:Cluster\\|Parallel\\|Socket\\|Sync\\)'),
+                ClassLikeConfig::create('^Amp\\(?:Cluster\\|Parallel\\|Pipeline\\|Socket\\|Sync\\)'),
                 ClassLikeConfig::create('^Revolt\\EventLoop(?:\\|$)'),
             ),
             $httpServer = Layer::withName('AMPHP HTTP Server')->collectors(
@@ -169,8 +175,11 @@ return static function (DeptracConfig $config): void {
             Ruleset::forLayer($moduleInfrastructure)->accesses(
                 $moduleCapability,
                 $sharedKernel,
+                $workOrchestrator,
+                $psrContainer,
                 $messageBusCore,
                 $ampCore,
+                $ampRuntime,
                 $httpClient,
                 $postgres,
                 $logging,
@@ -197,6 +206,8 @@ return static function (DeptracConfig $config): void {
                 $migrationTooling,
             ),
             Ruleset::forLayer($sharedKernel),
+            Ruleset::forLayer($workOrchestrator),
+            Ruleset::forLayer($psrContainer),
             Ruleset::forLayer($messageBusCore),
             Ruleset::forLayer($messageBusWorker)->accesses($messageBusCore),
             Ruleset::forLayer($thesisDic),

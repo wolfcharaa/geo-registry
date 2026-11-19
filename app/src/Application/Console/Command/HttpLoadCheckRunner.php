@@ -31,7 +31,7 @@ final readonly class HttpLoadCheckRunner
         $durations = [];
         $statusCounts = [];
         $errorCounts = [];
-        $startedAt = hrtime(true);
+        $startedAt = \hrtime(true);
         $workers = [];
 
         for ($worker = 0; $worker < $options->concurrency; ++$worker) {
@@ -50,7 +50,7 @@ final readonly class HttpLoadCheckRunner
                         return;
                     }
 
-                    $requestStartedAt = hrtime(true);
+                    $requestStartedAt = \hrtime(true);
                     try {
                         $request = new Request($options->url);
                         $request->setHeader('User-Agent', $this->userAgent);
@@ -64,7 +64,7 @@ final readonly class HttpLoadCheckRunner
                         $status = $response->getStatus();
                         $statusCounts[$status] = ($statusCounts[$status] ?? 0) + 1;
                         $body = buffer($response->getBody(), $cancellation, $options->maxBodyBytes);
-                        $responseBytes += strlen($body);
+                        $responseBytes += \strlen($body);
 
                         if ($status === $options->expectedStatus) {
                             ++$successes;
@@ -73,7 +73,7 @@ final readonly class HttpLoadCheckRunner
                         $errorType = $error::class;
                         $errorCounts[$errorType] = ($errorCounts[$errorType] ?? 0) + 1;
                     } finally {
-                        $durations[$requestIndex] = (float) ((hrtime(true) - $requestStartedAt) / 1_000_000);
+                        $durations[$requestIndex] = (float) ((\hrtime(true) - $requestStartedAt) / 1_000_000);
                     }
                 }
             });
@@ -82,10 +82,10 @@ final readonly class HttpLoadCheckRunner
         /** @var list<Future<void>> $workers */
         await($workers);
 
-        $durationMilliseconds = max(0.001, (hrtime(true) - $startedAt) / 1_000_000);
-        sort($durations, SORT_NUMERIC);
-        ksort($statusCounts);
-        ksort($errorCounts);
+        $durationMilliseconds = \max(0.001, (\hrtime(true) - $startedAt) / 1_000_000);
+        \sort($durations, SORT_NUMERIC);
+        \ksort($statusCounts);
+        \ksort($errorCounts);
 
         return new HttpLoadCheckReport(
             attempts: $options->requests,
@@ -105,7 +105,7 @@ final readonly class HttpLoadCheckRunner
     /** @param list<float|int> $sortedValues */
     private static function percentile(array $sortedValues, float $percentile): float
     {
-        $index = max(0, (int) ceil(count($sortedValues) * $percentile) - 1);
+        $index = \max(0, (int) \ceil(\count($sortedValues) * $percentile) - 1);
 
         return (float) ($sortedValues[$index] ?? throw new \LogicException('No request latencies were recorded.'));
     }

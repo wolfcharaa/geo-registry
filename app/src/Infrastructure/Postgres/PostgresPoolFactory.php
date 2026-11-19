@@ -24,7 +24,7 @@ final class PostgresPoolFactory
 
         $config = PostgresConfig::fromString($dsn);
         if ($statementTimeoutMilliseconds > 0) {
-            $options = trim((string) $config->getOptions());
+            $options = \trim((string) $config->getOptions());
             $options .= ($options === '' ? '' : ' ')
                 . '-c statement_timeout=' . $statementTimeoutMilliseconds;
             $config = $config->withOptions($options);

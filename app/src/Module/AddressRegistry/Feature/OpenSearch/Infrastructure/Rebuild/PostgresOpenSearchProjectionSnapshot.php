@@ -115,20 +115,20 @@ SQL;
     /** @return list<AddressAlias> */
     private function aliases(mixed $value): array
     {
-        if (is_string($value)) {
+        if (\is_string($value)) {
             try {
-                $value = json_decode($value, true, flags: JSON_THROW_ON_ERROR);
+                $value = \json_decode($value, true, flags: JSON_THROW_ON_ERROR);
             } catch (JsonException $error) {
                 throw new OpenSearchProjectionFailed('PostgreSQL returned invalid address alias JSON.', previous: $error);
             }
         }
-        if (!is_array($value) || !array_is_list($value)) {
+        if (!\is_array($value) || !\array_is_list($value)) {
             throw new OpenSearchProjectionFailed('PostgreSQL address aliases must be a JSON list.');
         }
 
         $aliases = [];
         foreach ($value as $alias) {
-            if (!is_array($alias)) {
+            if (!\is_array($alias)) {
                 throw new OpenSearchProjectionFailed('PostgreSQL address alias must be a JSON object.');
             }
             $aliases[] = new AddressAlias(
@@ -148,7 +148,7 @@ SQL;
     private static function string(array $values, string $field): string
     {
         $value = $values[$field] ?? null;
-        if (!is_string($value)) {
+        if (!\is_string($value)) {
             throw new OpenSearchProjectionFailed("PostgreSQL address alias field `{$field}` must be a string.");
         }
 

@@ -23,7 +23,7 @@ final readonly class ReverseGeocodePresenter
         array $query,
         AddressHierarchy $hierarchy,
     ): array {
-        $suggestions = array_map($this->document(...), $result->matches);
+        $suggestions = \array_map($this->document(...), $result->matches);
         if ($result->fallbackLocation !== null) {
             $suggestions[] = self::fallback($result->fallbackLocation, $hierarchy);
         }

@@ -15,29 +15,48 @@ final readonly class GarXmlImportAdapter implements ImportGarPort
     public function __construct(
         private GarImportConnectionFactory $connectionFactory,
         private GarXmlCatalog $catalog,
-        private GarImportWorkerPool $workerPool,
+        private GarRawImportCoordinator $rawImport,
+        private GarInitialLoadFinalizer $initialLoadFinalizer,
+        private GarImportPipelineSelector $pipelineSelector,
     ) {}
 
     public function import(ImportGar $command): ImportGarResult
     {
-        $sourcePath = $this->catalog->canonicalSourcePath($command->sourcePath);
-        $files = $this->catalog->files($sourcePath, $command->regions);
-        $sourceKey = hash('sha256', $sourcePath);
-        $manifestHash = $this->catalog->manifestHash($files);
+        $manifest = $this->catalog->manifest($command->sourcePath, $command->regions);
+        $sourcePath = $manifest->sourcePath;
+        $files = $manifest->files;
+        $sourceKey = \hash('sha256', $sourcePath);
+        $pipelineFiles = $this->pipelineSelector->select($command->pipelineFile, $files);
+        $pipelineSelectionKey = $pipelineFiles === [] ? null : $this->pipelineSelector->identity($pipelineFiles);
         $connection = $this->connectionFactory->connect();
         $store = new PostgresGarImportStore($connection);
+        $initialLoad = new GarInitialLoadStore($connection);
+        $databaseLockAcquired = false;
         $lockAcquired = false;
         $operationId = null;
 
         try {
+            $store->acquireDatabaseLock($command->initialLoad);
+            $databaseLockAcquired = true;
+            $store->ensureNoInitialLoadRecoveryRequired($command->initialLoad);
             $store->acquireLock($sourceKey);
             $lockAcquired = true;
             $operation = $store->startOperation(
                 sourceKey: $sourceKey,
                 sourcePath: $sourcePath,
-                manifestHash: $manifestHash,
+                manifestHash: $manifest->hash,
                 batchSize: $command->batchSize,
                 restart: $command->restart,
+                initialLoad: $command->initialLoad,
+                directCopy: $command->directCopy,
+                pipelineFileKey: $pipelineSelectionKey,
+                pipelineWriters: $command->pipelineWriters,
+                deferPrimaryKeys: $command->deferPrimaryKeys,
+                deferForeignKeys: $command->deferForeignKeys,
+                pipelineFileKeys: \array_map(
+                    static fn(GarXmlSourceFile $file): string => $file->key,
+                    $pipelineFiles,
+                ),
                 files: $files,
             );
             $operationId = $operation->id;
@@ -46,21 +65,36 @@ final readonly class GarXmlImportAdapter implements ImportGarPort
                 return $store->result($operation->id, false, true);
             }
 
-            $pendingFiles = array_values(array_filter(
+            if ($command->initialLoad) {
+                $initialLoad->prepare($operation->id, $this->catalog->tables());
+            }
+
+            $pendingFiles = \array_values(\array_filter(
                 $files,
                 static fn(GarXmlSourceFile $file): bool => !$store
                     ->fileState($operation->id, $file->key)
                     ->completed,
             ));
-            $this->workerPool->run(
-                operationId: $operation->id,
-                sourcePath: $sourcePath,
-                batchSize: $command->batchSize,
-                workerCount: $command->workers,
-                files: $pendingFiles,
+            $this->rawImport->run(
+                $command,
+                $operation->id,
+                $sourcePath,
+                $pipelineFiles,
+                $pendingFiles,
             );
 
-            $store->completeOperation($operation->id);
+            if ($command->initialLoad) {
+                $this->initialLoadFinalizer->complete(
+                    $operation->id,
+                    $initialLoad,
+                    $command->indexWorkers,
+                    $command->foreignKeyWorkers,
+                    $command->persistentIndexWorkers,
+                    $command->overlapIndexForeignKeys,
+                );
+            } else {
+                $store->completeOperation($operation->id);
+            }
 
             return $store->result($operation->id, $operation->resumed, false);
         } catch (Throwable $error) {
@@ -80,7 +114,15 @@ final readonly class GarXmlImportAdapter implements ImportGarPort
                     // Closing the dedicated CLI connection releases the session lock.
                 }
             }
-            pg_close($connection);
+            if ($databaseLockAcquired) {
+                try {
+                    $store->releaseDatabaseLock($command->initialLoad);
+                } catch (Throwable) {
+                    // Closing the dedicated CLI connection releases the session lock.
+                }
+            }
+            \pg_close($connection);
         }
     }
+
 }

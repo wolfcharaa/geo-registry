@@ -57,7 +57,7 @@ SQL;
     {
         $cancellation->throwIfRequested();
 
-        if (ctype_digit($id)) {
+        if (\ctype_digit($id)) {
             $condition = <<<'SQL'
 s.object_id = :object_id
 OR s.datamos_global_id = :object_id
@@ -65,7 +65,7 @@ OR s.datamos_unom = :object_id
 OR s.datamos_nreg = :object_id
 SQL;
             $parameters = ['object_id' => (int) $id, 'limit' => $limit];
-        } elseif (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iD', $id) === 1) {
+        } elseif (\preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iD', $id) === 1) {
             $condition = 's.object_guid = CAST(:object_guid AS uuid)';
             $parameters = ['object_guid' => $id, 'limit' => $limit];
         } else {
@@ -73,7 +73,7 @@ SQL;
         }
 
         try {
-            $result = $this->postgres->execute(sprintf(self::SELECT, $condition), $parameters);
+            $result = $this->postgres->execute(\sprintf(self::SELECT, $condition), $parameters);
             $documents = [];
 
             while (($row = $result->fetchRow()) !== null) {

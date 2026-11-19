@@ -15,7 +15,7 @@ final readonly class FindAddressByIdRequestMapper
 
     public function map(Request $request): FindAddressByIdRequest
     {
-        $rawBody = trim($request->getBody()->buffer());
+        $rawBody = \trim($request->getBody()->buffer());
         $payload = $rawBody === '' ? [] : $this->decode($rawBody);
         $input = new FindAddressByIdRequest(
             query: $payload['query'] ?? '',
@@ -40,7 +40,7 @@ final readonly class FindAddressByIdRequestMapper
     private function decode(string $body): array
     {
         try {
-            $decoded = json_decode($body, false, flags: JSON_THROW_ON_ERROR);
+            $decoded = \json_decode($body, false, flags: JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
             throw new InvalidFindAddressByIdRequest('body', 'Request body must contain valid JSON.', $exception);
         }
@@ -49,6 +49,6 @@ final readonly class FindAddressByIdRequestMapper
             throw new InvalidFindAddressByIdRequest('body', 'Request body must be a JSON object.');
         }
 
-        return get_object_vars($decoded);
+        return \get_object_vars($decoded);
     }
 }

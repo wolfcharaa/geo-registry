@@ -41,11 +41,11 @@ final class GarReleasesCommandTest
         Assert::true($reader->allRequested);
         Assert::same($reader->url, 'https://metadata.test/releases');
         Assert::same($reader->timeout, 7);
-        $payload = json_decode($output->fetch(), true, 512, JSON_THROW_ON_ERROR);
-        Assert::true(is_array($payload));
-        Assert::same(count($payload), 1);
+        $payload = \json_decode($output->fetch(), true, 512, JSON_THROW_ON_ERROR);
+        Assert::true(\is_array($payload));
+        Assert::same(\count($payload), 1);
         $release = $payload[0] ?? null;
-        Assert::true(is_array($release));
+        Assert::true(\is_array($release));
         Assert::same($release['version_id'] ?? null, 12);
     }
 }

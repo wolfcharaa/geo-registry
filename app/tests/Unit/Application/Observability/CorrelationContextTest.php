@@ -65,7 +65,7 @@ final class CorrelationContextTest
             static fn(): LogRecord => $processor($record),
         );
         $json = (new JsonFormatter(ignoreEmptyContextAndExtra: true))->format($processed);
-        json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+        \json_decode($json, true, flags: JSON_THROW_ON_ERROR);
 
         Assert::same($processed->extra, [
             'event' => 'http.request.completed',
@@ -74,6 +74,6 @@ final class CorrelationContextTest
             'request_id' => 'request-a',
             'correlation_id' => 'correlation-a',
         ]);
-        Assert::true(str_ends_with($json, "\n"));
+        Assert::true(\str_ends_with($json, "\n"));
     }
 }

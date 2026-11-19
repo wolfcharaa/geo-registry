@@ -22,12 +22,12 @@ final class JsonErrorHandlerTest
 
         Assert::same($notFound->getStatus(), HttpStatus::NOT_FOUND);
         Assert::same($notFound->getHeader('content-type'), 'application/json; charset=utf-8');
-        Assert::same(json_decode(buffer($notFound->getBody()), true, flags: JSON_THROW_ON_ERROR), [
+        Assert::same(\json_decode(buffer($notFound->getBody()), true, flags: JSON_THROW_ON_ERROR), [
             'success' => false,
             'error' => 'Not Found',
             'error_code' => 'route_not_found',
         ]);
-        Assert::same(json_decode(buffer($methodNotAllowed->getBody()), true, flags: JSON_THROW_ON_ERROR), [
+        Assert::same(\json_decode(buffer($methodNotAllowed->getBody()), true, flags: JSON_THROW_ON_ERROR), [
             'success' => false,
             'error' => 'Method Not Allowed',
             'error_code' => 'method_not_allowed',

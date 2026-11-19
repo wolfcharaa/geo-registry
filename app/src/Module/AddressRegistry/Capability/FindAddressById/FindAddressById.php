@@ -14,7 +14,7 @@ final readonly class FindAddressById implements Query
 
     public function __construct(string $id, int $limit = 20)
     {
-        $this->id = trim($id);
-        $this->limit = max(1, min(20, $limit));
+        $this->id = \trim($id);
+        $this->limit = \max(1, \min(20, $limit));
     }
 }

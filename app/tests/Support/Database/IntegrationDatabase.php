@@ -17,9 +17,9 @@ final class IntegrationDatabase
 {
     public static function dsn(): string
     {
-        $dsn = getenv('INTEGRATION_DATABASE_DSN');
+        $dsn = \getenv('INTEGRATION_DATABASE_DSN');
 
-        return is_string($dsn) && $dsn !== ''
+        return \is_string($dsn) && $dsn !== ''
             ? $dsn
             : 'host=127.0.0.1 port=55432 user=integration password=integration-only db=integration application_name=geo-registry-integration';
     }

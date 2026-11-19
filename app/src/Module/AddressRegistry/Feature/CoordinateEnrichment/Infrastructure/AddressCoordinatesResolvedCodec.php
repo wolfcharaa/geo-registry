@@ -51,7 +51,7 @@ final class AddressCoordinatesResolvedCodec implements MessageCodecInterface
     public function fromPayload(JsonValue $payload): AddressCoordinatesResolved
     {
         $data = $payload->value();
-        if (!is_array($data) || array_is_list($data)) {
+        if (!\is_array($data) || \array_is_list($data)) {
             throw new InvalidMessagePayload('Address coordinates payload must be an object.');
         }
 
@@ -71,7 +71,7 @@ final class AddressCoordinatesResolvedCodec implements MessageCodecInterface
     private static function integer(array $data, string $field): int
     {
         $value = $data[$field] ?? null;
-        if (!is_int($value)) {
+        if (!\is_int($value)) {
             throw new InvalidMessagePayload("Address coordinates field `{$field}` must be an integer.");
         }
 
@@ -82,7 +82,7 @@ final class AddressCoordinatesResolvedCodec implements MessageCodecInterface
     private static function nullableInteger(array $data, string $field): ?int
     {
         $value = $data[$field] ?? null;
-        if ($value !== null && !is_int($value)) {
+        if ($value !== null && !\is_int($value)) {
             throw new InvalidMessagePayload("Address coordinates field `{$field}` must be a nullable integer.");
         }
 
@@ -93,7 +93,7 @@ final class AddressCoordinatesResolvedCodec implements MessageCodecInterface
     private static function number(array $data, string $field): float
     {
         $value = $data[$field] ?? null;
-        if (!is_int($value) && !is_float($value)) {
+        if (!\is_int($value) && !\is_float($value)) {
             throw new InvalidMessagePayload("Address coordinates field `{$field}` must be numeric.");
         }
 
@@ -104,7 +104,7 @@ final class AddressCoordinatesResolvedCodec implements MessageCodecInterface
     private static function nullableString(array $data, string $field): ?string
     {
         $value = $data[$field] ?? null;
-        if ($value !== null && !is_string($value)) {
+        if ($value !== null && !\is_string($value)) {
             throw new InvalidMessagePayload("Address coordinates field `{$field}` must be a nullable string.");
         }
 
@@ -115,7 +115,7 @@ final class AddressCoordinatesResolvedCodec implements MessageCodecInterface
     private static function optionalString(array $data, string $field, string $default): string
     {
         $value = $data[$field] ?? $default;
-        if (!is_string($value)) {
+        if (!\is_string($value)) {
             throw new InvalidMessagePayload("Address coordinates field `{$field}` must be a string.");
         }
 

@@ -44,7 +44,7 @@ final class HttpLoadCheckCommand extends Command
     {
         try {
             $url = $input->getArgument('url');
-            if (!is_string($url)) {
+            if (!\is_string($url)) {
                 throw new InvalidArgumentException('Argument url must be a string.');
             }
 
@@ -61,7 +61,7 @@ final class HttpLoadCheckCommand extends Command
             if ($maxFailures < 0 || $maxFailures > $options->requests) {
                 throw new InvalidArgumentException('Option --max-failures must be between 0 and --requests.');
             }
-            if (!is_finite($maxP95Milliseconds) || $maxP95Milliseconds < 0) {
+            if (!\is_finite($maxP95Milliseconds) || $maxP95Milliseconds < 0) {
                 throw new InvalidArgumentException('Option --max-p95-ms must be non-negative.');
             }
         } catch (InvalidArgumentException $error) {
@@ -75,7 +75,7 @@ final class HttpLoadCheckCommand extends Command
 
         if ($input->getOption('json') === true) {
             try {
-                $output->writeln(json_encode([
+                $output->writeln(\json_encode([
                     'status' => $passed ? 'ok' : 'failed',
                     ...$report->toArray(),
                     'thresholds' => [
@@ -98,8 +98,8 @@ final class HttpLoadCheckCommand extends Command
     private static function integerOption(InputInterface $input, string $name): int
     {
         $value = $input->getOption($name);
-        if (!is_string($value) || filter_var($value, FILTER_VALIDATE_INT) === false) {
-            throw new InvalidArgumentException(sprintf('Option --%s must be an integer.', $name));
+        if (!\is_string($value) || \filter_var($value, FILTER_VALIDATE_INT) === false) {
+            throw new InvalidArgumentException(\sprintf('Option --%s must be an integer.', $name));
         }
 
         return (int) $value;
@@ -108,8 +108,8 @@ final class HttpLoadCheckCommand extends Command
     private static function floatOption(InputInterface $input, string $name): float
     {
         $value = $input->getOption($name);
-        if (!is_string($value) || filter_var($value, FILTER_VALIDATE_FLOAT) === false) {
-            throw new InvalidArgumentException(sprintf('Option --%s must be a number.', $name));
+        if (!\is_string($value) || \filter_var($value, FILTER_VALIDATE_FLOAT) === false) {
+            throw new InvalidArgumentException(\sprintf('Option --%s must be a number.', $name));
         }
 
         return (float) $value;
@@ -120,7 +120,7 @@ final class HttpLoadCheckCommand extends Command
         HttpLoadCheckReport $report,
         bool $passed,
     ): void {
-        $output->writeln(sprintf(
+        $output->writeln(\sprintf(
             'status=%s attempts=%d successes=%d failures=%d duration_ms=%.3f requests_per_second=%.3f',
             $passed ? 'ok' : 'failed',
             $report->attempts,
@@ -129,14 +129,14 @@ final class HttpLoadCheckCommand extends Command
             $report->durationMilliseconds,
             $report->requestsPerSecond,
         ));
-        $output->writeln(sprintf(
+        $output->writeln(\sprintf(
             'latency_ms p50=%.3f p95=%.3f p99=%.3f response_bytes=%d',
             $report->p50Milliseconds,
             $report->p95Milliseconds,
             $report->p99Milliseconds,
             $report->responseBytes,
         ));
-        $output->writeln('http_statuses=' . json_encode($report->statusCounts, JSON_THROW_ON_ERROR));
-        $output->writeln('errors=' . json_encode($report->errorCounts, JSON_THROW_ON_ERROR));
+        $output->writeln('http_statuses=' . \json_encode($report->statusCounts, JSON_THROW_ON_ERROR));
+        $output->writeln('errors=' . \json_encode($report->errorCounts, JSON_THROW_ON_ERROR));
     }
 }

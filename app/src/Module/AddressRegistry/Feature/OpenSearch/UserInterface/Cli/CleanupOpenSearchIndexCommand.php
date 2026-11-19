@@ -42,7 +42,7 @@ final class CleanupOpenSearchIndexCommand extends Command
     {
         $index = $input->getOption('index');
         $confirmation = $input->getOption('confirm');
-        if (!is_string($index) || !is_string($confirmation)) {
+        if (!\is_string($index) || !\is_string($confirmation)) {
             $output->writeln('<error>Options --index and --confirm are required.</error>');
 
             return self::INVALID;

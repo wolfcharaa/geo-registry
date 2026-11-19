@@ -71,7 +71,7 @@ final class SuggestAddressScenarioTest
         Assert::same(self::ids($results[1]), [770002]);
         Assert::same(self::ids($results[2]), [770004]);
         Assert::same($reader->resolvedParentIds, [770001, 770002]);
-        Assert::same(array_map(
+        Assert::same(\array_map(
             static fn(SuggestionCriteria $criteria): ?int => $criteria->context?->regionCode,
             $reader->administrativeCriteria,
         ), [null, 77]);
@@ -97,7 +97,7 @@ final class SuggestAddressScenarioTest
         );
 
         Assert::same($result->progressiveSuggestions, []);
-        Assert::same(count($reader->administrativeCriteria), 1);
+        Assert::same(\count($reader->administrativeCriteria), 1);
     }
 
     public function testItRejectsAnUnknownParentBeforeTheStageReaderRuns(): void
@@ -139,7 +139,7 @@ final class SuggestAddressScenarioTest
             )),
         );
 
-        Assert::same(array_map(
+        Assert::same(\array_map(
             static fn(SearchAddressMatch $match): int => $match->document->objectId,
             $result->searchMatches,
         ), [770005]);
@@ -151,7 +151,7 @@ final class SuggestAddressScenarioTest
     /** @return list<int> */
     private static function ids(SuggestAddressResult $result): array
     {
-        return array_map(
+        return \array_map(
             static fn(ProgressiveAddressSuggestion $suggestion): int => $suggestion->objectId,
             $result->progressiveSuggestions,
         );
@@ -188,7 +188,7 @@ final readonly class SuggestAddressScenarioModule implements Module
                 ->arg('reader', $reader)
                 ->canBeScoped(),
         ];
-        $classes = array_keys($services);
+        $classes = \array_keys($services);
         $serviceClasses = [];
         foreach ($classes as $class) {
             $serviceClasses[$class] = $class;
@@ -231,7 +231,7 @@ final class RecordingSuggestionPort implements
     ): ?SuggestionContext {
         $cancellation->throwIfRequested();
         $this->resolvedParentIds[] = $parentId;
-        if (!in_array($parentId, [770001, 770002, 770004], true)) {
+        if (!\in_array($parentId, [770001, 770002, 770004], true)) {
             return null;
         }
 
@@ -317,7 +317,7 @@ final class RecordingSuggestionPort implements
     ): ProgressiveAddressSuggestion {
         return new ProgressiveAddressSuggestion(
             objectId: $objectId,
-            objectGuid: sprintf('00000000-0000-4000-8000-%012d', $objectId),
+            objectGuid: \sprintf('00000000-0000-4000-8000-%012d', $objectId),
             name: $name,
             typeName: $typeName,
             hierarchy: $hierarchy,

@@ -9,7 +9,10 @@ RUN apk add --no-cache curl git libpq libuv \
     && docker-php-ext-enable --ini-name 40-uv.ini uv \
     && apk del .build-deps \
     && php -r "foreach (['pcntl', 'pdo_pgsql', 'pgsql', 'posix', 'sockets', 'uv', 'xmlreader'] as \$extension) { if (!extension_loaded(\$extension)) { fwrite(STDERR, \"Missing extension: {\$extension}\\n\"); exit(1); } }" \
-    && printf '%s\n' 'zend.assertions=-1' > /usr/local/etc/php/conf.d/zz-production.ini
+    && printf '%s\n' \
+        'memory_limit=512M' \
+        'zend.assertions=-1' \
+        > /usr/local/etc/php/conf.d/zz-production.ini
 
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 

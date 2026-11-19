@@ -49,7 +49,7 @@ HELP);
     {
         try {
             $destination = $input->getArgument('destination');
-            if (!is_string($destination) || trim($destination) === '') {
+            if (!\is_string($destination) || \trim($destination) === '') {
                 throw new InvalidArgumentException('Argument destination must be a non-empty path.');
             }
             $apiKey = $this->defaultApiKey;
@@ -61,7 +61,7 @@ HELP);
 
             if ($input->getOption('dry-run') === true) {
                 $metadata = $this->downloader->inspect($apiKey, $datasetId, $timeout);
-                $output->writeln(sprintf(
+                $output->writeln(\sprintf(
                     'status=available dataset=%d version=%s release=%s rows=%d dry_run=yes',
                     $metadata->datasetId,
                     $metadata->versionNumber ?? 'unknown',
@@ -72,7 +72,7 @@ HELP);
                 return self::SUCCESS;
             }
 
-            $lastProgressAt = microtime(true);
+            $lastProgressAt = \microtime(true);
             $result = $this->downloader->download(
                 destination: $destination,
                 apiKey: $apiKey,
@@ -82,18 +82,18 @@ HELP);
                 timeoutSeconds: $timeout,
                 force: $input->getOption('force') === true,
                 progress: static function (int $downloadedRows, int $advertisedRows) use ($output, &$lastProgressAt): void {
-                    if (microtime(true) - $lastProgressAt < 5.0) {
+                    if (\microtime(true) - $lastProgressAt < 5.0) {
                         return;
                     }
-                    $output->writeln(sprintf(
+                    $output->writeln(\sprintf(
                         'phase=download rows=%d advertised_rows=%d',
                         $downloadedRows,
                         $advertisedRows,
                     ));
-                    $lastProgressAt = microtime(true);
+                    $lastProgressAt = \microtime(true);
                 },
             );
-            $output->writeln(sprintf(
+            $output->writeln(\sprintf(
                 'status=downloaded dataset=%d version=%s release=%s rows=%d bytes=%d sha256=%s path=%s manifest=%s',
                 $result->dataset->datasetId,
                 $result->dataset->versionNumber ?? 'unknown',
@@ -129,7 +129,7 @@ HELP);
         if ($value === null) {
             return null;
         }
-        if (!is_string($value) || !ctype_digit($value) || (int) $value < 1) {
+        if (!\is_string($value) || !\ctype_digit($value) || (int) $value < 1) {
             throw new InvalidArgumentException("Option --{$name} must be a positive integer.");
         }
 

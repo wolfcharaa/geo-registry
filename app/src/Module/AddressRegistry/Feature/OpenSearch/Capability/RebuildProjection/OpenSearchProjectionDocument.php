@@ -19,14 +19,14 @@ final readonly class OpenSearchProjectionDocument
         if ($this->regionCode < 1 || $this->regionCode > 99) {
             throw new InvalidArgumentException('OpenSearch projection region code must be between 1 and 99.');
         }
-        if ($this->document->aliasCount !== count($this->aliases)) {
+        if ($this->document->aliasCount !== \count($this->aliases)) {
             throw new InvalidArgumentException('OpenSearch projection alias count must match the alias collection.');
         }
     }
 
     public function id(): string
     {
-        return sprintf(
+        return \sprintf(
             '%02d:%s:%d',
             $this->regionCode,
             $this->document->hierarchy->value,

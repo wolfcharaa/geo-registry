@@ -15,16 +15,16 @@ final class GarImportWorkerPlanTest
 {
     public function testItBalancesFilesAcrossWorkersWithoutCrossingDependencyPhases(): void
     {
-        $files = new GarXmlCatalog()->files(dirname(__DIR__, 5) . '/Fixture/Gar/representative');
+        $files = new GarXmlCatalog()->manifest(\dirname(__DIR__, 5) . '/Fixture/Gar/representative')->files;
         $phases = new GarImportWorkerPlan()->phases($files, 2);
 
-        Assert::same(count($phases), 5);
-        Assert::same(array_map('count', $phases), [2, 1, 1, 1, 1]);
+        Assert::same(\count($phases), 5);
+        Assert::same(\array_map('count', $phases), [2, 1, 1, 1, 1]);
 
         $plannedPaths = [];
         $previousPriority = 0;
         foreach ($phases as $assignments) {
-            Assert::true(count($assignments) <= 2);
+            Assert::true(\count($assignments) <= 2);
             $priorities = [];
             foreach ($assignments as $assignment) {
                 foreach ($assignment as $file) {
@@ -32,19 +32,19 @@ final class GarImportWorkerPlanTest
                     $priorities[$file->descriptor->priority] = true;
                 }
             }
-            Assert::same(count($priorities), 1);
-            $priority = array_key_first($priorities);
-            Assert::true(is_int($priority));
+            Assert::same(\count($priorities), 1);
+            $priority = \array_key_first($priorities);
+            Assert::true(\is_int($priority));
             Assert::true($priority > $previousPriority);
             $previousPriority = $priority;
         }
 
-        $expectedPaths = array_map(
+        $expectedPaths = \array_map(
             static fn(GarXmlSourceFile $file): string => $file->relativePath,
             $files,
         );
-        sort($expectedPaths);
-        sort($plannedPaths);
+        \sort($expectedPaths);
+        \sort($plannedPaths);
         Assert::same($plannedPaths, $expectedPaths);
     }
 }

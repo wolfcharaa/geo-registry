@@ -36,7 +36,7 @@ final class OpenSearchSearchAddressDecoratorTest
 {
     public function testItReturnsNormalizedRegionalOpenSearchHits(): void
     {
-        $http = new FakeOpenSearchHttpClient(body: json_encode([
+        $http = new FakeOpenSearchHttpClient(body: \json_encode([
             'hits' => [
                 'hits' => [[
                     '_score' => 12.5,
@@ -68,7 +68,7 @@ final class OpenSearchSearchAddressDecoratorTest
 
         $matches = $this->decorator($http, $fallback)->search($this->criteria(), new NullCancellation());
 
-        Assert::same(count($matches), 1);
+        Assert::same(\count($matches), 1);
         $match = $matches[0] ?? null;
         Assert::notNull($match);
         Assert::same($match->backend, 'opensearch');
@@ -102,7 +102,7 @@ final class OpenSearchSearchAddressDecoratorTest
         ]);
         Assert::same($bool['minimum_should_match'] ?? null, 1);
         $ranking = self::list($bool['should'] ?? null);
-        Assert::same(count($ranking), 10);
+        Assert::same(\count($ranking), 10);
         Assert::same($ranking[0] ?? null, [
             'term' => [
                 'address.keyword' => [
@@ -190,10 +190,10 @@ final class OpenSearchSearchAddressDecoratorTest
 
         Assert::true($handler->hasRecordThatContains('fell back to PostgreSQL', Level::Warning));
         $records = $handler->getRecords();
-        Assert::same(count($records), 1);
+        Assert::same(\count($records), 1);
         $record = $records[0] ?? null;
         Assert::notNull($record);
-        Assert::false(str_contains(json_encode($record->context, JSON_THROW_ON_ERROR), 'must-not-be-logged'));
+        Assert::false(\str_contains(\json_encode($record->context, JSON_THROW_ON_ERROR), 'must-not-be-logged'));
     }
 
     public function testItPropagatesCancellationWithoutCallingPostgres(): void
@@ -248,13 +248,13 @@ final class OpenSearchSearchAddressDecoratorTest
     /** @return array<array-key, mixed> */
     private static function jsonObject(string $json): array
     {
-        return self::object(json_decode($json, true, flags: JSON_THROW_ON_ERROR));
+        return self::object(\json_decode($json, true, flags: JSON_THROW_ON_ERROR));
     }
 
     /** @return array<array-key, mixed> */
     private static function object(mixed $value): array
     {
-        if (!is_array($value) || array_is_list($value)) {
+        if (!\is_array($value) || \array_is_list($value)) {
             throw new \LogicException('Expected an object.');
         }
 
@@ -264,7 +264,7 @@ final class OpenSearchSearchAddressDecoratorTest
     /** @return list<mixed> */
     private static function list(mixed $value): array
     {
-        if (!is_array($value) || !array_is_list($value)) {
+        if (!\is_array($value) || !\array_is_list($value)) {
             throw new \LogicException('Expected a list.');
         }
 

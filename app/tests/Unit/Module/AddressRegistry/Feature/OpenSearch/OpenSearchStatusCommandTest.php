@@ -32,11 +32,11 @@ final class OpenSearchStatusCommandTest
         ));
 
         Assert::same($exitCode, 0);
-        Assert::true(str_contains($output, 'cluster status=yellow timed_out=no nodes=1 data_nodes=1'));
-        Assert::true(str_contains($output, 'alias name=places targets=places-v2'));
-        Assert::true(str_contains($output, 'parity source=100 target=100 invalid_regions=0 status=ok'));
-        Assert::true(str_contains($output, 'inactive count=1 indexes=places-v1'));
-        Assert::true(str_contains($output, 'summary status=ok'));
+        Assert::true(\str_contains($output, 'cluster status=yellow timed_out=no nodes=1 data_nodes=1'));
+        Assert::true(\str_contains($output, 'alias name=places targets=places-v2'));
+        Assert::true(\str_contains($output, 'parity source=100 target=100 invalid_regions=0 status=ok'));
+        Assert::true(\str_contains($output, 'inactive count=1 indexes=places-v1'));
+        Assert::true(\str_contains($output, 'summary status=ok'));
     }
 
     public function testItFailsClosedForAnAmbiguousAliasAndInvalidSourceRegions(): void
@@ -55,9 +55,9 @@ final class OpenSearchStatusCommandTest
         ));
 
         Assert::same($exitCode, 1);
-        Assert::true(str_contains($output, 'targets=places-v1,places-v2'));
-        Assert::true(str_contains($output, 'target=unavailable invalid_regions=1 status=failed'));
-        Assert::true(str_contains($output, 'summary status=failed'));
+        Assert::true(\str_contains($output, 'targets=places-v1,places-v2'));
+        Assert::true(\str_contains($output, 'target=unavailable invalid_regions=1 status=failed'));
+        Assert::true(\str_contains($output, 'summary status=failed'));
     }
 
     /** @return array{int, string} */

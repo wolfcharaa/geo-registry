@@ -166,7 +166,7 @@ SQL;
         $cancellation->throwIfRequested();
 
         try {
-            $row = $this->postgres->execute(sprintf(
+            $row = $this->postgres->execute(\sprintf(
                 self::RESOLVE_CONTEXT,
                 self::hierarchyTable($hierarchy),
             ), [
@@ -233,10 +233,10 @@ SQL;
         }
 
         try {
-            $result = $this->postgres->execute(sprintf(
+            $result = $this->postgres->execute(\sprintf(
                 self::SUGGEST,
                 $regionCondition,
-                str_replace('candidate.', 's.', $levelCondition),
+                \str_replace('candidate.', 's.', $levelCondition),
                 self::hierarchyTable($criteria->hierarchy),
                 $parentCondition,
             ), $parameters);
@@ -290,7 +290,7 @@ SQL;
     private function string(array $row, string $field): string
     {
         $value = $row[$field] ?? null;
-        if (!is_string($value)) {
+        if (!\is_string($value)) {
             throw new RuntimeException("PostgreSQL field `{$field}` must be a string.");
         }
 
