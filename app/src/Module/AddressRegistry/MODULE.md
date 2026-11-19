@@ -1,7 +1,7 @@
 ---
 module: AddressRegistry
-version: 0.14.0
-updated: 2026-11-08
+version: 0.38.1
+updated: 2026-11-19
 language: ru
 ---
 
@@ -17,6 +17,72 @@ Canonical GAR tables остаются источником истины, а onli
 application-owned `address_search` и связанные иерархии через capability ports.
 Модуль также владеет состоянием CLI-операций импорта и перестройки производной
 региональной projection. Эти blocking adapters доступны только в CLI runtime.
+Raw `object_params.value` не является online fuzzy-search boundary:
+нормализация выбирает параметры по object/type/date и только читает значение,
+поэтому schema не поддерживает trigram GIN для этой колонки. Новый прямой
+raw-search consumer должен отдельно обосновать и измерить свой index.
+Canonical hierarchy также не хранит GIN по `path`/`path_arr`: текущие
+normalization, suggestion, integrity и DataMos paths находят hierarchy по PK,
+`object_id` и `region_code`, а membership проверяют выражением
+`value = ANY(path_arr)`, которое PostgreSQL 17 не обслуживает array GIN.
+Будущий containment/fuzzy consumer должен принести совместимый оператор,
+проверенный план и отдельную migration вместо профилактического индекса.
+Остальные presentation columns canonical GAR tables также не получают
+`gin_trgm_ops` без фактического raw fuzzy consumer. Текущий suggestion SQL даже
+для `address_objects.name` использует active/current composite candidate set и
+фильтрует similarity после него. Search indexes нормализованных
+`address_search`, aliases и DataMos остаются частью соответствующих read models.
+Lookup актуальной строки в `address_objects`, `houses`, `apartments`, `rooms`,
+`steads` и `car_places` обслуживают шесть partial active/current composites по
+object identity, update date и id. Отдельные B-tree по start/end/update date и
+active/actual flags не являются запасными индексами «на будущее»; новый broad
+lifecycle query должен вернуть только подтверждённый своим планом access path.
+`prev_id`/`next_id` остаются raw GAR lineage values: их self-FK намеренно сняты,
+потому что текущая выгрузка может не содержать связанную версию. Текущие
+normalization, search, integrity и recovery paths не обходят эти links, поэтому
+отдельные B-tree также не сохраняются «на будущее». Новый version traversal
+consumer должен вернуть минимальный индекс собственной migration и подтвердить
+его планом/benchmark.
+Чтение `object_params` для normalizer выбирает типы `5/6/7/16` по object id,
+фильтрует `end_date` и сортирует по `update_date/id`; этот access path обслуживает
+partial `idx_object_params_denorm_type_object_update`. Отдельные B-tree по
+`start_date`, `end_date` и `update_date` не являются broad-query contract и не
+сохраняются без самостоятельного consumer/плана.
+`change_id_end` сохраняется как исходное GAR-значение, но не имеет FK: ссылка
+может вести в историю изменений за пределами загруженного среза. Текущие
+normalization, search, integrity и recovery paths не выполняют по ней join или
+traversal, поэтому отдельный `idx_object_params_change_id_end` также не
+поддерживается профилактически. Будущий consumer должен вернуть минимальный
+access path собственной migration и подтвердить его планом и benchmark.
+Дублирующие UUID в `address_objects`, `apartments`, `car_places`, `houses`,
+`rooms` и `steads` также остаются canonical raw values, но не несут отдельных
+B-tree: нормализация получает UUID через уникальный
+`reestr_objects.object_guid`, а unit rows связывает по индексированным числовым
+FK. Новый прямой unit-GUID lookup должен сначала подтвердить преимущество перед
+маршрутом `reestr_objects.object_guid → id → unit FK`.
+`parent_obj_id` и `change_id` административной и муниципальной иерархий также
+сохраняются как raw GAR cross-link values. Их FK намеренно сняты, потому что
+региональный срез может не содержать родительский объект или запись истории, а
+текущие normalization, integrity, recovery и search paths не выполняют по этим
+полям join/traversal. Поэтому отдельные B-tree по ним не поддерживаются без
+фактического consumer; используемые `object_id` и административный
+`region_code` access paths остаются индексированными.
+`start_date` и `update_date` обеих hierarchy tables сохраняются как canonical
+GAR values, но не имеют отдельных B-tree: текущие rebuild, integrity, DataMos,
+search и recovery paths не фильтруют и не сортируют hierarchy rows по этим
+полям. `end_date`, напротив, входит в active-current predicates и сохраняет
+свои два индекса; новый start/update consumer должен вернуть только нужный
+access path с populated plan и read/write benchmark.
+`reestr_objects.change_id`, `create_date` и `update_date` также сохраняются как
+canonical GAR metadata без отдельных B-tree: runtime, normalization, integrity
+и recovery paths по ним не фильтруют и не сортируют. `is_active` проверяется
+только после точечного соединения по PK `reestr_objects.id`; в region-50
+fixture значение `true` занимает `95.1924%` строк, поэтому отдельный полный
+boolean B-tree не обслуживает текущий predicate. PK, unique `object_guid` и
+FK/access path `level_id` остаются индексированными. Будущий broad metadata или
+inactive-object query должен вернуть только свой измеренный access path;
+редкий `false` predicate сам по себе не оправдывает профилактический partial
+index без production consumer.
 
 ## Async Runtime Boundary
 
@@ -54,21 +120,94 @@ lifecycle — `Application/Worker`. Модуль владеет только mes
 
 **Правила**
 
-- XML читается `XMLReader` только вперёд; каждый worker держит в памяти не
-  больше выбранного batch и служебного состояния одного файла. Совокупная
-  верхняя граница растёт пропорционально `--workers`.
+- Обычный путь читает XML через `XMLReader` только вперёд. Opt-in parallel
+  parser сначала потоково планирует непересекающиеся byte ranges по имени
+  depth-1 element, а каждый child повторно разбирает свой fragment через libxml;
+  fragment с неверным числом строк или malformed XML не достигает COPY.
 - Supervisor сохраняет advisory lock и запускает отдельные worker-процессы с
   собственными PostgreSQL-соединениями. Файлы одной dependency-фазы могут
   обрабатываться параллельно; следующая фаза начинается только после завершения
   всех workers текущей.
-- Worker создаёт temporary staging table один раз на XML-файл и переиспользует
-  её между batches. Каждый batch одной PostgreSQL-транзакцией выполняет native
-  `COPY FROM`, set-based upsert и обновляет checkpoint; `ON COMMIT DELETE ROWS`
-  очищает staging после успешного commit.
+- В обычном write mode worker создаёт temporary staging table один раз на
+  XML-файл и переиспользует её между batches. Каждый batch одной
+  PostgreSQL-транзакцией выполняет native `COPY FROM`, set-based upsert и
+  обновляет checkpoint; `ON COMMIT DELETE ROWS` очищает staging после commit.
+- Opt-in `--direct-copy` доступен только для `initial-load`: batch выполняет
+  native `COPY` сразу в canonical table и продвигает checkpoint той же
+  транзакцией, без staging и `ON CONFLICT`. PK, unique и CHECK остаются
+  активными; по умолчанию FK также активны, поэтому duplicate, неизвестный
+  address-object type или нарушенная ссылка откатывают весь batch.
+- Opt-in `--defer-foreign-keys` для direct initial-load фиксирует
+  exact definitions/hash только canonical FK и снимает их в той же транзакции,
+  что переводит operation из `prepare` в `import`. После index build все FK
+  восстанавливаются как `NOT VALID`, затем bounded process pool выполняет
+  `VALIDATE CONSTRAINT`, начиная с крупнейших referencing tables и не проверяя
+  одновременно два ограничения одной таблицы. Без отдельного PK option primary,
+  unique, CHECK и `NOT NULL` в этом режиме не снимаются.
+- Opt-in `--defer-primary-keys` требует одновременно `--initial-load`,
+  `--direct-copy` и `--defer-foreign-keys`. Snapshot сохраняет exact backing
+  index SQL, primary constraint definition и оба SHA-256; FK снимаются раньше
+  PK. После raw каждый PK восстанавливается bulk unique build плюс
+  `ADD CONSTRAINT ... PRIMARY KEY USING INDEX` и проходит definition,
+  validity и ownership gates до начала FK restore. Unique, CHECK и `NOT NULL`
+  остаются активными.
+- Для одного явно выбранного compatible XML или автоматически для всех
+  compatible XML каждой data phase direct initial-load может включить bounded
+  batch pipeline. Auto-selection упорядочен по priority, size и path;
+  выбранные XML одной фазы последовательно используют общий bounded
+  importer, а incompatible siblings могут идти ordinary workers. Без
+  `--pipeline-parsers` parent последовательно читает файл
+  одним `XMLReader`; с option он передаёт byte ranges parser pool-у, принимает
+  нумерованные encoded batches и направляет их в прежний durable COPY pool.
+  С `--pipeline-fused-ranges` каждый child кодирует около `1 MiB`, отправляет
+  parent только row/byte metadata, ждёт bounded writer permit, затем продолжает
+  generator и передаёт row-aligned `1 MiB` chunks напрямую в PostgreSQL. Один
+  XML-safe planned range фиксируется одной atomic COPY/checkpoint transaction.
+  Это исключает двойную сериализацию rows между процессами и не удерживает весь
+  encoded range до writer permit; parent по-прежнему владеет точными in-flight
+  limits и метриками. Каждый writer переиспользует PostgreSQL-соединение и
+  выполняет direct COPY независимо от порядка завершения соседних ranges.
+- `--overlap-table-indexes` запускает отдельный bounded scheduler OS-процессом:
+  после завершения последнего manifest-файла конкретной canonical table её
+  secondary indexes могут восстанавливаться, пока raw import других таблиц ещё
+  продолжается. Raw coordinator и index scheduler не делят event loop или
+  process watchers; готовность и завершение raw согласуются через durable
+  PostgreSQL state. Admission повторно проверяется транзакционно перед каждым
+  index build. Опциональный `--overlap-index-start-percent` откладывает первый
+  ранний index build, пока завершённые manifest-файлы не составят заданную
+  долю исходных XML-байтов; это устойчивый к разному числу и размеру файлов
+  admission barrier, а не wall-clock delay. Во время raw используется
+  отдельный лимит `--overlap-index-workers`; после raw обычная index phase
+  продолжает с полным `--index-workers` и подбирает оставшийся backlog.
+- `--persistent-index-workers` заменяет отдельный Symfony CLI bootstrap для
+  каждого index snapshot на bounded Amp process pool. Каждый процесс
+  последовательно выполняет несколько index tasks и переиспользует своё
+  PostgreSQL-соединение; одноимённый snapshot/result проверяется parent-ом.
+  Отдельный scheduler process, запрет параллельных индексов одной таблицы и
+  durable `pending/building/completed/failed` recovery state не меняются.
+- `--workers` остаётся общим budget активной работы: ordinary file workers,
+  range parsers и pipeline writers вместе не превышают лимит. Пока в
+  dependency-фазе работают соседние XML, pipeline получает свободные слоты, а
+  после их завершения динамически расширяется не выше суммы parser/writer caps.
+- Каждый fused pipeline writer одной транзакцией на planned range выполняет COPY, записывает
+  непересекающийся committed range в `gar_import_file_batches`, складывает
+  только непрерывный префикс в file checkpoint и обновляет точные operation
+  counters. Завершение файла запрещено, пока остаётся range backlog или
+  `processed_rows` не равен `merged_rows`.
 - `gar_import_operations` и `gar_import_files` хранят progress/recovery state;
-  `parser_logs` не участвует в принятии решений о возобновлении.
+  `gar_import_files.pipeline_enabled` фиксирует точный набор pipeline XML.
+  Legacy single-file operations backfill-ятся migration; `parser_logs` не
+  участвует в принятии решений о возобновлении.
 - Повтор завершённого неизменного manifest является успешным no-op. Незавершённая
   операция продолжает тот же файл после числа уже зафиксированных строк.
+  `write_mode` входит в durable identity operation, поэтому незавершённый
+  direct-copy import нельзя продолжить через merge или наоборот.
+- Pipeline selection также входит в durable identity: один XML использует его
+  file key, multi-file selection — SHA-256 упорядоченного набора file keys. При
+  resume persisted selection сверяется целиком, а parser пропускает contiguous
+  checkpoint и уже committed ranges впереди него; число parsers/writers и batch
+  size можно безопасно изменить, не меняя selection. После восстановления
+  непрерывного префикса сложенные ledger ranges удаляются.
 - Manifest связывает descriptor, относительный путь, размер и mtime файла.
   Изменённый источник при активном checkpoint требует явного `--restart`.
 - `--restart` помечает незавершённую операцию `abandoned` и начинает новую; уже
@@ -76,12 +215,43 @@ lifecycle — `Application/Worker`. Модуль владеет только mes
 - Ошибка XML, COPY или merge помечает файл и операцию `failed`, возвращает
   ненулевой exit code и оставляет только ранее завершённые batches. Остальные
   workers текущей фазы получают завершение процесса: их незавершённая транзакция
-  откатывается, а новая dependency-фаза не запускается. `SIGINT`/`SIGTERM`
-  supervisor обрабатывает так же. Temporary staging удаляется при закрытии
-  dedicated worker connection.
+  откатывается, а новая dependency-фаза не запускается. Temporary staging
+  удаляется при закрытии dedicated worker connection.
+- `SIGINT`/`SIGTERM` supervisor и потеря PostgreSQL backend завершают текущий
+  attempt как `failed` после bounded cleanup. Следующий совместимый запуск
+  продолжает тот же operation id, увеличивает attempt и может изменить batch
+  size и предел writers; committed ranges не повторяются, незакоммиченный COPY
+  откатывается, orphan writer после завершения supervisor не остаётся.
+- Неожиданное завершение одного pipeline child при работающем supervisor
+  восстанавливается worker pool. Операция может завершиться в том же attempt и
+  не требует ручного resume, если потерянная задача успешно выполнена заменой.
+- При pipeline-ошибке supervisor прекращает приём новых batches, даёт уже
+  отправленным задачам до пяти секунд на завершение и затем принудительно
+  останавливает pool. Любой COPY без зафиксированного range откатывается вместе
+  с транзакцией; успевшие commit ranges остаются основанием точного resume.
 - Advisory lock запрещает два одновременных импорта одного source. Общей
   транзакции на всю выгрузку нет, поэтому partial state является намеренной
   основой resume, а не скрытым rollback всего release.
+- Каждый обычный import дополнительно держит shared database advisory lock.
+  `--initial-load` получает exclusive lock, требует пустые canonical GAR tables
+  и отклоняется до изменения schema, если обнаруживает данные или index/FK
+  snapshot backlog. Обычный import также отклоняется при snapshot backlog и не
+  позволяет обойти незавершённое восстановление через `--restart`.
+- `initial-load` по умолчанию сохраняет PK, unique/exclusion и constraint-owned
+  indexes, а определения остальных вторичных индексов фиксирует в
+  `gar_import_index_snapshots` и снимает одной транзакцией. После XML import
+  bounded pool восстанавливает индексы, начиная с крупнейших heap tables; два
+  индекса одной таблицы не строятся одновременно. При deferred PK тот же
+  snapshot lifecycle сначала восстанавливает все primary indexes/constraints,
+  и только затем допускает FK restore. Затем выполняются `ANALYZE` и fail-closed
+  проверка checkpoints, счётчиков и index validity.
+- Без deferred FK фазы остаются `prepare → import → index-build → analyze →
+  integrity → ready`. С `--defer-foreign-keys` между index build и `ANALYZE`
+  добавляются durable `foreign-key-restore → foreign-key-validate`. Snapshot
+  хранит статус и attempt каждого ограничения; повтор принимает как откат
+  незавершённого `VALIDATE`, так и уже завершённую server-side validation, но
+  не допускает `ready` без exact definition parity и `convalidated=true`.
+  Успешный `ready` очищает оба snapshot backlog.
 - Прямой XML-файл с неизвестным именем отклоняется. При обходе каталога файлы,
   для которых в canonical schema нет descriptor, не импортируются.
 
@@ -94,9 +264,86 @@ lifecycle — `Application/Worker`. Модуль владеет только mes
   progress, большее уменьшает число round trips ценой памяти текущего batch.
 - `--workers` — максимальное число параллельных worker-процессов внутри одной
   dependency-фазы; default `2`, допустимый диапазон `1..16`. Каждый worker имеет
-  отдельное PostgreSQL-соединение, XMLReader и temporary staging table.
+  отдельное PostgreSQL-соединение и XMLReader; в обычном write mode также
+  отдельную temporary staging table.
+- `--index-workers` — ширина bounded worker pool для initial-load index build;
+  default `2`, диапазон `1..4`. Это execution knob: его можно изменить при
+  resume, а scheduler начинает очереди крупнейших heap tables первыми и
+  по-прежнему не строит одновременно два индекса одной таблицы.
+- `--persistent-index-workers` — opt-in reuse index worker processes и их
+  PostgreSQL-соединений между snapshots; требует `--initial-load`. Это
+  execution knob и не входит в durable identity: resume можно продолжить с
+  ним или без него. Для измеренного dedicated host q73 принял persistent pool
+  по двум crossover-парам; unknown/shared host проверяет собственный A/B.
 - `--restart` — не продолжать незавершённый checkpoint выбранного source, а
   начать новую операцию. По умолчанию команда возобновляет совместимый manifest.
+- `--initial-load` — offline-режим только для новой пустой
+  выделенной БД. Временно снимает вторичные неуникальные индексы и восстанавливает
+  их bounded pool-ом. Совместное использование с `--restart` запрещено: для
+  отказа от recovery state нужно пересоздать disposable database.
+- `--direct-copy` — opt-in write mode для `--initial-load`. Пишет batches сразу
+  в canonical tables и сохраняет точный committed-row resume, но не выполняет
+  UPSERT; без `--initial-load` отклоняется до запуска импорта.
+- `--defer-foreign-keys` — opt-in только для
+  `--initial-load --direct-copy`. Переносит проверки canonical FK после import,
+  затем восстанавливает и валидирует их bounded process pool-ом; flag входит в durable
+  identity операции. Region-50 W4 A/B принял режим для измеренного host, но он
+  остаётся явным option, а не default для неизвестного schema/storage.
+- `--defer-primary-keys` — opt-in только для
+  `--initial-load --direct-copy --defer-foreign-keys`. Убирает per-row PK
+  maintenance из raw, затем bulk-восстанавливает все primary constraints до
+  FK; flag входит в durable identity. Region-50 q113 crossover сократил raw на
+  `26.40%`, E2E на `15.16%` и WAL на `32.63%`.
+- `--foreign-key-workers` — ширина deferred validation pool, default `2`,
+  диапазон `1..4`; значение, отличное от default, требует
+  `--defer-foreign-keys`. Это execution knob: при resume его можно изменить,
+  durable definitions/checkpoints от ширины не зависят. Для измеренного
+  dedicated host принят `4`, но неизвестный или shared host начинает с `2`.
+- `--pipeline-file` — точный manifest-relative путь совместимого direct XML
+  либо `auto`. Автоматический режим выбирает все XML с одинаковыми stage/target
+  columns в data dependency phases выше priority `10`.
+  Используется только вместе с `--initial-load`, `--direct-copy` и
+  `--pipeline-writers`.
+- `--pipeline-writers` — предел process writers для выбранного XML, `1..4` и не
+  больше `--workers`. Это верхняя граница: доступная ёмкость динамически
+  уменьшается на число обычных file workers текущей dependency-фазы.
+- `--pipeline-parsers` — opt-in byte-range parser pool, `1..4`; требует оба
+  pipeline option. С `--pipeline-fused-ranges` допустимо `1..8`, потому что
+  parsed rows не пересылаются в отдельный writer process. Настроенная сумма
+  parsers и writer permits должна помещаться в `--workers`. Это execution knob:
+  durable identity и committed ranges от него не зависят.
+- `--pipeline-fused-ranges` — оставляет XML decode, COPY-text encode и COPY в
+  одном worker, использует row-aligned `1 MiB` transport chunks и одну atomic
+  transaction на planned range; разрешает parser width `1..8` и требует
+  `--pipeline-parsers`. Writer concurrency всё равно ограничена
+  `--pipeline-writers`.
+- `--pipeline-file-concurrency` — число одновременно активных XML внутри одной
+  dependency phase, `1..2`; значение `2` требует fused ranges и делит единые
+  parser/writer/byte limits между обоими файлами.
+- `--pipeline-buffer-mib` — общий encoded in-flight COPY window, `16..64 MiB`;
+  расширение требует fused ranges.
+- `--pipeline-fragment-mib` — общий предел raw/encoded fragment, `8..16 MiB`;
+  не может превышать buffer и требует fused ranges.
+- `--pipeline-table-aware-files` — при file concurrency `2` группирует XML по
+  canonical table: siblings одной таблицы идут параллельно, группы разных
+  таблиц закрываются последовательно для раннего table-ready index build.
+- `--overlap-table-indexes` — initial-load режим для раннего
+  восстановления индексов таблиц, закрытых для дальнейшей raw-записи; требует
+  `--initial-load --direct-copy`.
+- `--overlap-index-workers` — предел ранних index workers во время raw import,
+  default `1`, диапазон `1..4` и не больше `--index-workers`. Без
+  `--overlap-table-indexes` значение, отличное от default, отклоняется. После
+  raw снова действует полный `--index-workers`.
+- `--overlap-index-start-percent` — минимальная доля завершённых исходных
+  XML-байтов перед admission первого раннего индекса, default `0`, диапазон
+  `0..99`; требует `--overlap-table-indexes`. Значение `0` сохраняет
+  немедленный table-ready scheduler, а ненулевой порог позволяет измерять
+  поздний overlap без привязки к именам таблиц или времени сервера.
+- Pipeline ограничивает не только rows: planned range/transaction ограничен
+  `--pipeline-fragment-mib`, parser task queue — общим parser width, а сумма
+  prefetched bytes, ожидающих writer permit, — `--pipeline-buffer-mib`. В
+  прежнем single-reader пути один oversized row остаётся допустимым и
+  обрабатывается отдельным batch.
 - Стандартные Symfony Console flags управляют только консолью; их актуальный
   список показывает `--help`.
 
@@ -114,9 +361,15 @@ bin/app gar:import --help
 
 **Результат запуска**
 
-Успех печатает status, operation id, число завершённых файлов, обработанных и
-merged rows и признак resume. Ошибка печатается в console output и возвращает
-exit code `1`.
+Успех печатает status, operation id, lifecycle mode, write mode, pipeline
+target, parser/writer limits, fused-range mode, persistent index-worker mode,
+phase, число завершённых файлов,
+обработанных и merged
+rows, configured file/index workers, восстановленных индексов, признак resume,
+число/encoded bytes pipeline
+batches, пиковое число/encoded bytes одновременно отправленных batches, режим
+FK и число завершённых FK checkpoints. Ошибка печатается в console output и
+возвращает exit code `1`.
 
 **Подключение/условие**
 
@@ -125,6 +378,160 @@ exit code `1`.
   импортёр или его blocking `ext-pgsql` connection.
 - Runtime обязан иметь `ext-xmlreader` и `ext-pgsql`; перед импортом должны быть
   применены migrations, создающие canonical GAR и operation tables.
+
+### Экспериментальная raw-граница — `Capability/ImportGarRaw`
+
+Оператор запускает отдельный work-orchestrator путь для сравнения только raw
+части initial load. Сценарий использует тот же manifest, operation ledger,
+advisory locks и direct-COPY schema, но намеренно не восстанавливает индексы и
+FK, не выполняет `ANALYZE`/integrity и не переводит operation в `completed`.
+Production-команда `gar:import` и её coordinator этим сценарием не заменяются.
+
+**Правила**
+
+- Сценарий всегда создаёт или возобновляет `initial-load/direct-copy`
+  operation. Source manifest, pipeline selection, defer flags и committed range
+  ledger проверяются теми же `PostgresGarImportStore` и
+  `GarInitialLoadStore`, что и в production path.
+- Manifest-файлы допускаются строгими группами dependency priority; внутри
+  группы сначала выдаются самые большие файлы. Следующая группа не начинается,
+  пока предыдущая полностью не завершена.
+- Каждый primary process переиспользует одно PostgreSQL-соединение. Ordinary
+  XML целиком импортируется в primary, а каждый range выбранного compatible
+  pipeline XML выполняется managed child-ом, который также переиспользует одно
+  собственное соединение.
+- Через managed IPC передаются только сериализуемый file/range locator и
+  компактный result со счётчиками. XML fragments и encoded COPY rows остаются
+  внутри child process; child сам выполняет parse, encode и atomic direct COPY
+  с durable range checkpoint.
+- Число одновременно ожидающих range tasks в каждом primary ограничено числом
+  его child workers. Topology проверяется до запуска по формуле
+  `primary_workers × (1 + child_workers_per_primary) ≤ 16`.
+- Raw success разрешён только после durable completion каждого manifest-файла,
+  отсутствия range backlog и равенства operation counters
+  `rows_processed = rows_merged`. Успешная operation остаётся в
+  `status=running`, `phase=import`; index/FK snapshot backlog сохраняется для
+  отдельной финализации или удаления disposable database.
+- Повтор совместимого запуска продолжает тот же operation и пропускает уже
+  завершённые файлы/ranges. Сценарий не предоставляет `--restart`: конфликт
+  manifest или durable identity отклоняется fail-closed.
+- Ошибка managed task, XML/COPY, неправильный result или сигнал
+  `SIGINT`/`SIGTERM` отменяет orchestration, помечает текущий файл/operation
+  failed и оставляет только committed checkpoints. Primary и child bootstrap
+  закрывают принадлежащие им PostgreSQL-соединения.
+- `--defer-primary-keys` разрешён только вместе с
+  `--defer-foreign-keys`. Snapshot definitions и hash gates не ослабляются;
+  raw-сценарий лишь останавливается до их восстановления.
+
+**Параметры запуска**
+
+- `source` — обязательный поддерживаемый XML или каталог GAR release.
+- `--batch-size` — число строк для планирования bounded ranges; default
+  `50000`, диапазон `1..100000`.
+- `--primary-workers` — число reusable primary processes; default `1`,
+  диапазон `1..16` с учётом общего topology budget.
+- `--child-workers-per-primary` — reusable managed children каждого primary;
+  default `8`, диапазон `1..8` с учётом общего topology budget.
+- `--regions` — уникальные коды `1..99` через запятую; без option выбирается
+  весь manifest.
+- `--pipeline-file` — compatible manifest-relative XML или `auto`; default
+  `auto`, который выбирает все compatible data-phase XML.
+- `--fragment-mib` — общий предел raw и encoded bytes одной range task;
+  default `8`, диапазон `8..16 MiB`.
+- `--defer-foreign-keys` — снять и сохранить canonical FK до raw stage.
+- `--defer-primary-keys` — дополнительно снять и сохранить primary keys;
+  требует `--defer-foreign-keys`.
+
+**Справка с хоста**
+
+```shell
+docker/compose/dev.sh run --rm --no-deps app bin/app gar:import:raw --help
+```
+
+**Справка внутри runtime-контекста**
+
+```shell
+bin/app gar:import:raw --help
+```
+
+**Результат запуска**
+
+Успех печатает `status=raw-completed`, `boundary=raw`, operation/phase,
+file/row parity, topology budget, pipeline/range counters, serialized managed
+IPC bytes, snapshot backlog, defer flags, resume marker и время raw stage.
+Ошибка печатается в console output и возвращает exit code `1`. Failure внутри
+orchestrator дополнительно печатает bounded JSON evidence: kind, process/task
+origin, canonical work id, attempt, type/message/location, до пяти frames и
+трёх causes с explicit omitted counters. Args, payload, env, locals и object
+state в этот контракт не входят.
+
+**Production-финализация raw-операции**
+
+После raw success обычный `gar:import` с теми же source, regions, batch size,
+initial-load/direct-copy mode, pipeline selection и defer-флагами возобновляет
+ту же durable operation (`resumed=yes`). Завершённые XML и ranges повторно не
+импортируются: команда восстанавливает primary/secondary indexes и foreign
+keys, выполняет `ANALYZE`, integrity gate и переводит operation в
+`status=completed`, `phase=ready`. Это две явные CLI-стадии; raw success сам по
+себе не означает готовность production database.
+
+**Подключение/условие**
+
+- `GarWorkOrchestratedRawImportAdapter` реализует отдельный
+  `ImportGarRawPort`; production `ImportGarPort` остаётся связан с
+  `GarXmlImportAdapter`, который также завершает совместимую raw-операцию.
+- Команда зарегистрирована только в `GarImportCliModule` CLI runtime и требует
+  те же migrations, `ext-xmlreader`, `ext-pgsql`, `ext-pcntl` и disposable
+  empty database, что и direct initial load.
+
+### Выбор Кандидата Для Bounded Pipeline — `Capability/ImportGar/GarImportPlanner`
+
+Оператор до импорта проверяет фактический manifest выбранного source и получает
+упорядоченный список XML, совместимых с direct batch pipeline. Команда
+показывает dependency priority и автоматический selection, но не запускает
+import и не меняет checkpoints.
+
+**Правила**
+
+- Planner использует тот же catalog и regional filter, что и import, и печатает
+  manifest hash, число файлов, суммарные source bytes и число кандидатов.
+- Кандидатами становятся все XML, у которых stage и target columns совпадают;
+  список сортируется по убыванию размера, затем по пути.
+- `auto=yes` отмечает каждый compatible XML data phase. Priority `10` не
+  включается автоматически; точный compatible path можно выбрать явно.
+- Отсутствующий регион, неподдерживаемый source или некорректный список регионов
+  завершают команду с exit code `1`; import state при этом не создаётся.
+
+**Параметры запуска**
+
+- `source` — обязательный путь к поддерживаемому XML или каталогу GAR release.
+- `--regions` — уникальные коды `1..99` через запятую. Без опции анализируется
+  весь выбранный manifest; с опцией — общие XML и только указанные каталоги.
+- Стандартные Symfony Console flags управляют только консолью; их актуальный
+  список показывает `--help`.
+
+**Справка с хоста**
+
+```shell
+docker/compose/dev.sh run --rm --no-deps app bin/app gar:import:plan --help
+```
+
+**Справка внутри runtime-контекста**
+
+```shell
+bin/app gar:import:plan --help
+```
+
+**Результат запуска**
+
+Успех печатает одну сводную строку manifest и по строке `pipeline_candidate` с
+относительным путём и размером. Пустой список кандидатов является успешным
+read-only результатом, а не разрешением выбрать произвольный XML.
+
+**Подключение/условие**
+
+- Команда зарегистрирована тем же `GarImportCliModule` только в CLI runtime.
+- Planner читает filesystem catalog и не зависит от PostgreSQL import store.
 
 ## Перестройка Региональной Проекции
 
@@ -199,66 +606,148 @@ scanned/written rows, итоговый physical row count, elapsed milliseconds 
 
 ## Операционный Статус GAR
 
-`bin/app gar:import <release-directory> --regions=50,77` импортирует общие XML
-из корня release и региональные XML только из каталогов `50/` и `77/`.
-Отсутствие любого запрошенного региона является ошибкой до запуска workers;
-для single-file source опция запрещена, потому что регион нельзя доказать по
-структуре release.
+### Сводка Импорта И Проекции — `Capability/Status`
 
-`bin/app gar:status` читает последний import manifest, file checkpoints,
-последнюю shadow rebuild operation и региональные checkpoints. По умолчанию
-используются регионы `50,77`; другой ограниченный набор задаётся через
-`--regions=50,77`.
+Оператор получает один read-only snapshot последнего GAR import, последней
+перестройки `address_search` и покрытия выбранных регионов. Снимок показывает,
+можно ли продолжать release path, требуется ли recovery и насколько свеж
+последний durable progress.
 
-Быстрый режим не сканирует многомиллионную `address_search`: актуальные
-projection/Data.Mos/alias/geocode counters выводятся как `not-scanned`, а
-последний зафиксированный rebuild count остаётся в `checkpoint_rows`. Для
-release-сверки `--exact` выполняет точные региональные агрегаты:
+**Правила**
+
+- Import выводит status, operation id, mode, phase, write mode, attempt, batch
+  size, source, manifest, file states, processed/merged rows, `updated_at` и
+  `progress_age`, а также режим и completed/total counters deferred FK.
+- Pipeline выводит target, writer limit, batches/bytes, пиковое окно,
+  pending ranges/rows и возраст progress target-файла. Состояние не хранится
+  отдельной машиной: оно вычисляется из operation, target file и range ledger.
+- Приоритет вычисления: `off` без target; `recovery-required` для failed или
+  abandoned operation; `waiting-for-gap` при pending ranges; `completed` после
+  завершения; `recovering` для running attempt больше первого; затем `running`
+  или `pending` по состоянию target-файла.
+- Быстрый режим не сканирует многомиллионную `address_search`: актуальные
+  projection/Data.Mos/alias/geocode counters выводятся как `not-scanned`, а
+  последний rebuild count остаётся в `checkpoint_rows`. `--exact` выполняет
+  точные региональные агрегаты.
+- Неизвестная строка `gar_versions` отображается как `gar_version=unknown`:
+  manifest hash остаётся доступен и не подменяется вымышленной версией.
+
+**Параметры запуска**
+
+- `--regions` — коды `1..99` через запятую; default `50,77`.
+- `--exact` — добавить дорогие точные projection/Data.Mos/alias/geocode counts.
+
+**Справка с хоста**
 
 ```shell
-bin/app gar:status --regions=50,77 --exact
+docker/compose/dev.sh run --rm --no-deps app bin/app gar:status --help
 ```
 
-Команда read-only. Неизвестная строка `gar_versions` отображается как
-`gar_version=unknown`: import manifest hash при этом остаётся доступен и не
-подменяется вымышленной версией релиза.
+**Справка внутри runtime-контекста**
+
+```shell
+bin/app gar:status --help
+```
+
+**Результат запуска**
+
+Команда ничего не меняет и возвращает ненулевой exit code при некорректных
+регионах или недоступном operational snapshot.
 
 ## Release Integrity GAR
 
-`bin/app gar:integrity --regions=50,77` выполняет быстрый fail-closed
-gate: проверяет завершённые import/rebuild checkpoints, сохранённую
-rebuild parity, LIST parent, непустые `adm`/`mun` projections и фактическую
-маршрутизацию строк в physical partitions.
+### Fail-Closed Проверка Релиза — `Capability/Integrity`
 
-`--deep` добавляет точные проверки дубликатов, обязательных полей,
-canonical GAR references, владения регионом, полноты активных
-hierarchies и alias references. Тяжёлые SQL выполняются не более двух
-одновременно. Режим предназначен для release window:
+Оператор проверяет, что последний import и rebuild можно принять как основу
+release. Команда агрегирует независимые checks и не исправляет найденное
+состояние.
+
+**Правила**
+
+- Быстрый gate требует завершённых import/rebuild checkpoints, равных import
+  counters, сохранённой rebuild parity, LIST parent, непустых `adm`/`mun`
+  projections и маршрутизации строк в physical partitions.
+- Последний import обязан иметь пустой `gar_import_file_batches`: любой
+  committed range backlog является issue даже при внешне завершённых counters.
+- Последний import обязан иметь пустой FK snapshot backlog, а canonical GAR FK
+  должны иметь `convalidated=true`; это quick gate и для режима с активными FK,
+  и для deferred lifecycle.
+- Этот быстрый backlog check не заменяет exact digest, recovery и constraint
+  evidence полного benchmark/test gate.
+- `--deep` добавляет точные проверки дубликатов, обязательных полей, canonical
+  references, владения регионом, полноты active hierarchies и alias references.
+  Тяжёлые SQL выполняются не более двух одновременно.
+- Любое число issues больше нуля или недоступная SQL-проверка возвращает exit
+  code `1`; опции игнорировать issues нет.
+
+**Параметры запуска**
+
+- `--regions` — коды `1..99` через запятую; default `50,77`.
+- `--deep` — добавить точные проверки projection и canonical ownership.
+- `--only-failed` — не печатать успешные checks.
+
+**Справка с хоста**
 
 ```shell
-bin/app gar:integrity --regions=50,77 --deep --only-failed
+docker/compose/dev.sh run --rm --no-deps app bin/app gar:integrity --help
 ```
 
-Любое число issues больше нуля или недоступная SQL-проверка возвращает
-exit code `1`; опции, разрешающей проигнорировать issues, нет.
+**Справка внутри runtime-контекста**
+
+```shell
+bin/app gar:integrity --help
+```
+
+**Результат запуска**
+
+Успех означает только прохождение выбранного quick/deep набора на текущем
+snapshot. Команда read-only и не удаляет backlog или partial state.
 
 ## Текущая Активность GAR
 
-`bin/app gar:activity` даёт один read-only snapshot для оперативной диагностики:
+### Оперативный Read-Only Snapshot — `Capability/Activity`
 
-- активные statements текущей application database из `pg_stat_activity`;
-- последние durable `gar_import` и `address_search_rebuild` operations;
-- зарегистрированные worker instances без `stopped_at`;
-- незавершённые или failed queue jobs с target binding prefix `gar.`.
+Оператор сопоставляет активные PostgreSQL statements, durable GAR operations,
+worker heartbeats и GAR queue backlog в одном снимке. Команда помогает отличить
+работающий import от stalled/recovery состояния, но не управляет процессами.
 
-`--limit` ограничивает каждую динамическую секцию диапазоном `1..100`, default
-`20`. Полный worker control plane остаётся в `worker:status` и
-`worker:control`; `gar:activity` не посылает команды и не меняет operation
-state.
+**Правила**
 
-Legacy `parser_logs` намеренно не читается и не является recovery/progress
-источником target. Состояние import/rebuild берётся только из их checkpoint
-tables, а worker activity — из versioned MessageBus runtime schema.
+- Snapshot содержит активные statements текущей application database, последние
+  `gar_import` и `address_search_rebuild` operations, worker instances без
+  `stopped_at` и незавершённые/failed jobs с binding prefix `gar.`.
+- Import operation показывает mode, phase, write mode, attempt, batch size,
+  steps, rows, `progress_age`, deferred FK mode/counters и ошибку. Отдельная
+  pipeline-строка показывает то же inferred state и counters, что `gar:status`,
+  включая pending ranges/rows.
+- `--limit` ограничивает SQL, worker и queue секции, но не скрывает последние
+  две durable target operations.
+- Полный control plane остаётся в `worker:status`/`worker:control`;
+  `gar:activity` не посылает команд и не меняет operation state.
+- Legacy `parser_logs` не читается. Import/rebuild progress берётся только из
+  checkpoint tables, worker activity — из versioned MessageBus runtime schema.
+
+**Параметры запуска**
+
+- `--limit` — максимум строк в каждой динамической секции, `1..100`, default
+  `20`.
+
+**Справка с хоста**
+
+```shell
+docker/compose/dev.sh run --rm --no-deps app bin/app gar:activity --help
+```
+
+**Справка внутри runtime-контекста**
+
+```shell
+bin/app gar:activity --help
+```
+
+**Результат запуска**
+
+Команда read-only; некорректный limit или недоступный snapshot возвращает
+ненулевой exit code.
 
 ## Optional Metadata GAR Releases
 

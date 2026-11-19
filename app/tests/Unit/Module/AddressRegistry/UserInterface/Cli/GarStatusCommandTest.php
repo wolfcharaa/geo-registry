@@ -31,10 +31,12 @@ final class GarStatusCommandTest
         Assert::same($exitCode, 0);
         Assert::same($reader->regions, [50, 77]);
         Assert::true($reader->exact);
-        Assert::true(str_contains($output, 'import=completed operation=7'));
-        Assert::true(str_contains($output, 'rebuild=completed phase=completed operation=8'));
-        Assert::true(str_contains($output, 'region=50 hierarchy=adm'));
-        Assert::true(str_contains($output, 'projection_rows=100 geocoded=9 datamos=8 aliases=7'));
+        Assert::true(\str_contains($output, 'import=completed operation=7'));
+        Assert::true(\str_contains($output, 'pipeline=completed target=77/AS_HOUSES_PARAMS.XML writers=4'));
+        Assert::true(\str_contains($output, 'foreign_keys=deferred completed=34/34'));
+        Assert::true(\str_contains($output, 'rebuild=completed phase=completed operation=8'));
+        Assert::true(\str_contains($output, 'region=50 hierarchy=adm'));
+        Assert::true(\str_contains($output, 'projection_rows=100 geocoded=9 datamos=8 aliases=7'));
     }
 
     public function testItRejectsAnInvalidRegionBeforeReadingPostgres(): void
@@ -47,7 +49,7 @@ final class GarStatusCommandTest
 
         Assert::same($exitCode, 2);
         Assert::same($reader->regions, []);
-        Assert::true(str_contains($output, 'codes from 1 to 99'));
+        Assert::true(\str_contains($output, 'codes from 1 to 99'));
     }
 
     /**
@@ -84,8 +86,13 @@ final class RecordingGarStatusReader implements GarStatusReader
             import: new GarImportStatus(
                 operationId: 7,
                 status: 'completed',
+                mode: 'initial-load',
+                phase: 'ready',
+                writeMode: 'direct-copy',
+                attempt: 2,
+                batchSize: 50000,
                 sourcePath: '/data/gar',
-                manifestHash: str_repeat('a', 64),
+                manifestHash: \str_repeat('a', 64),
                 filesCompleted: 2,
                 filesTotal: 2,
                 rowsProcessed: 200,
@@ -95,6 +102,20 @@ final class RecordingGarStatusReader implements GarStatusReader
                 runningFiles: 0,
                 completedFiles: 2,
                 failedFiles: 0,
+                progressAge: '00:00:02',
+                pipelineState: 'completed',
+                pipelineFile: '77/AS_HOUSES_PARAMS.XML',
+                pipelineWriters: 4,
+                pipelineBatches: 20,
+                pipelineBytes: 4000,
+                pipelinePeakInFlightBatches: 4,
+                pipelinePeakInFlightBytes: 1000,
+                pipelinePendingRanges: 0,
+                pipelinePendingRows: 0,
+                pipelineProgressAge: '00:00:03',
+                deferForeignKeys: true,
+                foreignKeysCompleted: 34,
+                foreignKeysTotal: 34,
             ),
             rebuild: new AddressSearchRebuildStatus(
                 operationId: 8,

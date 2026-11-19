@@ -34,7 +34,7 @@ final readonly class OpenSearchProjectionRebuilder implements RebuildOpenSearchP
 
     public function rebuild(RebuildOpenSearchProjection $command): RebuildOpenSearchProjectionResult
     {
-        $startedAt = hrtime(true);
+        $startedAt = \hrtime(true);
         $targetIndex = OpenSearchVersionedIndexName::generate($this->alias);
         $snapshot = null;
         $pending = [];
@@ -70,7 +70,7 @@ final readonly class OpenSearchProjectionRebuilder implements RebuildOpenSearchP
             $snapshot = $this->source->openSnapshot();
             $manifest = $snapshot->manifest;
             if ($manifest->invalidRegionDocuments !== 0) {
-                throw new OpenSearchProjectionFailed(sprintf(
+                throw new OpenSearchProjectionFailed(\sprintf(
                     'OpenSearch source contains %d document(s) without a valid region_code.',
                     $manifest->invalidRegionDocuments,
                 ), $targetIndex);
@@ -92,7 +92,7 @@ final readonly class OpenSearchProjectionRebuilder implements RebuildOpenSearchP
                     $cancellation->getCancellation(),
                 ));
 
-                if (count($pending) >= $command->concurrency) {
+                if (\count($pending) >= $command->concurrency) {
                     $indexedDocuments += self::awaitOne($pending);
                 }
             }
@@ -111,7 +111,7 @@ final readonly class OpenSearchProjectionRebuilder implements RebuildOpenSearchP
                 $indexedDocuments !== $manifest->documents
                 || $targetDocuments !== $manifest->documents
             ) {
-                throw new OpenSearchProjectionFailed(sprintf(
+                throw new OpenSearchProjectionFailed(\sprintf(
                     'OpenSearch parity failed: source=%d indexed=%d target=%d.',
                     $manifest->documents,
                     $indexedDocuments,
@@ -131,7 +131,7 @@ final readonly class OpenSearchProjectionRebuilder implements RebuildOpenSearchP
                 targetDocuments: $targetDocuments,
                 aliasSwitched: $command->switchAlias,
                 previousIndexes: $previousIndexes,
-                elapsedMilliseconds: max(0, (int) ((hrtime(true) - $startedAt) / 1_000_000)),
+                elapsedMilliseconds: \max(0, (int) ((\hrtime(true) - $startedAt) / 1_000_000)),
             );
         } catch (Throwable $error) {
             $cancellation->cancel($error);

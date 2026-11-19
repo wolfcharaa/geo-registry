@@ -16,9 +16,9 @@ final readonly class FindAddressByIdPresenter
     {
         return [
             'success' => true,
-            'count' => count($result->documents),
+            'count' => \count($result->documents),
             'query' => ['query' => $id, 'limit' => $limit],
-            'suggestions' => array_map(
+            'suggestions' => \array_map(
                 fn($document): array => $this->suggestions->present($document, 1.0),
                 $result->documents,
             ),

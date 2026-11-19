@@ -7,7 +7,7 @@ namespace App\Module\AddressRegistry\UserInterface\Cli;
 use App\Module\AddressRegistry\Capability\ImportGar\GarImportFailed;
 use App\Module\AddressRegistry\Capability\ImportGar\GarImportWorkerFile;
 use App\Module\AddressRegistry\Capability\ImportGar\RunGarImportWorker;
-use App\Module\AddressRegistry\Capability\ImportGar\RunGarImportWorkerRunner;
+use App\Module\AddressRegistry\Capability\ImportGar\RunGarImportWorkerPort;
 use InvalidArgumentException;
 use JsonException;
 use Symfony\Component\Console\Command\Command;
@@ -19,7 +19,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class RunGarImportWorkerCommand extends Command
 {
     public function __construct(
-        private readonly RunGarImportWorkerRunner $runner,
+        private readonly RunGarImportWorkerPort $worker,
     ) {
         parent::__construct('gar:import:worker');
         $this->setHidden(true);
@@ -37,6 +37,12 @@ final class RunGarImportWorkerCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Rows per atomic COPY/merge/checkpoint batch.',
                 '50000',
+            )
+            ->addOption(
+                'direct-copy',
+                null,
+                InputOption::VALUE_NONE,
+                'Write encoded batches directly into canonical tables.',
             );
     }
 
@@ -47,24 +53,25 @@ final class RunGarImportWorkerCommand extends Command
             $source = $input->getArgument('source');
             $batchSize = $input->getOption('batch-size');
             if (
-                !is_string($operation)
-                || !is_string($source)
-                || !is_string($batchSize)
-                || preg_match('/^[0-9]+$/D', $operation) !== 1
-                || preg_match('/^[0-9]+$/D', $batchSize) !== 1
+                !\is_string($operation)
+                || !\is_string($source)
+                || !\is_string($batchSize)
+                || \preg_match('/^[0-9]+$/D', $operation) !== 1
+                || \preg_match('/^[0-9]+$/D', $batchSize) !== 1
             ) {
                 throw new InvalidArgumentException('GAR import worker arguments must have valid scalar values.');
             }
 
-            $payload = stream_get_contents(STDIN);
-            if (!is_string($payload)) {
+            $payload = \stream_get_contents(STDIN);
+            if (!\is_string($payload)) {
                 throw new InvalidArgumentException('Unable to read the GAR import worker assignment.');
             }
-            $this->runner->run(new RunGarImportWorker(
+            $this->worker->run(new RunGarImportWorker(
                 operationId: (int) $operation,
                 sourcePath: $source,
                 batchSize: (int) $batchSize,
                 files: $this->files($payload),
+                directCopy: $input->getOption('direct-copy') === true,
             ));
         } catch (InvalidArgumentException|JsonException|GarImportFailed $error) {
             $output->writeln('<error>' . $error->getMessage() . '</error>');
@@ -81,17 +88,17 @@ final class RunGarImportWorkerCommand extends Command
      */
     private function files(string $payload): array
     {
-        $decoded = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
-        if (!is_array($decoded) || $decoded === []) {
+        $decoded = \json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
+        if (!\is_array($decoded) || $decoded === []) {
             throw new InvalidArgumentException('GAR import worker assignment must be a non-empty JSON list.');
         }
 
         $files = [];
         foreach ($decoded as $item) {
             if (
-                !is_array($item)
-                || !is_string($item['relative_path'] ?? null)
-                || !is_string($item['file_key'] ?? null)
+                !\is_array($item)
+                || !\is_string($item['relative_path'] ?? null)
+                || !\is_string($item['file_key'] ?? null)
             ) {
                 throw new InvalidArgumentException('GAR import worker assignment contains an invalid file.');
             }

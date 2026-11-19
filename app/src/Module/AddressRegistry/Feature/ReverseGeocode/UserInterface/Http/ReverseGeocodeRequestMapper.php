@@ -13,8 +13,8 @@ final readonly class ReverseGeocodeRequestMapper
 
     public function map(Request $request): ReverseGeocodeRequest
     {
-        parse_str($request->getUri()->getQuery(), $parameters);
-        if (!array_key_exists('lat', $parameters) || !array_key_exists('lon', $parameters)) {
+        \parse_str($request->getUri()->getQuery(), $parameters);
+        if (!\array_key_exists('lat', $parameters) || !\array_key_exists('lon', $parameters)) {
             throw new InvalidReverseGeocodeRequest(
                 'missing_coordinates',
                 'Missing required parameters: lat and lon',
@@ -52,8 +52,8 @@ final readonly class ReverseGeocodeRequestMapper
         return [
             'lat' => self::safeCoordinate($parameters['lat'] ?? null),
             'lon' => self::safeCoordinate($parameters['lon'] ?? null),
-            'hierarchy' => is_string($parameters['hier'] ?? null) ? $parameters['hier'] : 'adm',
-            'limit' => is_string($parameters['num'] ?? null) && ctype_digit($parameters['num'])
+            'hierarchy' => \is_string($parameters['hier'] ?? null) ? $parameters['hier'] : 'adm',
+            'limit' => \is_string($parameters['num'] ?? null) && \ctype_digit($parameters['num'])
                 ? (int) $parameters['num']
                 : 1,
         ];
@@ -61,7 +61,7 @@ final readonly class ReverseGeocodeRequestMapper
 
     private static function safeCoordinate(mixed $value): ?float
     {
-        return (is_int($value) || is_float($value) || is_string($value)) && is_numeric($value)
+        return (\is_int($value) || \is_float($value) || \is_string($value)) && \is_numeric($value)
             ? (float) $value
             : null;
     }

@@ -53,10 +53,10 @@ final class GarActivityCommand extends Command
             return self::FAILURE;
         }
 
-        $output->writeln('postgres_activity count=' . count($snapshot->statements));
+        $output->writeln('postgres_activity count=' . \count($snapshot->statements));
         foreach ($snapshot->statements as $statement) {
-            $wait = implode('/', array_filter([$statement->waitEventType, $statement->waitEvent], 'is_string'));
-            $output->writeln(sprintf(
+            $wait = \implode('/', \array_filter([$statement->waitEventType, $statement->waitEvent], 'is_string'));
+            $output->writeln(\sprintf(
                 'sql pid=%d application="%s" state=%s age=%s wait=%s query="%s"',
                 $statement->pid,
                 self::quoted($statement->application),
@@ -67,26 +67,59 @@ final class GarActivityCommand extends Command
             ));
         }
 
-        $output->writeln('operations count=' . count($snapshot->operations));
+        $output->writeln('operations count=' . \count($snapshot->operations));
         foreach ($snapshot->operations as $operation) {
-            $output->writeln(sprintf(
-                'operation type=%s id=%d status=%s phase=%s steps=%d/%d rows=%d/%d updated_at="%s" error="%s"',
+            $output->writeln(\sprintf(
+                'operation type=%s id=%d status=%s mode=%s phase=%s write=%s attempt=%s batch_size=%s '
+                    . 'steps=%d/%d rows=%d/%d updated_at="%s" '
+                    . 'progress_age=%s error="%s"',
                 $operation->type,
                 $operation->operationId,
                 $operation->status,
+                $operation->mode ?? 'none',
                 $operation->phase ?? 'none',
+                $operation->writeMode ?? 'none',
+                $operation->attempt === null ? 'none' : (string) $operation->attempt,
+                $operation->batchSize === null ? 'none' : (string) $operation->batchSize,
                 $operation->stepsCompleted,
                 $operation->stepsTotal,
                 $operation->rowsRead,
                 $operation->rowsWritten,
                 self::quoted($operation->updatedAt),
+                $operation->progressAge,
                 self::quoted($operation->error ?? 'none'),
             ));
+            if ($operation->pipelineState !== null) {
+                $output->writeln(\sprintf(
+                    'operation_pipeline id=%d state=%s target=%s writers=%s batches=%d bytes=%d '
+                        . 'peak_batches=%d peak_bytes=%d pending_ranges=%d pending_rows=%d progress_age=%s',
+                    $operation->operationId,
+                    $operation->pipelineState,
+                    $operation->pipelineFile ?? 'off',
+                    $operation->pipelineWriters === null ? 'off' : (string) $operation->pipelineWriters,
+                    $operation->pipelineBatches,
+                    $operation->pipelineBytes,
+                    $operation->pipelinePeakInFlightBatches,
+                    $operation->pipelinePeakInFlightBytes,
+                    $operation->pipelinePendingRanges,
+                    $operation->pipelinePendingRows,
+                    $operation->pipelineProgressAge ?? 'none',
+                ));
+            }
+            if ($operation->type === 'gar_import') {
+                $output->writeln(\sprintf(
+                    'operation_foreign_keys id=%d mode=%s completed=%d/%d',
+                    $operation->operationId,
+                    $operation->deferForeignKeys ? 'deferred' : 'active',
+                    $operation->foreignKeysCompleted,
+                    $operation->foreignKeysTotal,
+                ));
+            }
         }
 
-        $output->writeln('workers count=' . count($snapshot->workers));
+        $output->writeln('workers count=' . \count($snapshot->workers));
         foreach ($snapshot->workers as $worker) {
-            $output->writeln(sprintf(
+            $output->writeln(\sprintf(
                 'worker instance=%s name="%s" state=%s activity=%s transport=%s queue=%s heartbeat_at="%s" heartbeat_age=%s',
                 $worker->instanceId,
                 self::quoted($worker->name),
@@ -99,9 +132,9 @@ final class GarActivityCommand extends Command
             ));
         }
 
-        $output->writeln('gar_queue_activity count=' . count($snapshot->queues));
+        $output->writeln('gar_queue_activity count=' . \count($snapshot->queues));
         foreach ($snapshot->queues as $queue) {
-            $output->writeln(sprintf(
+            $output->writeln(\sprintf(
                 'queue flow=%s binding=%s status=%s jobs=%d oldest_at="%s"',
                 $queue->flow,
                 $queue->bindingId,
@@ -117,7 +150,7 @@ final class GarActivityCommand extends Command
     private static function limit(InputInterface $input): int
     {
         $limit = $input->getOption('limit');
-        if (!is_string($limit) || !ctype_digit($limit) || (int) $limit < 1 || (int) $limit > 100) {
+        if (!\is_string($limit) || !\ctype_digit($limit) || (int) $limit < 1 || (int) $limit > 100) {
             throw new InvalidArgumentException('Option --limit must be an integer from 1 to 100.');
         }
 
@@ -126,7 +159,7 @@ final class GarActivityCommand extends Command
 
     private static function quoted(string $value): string
     {
-        return str_replace(
+        return \str_replace(
             ["\\", '"', "\r", "\n"],
             ["\\\\", '\\"', '\\r', '\\n'],
             $value,

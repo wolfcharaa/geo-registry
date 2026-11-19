@@ -43,7 +43,7 @@ final class FindAddressByIdScenarioTest
         Assert::same($reader->id, '770005');
         Assert::same($reader->limit, 20);
         Assert::same($reader->cancellation, $deferredCancellation->getCancellation());
-        Assert::same(array_map(
+        Assert::same(\array_map(
             static fn(AddressDocument $document): int => $document->objectId,
             $result->documents,
         ), [770005]);

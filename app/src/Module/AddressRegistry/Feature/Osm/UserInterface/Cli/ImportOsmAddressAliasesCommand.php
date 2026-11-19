@@ -46,11 +46,11 @@ HELP);
     {
         try {
             $source = $input->getArgument('source');
-            if (!is_string($source) || trim($source) === '') {
+            if (!\is_string($source) || \trim($source) === '') {
                 throw new InvalidArgumentException('Argument source must be a non-empty path.');
             }
 
-            $lastProgressAt = microtime(true);
+            $lastProgressAt = \microtime(true);
             $result = $this->importer->import(
                 source: $source,
                 batchSize: self::integerOption($input, 'batch-size', 1000, 50000),
@@ -63,18 +63,18 @@ HELP);
                     int $writtenRows,
                     int $skippedRows,
                 ) use ($output, &$lastProgressAt): void {
-                    if (microtime(true) - $lastProgressAt < 5.0) {
+                    if (\microtime(true) - $lastProgressAt < 5.0) {
                         return;
                     }
 
-                    $output->writeln(sprintf(
+                    $output->writeln(\sprintf(
                         'phase=import read=%d matched=%d written=%d skipped=%d',
                         $readRows,
                         $matchedRows,
                         $writtenRows,
                         $skippedRows,
                     ));
-                    $lastProgressAt = microtime(true);
+                    $lastProgressAt = \microtime(true);
                 },
             );
         } catch (Throwable $error) {
@@ -83,14 +83,14 @@ HELP);
             return self::FAILURE;
         }
 
-        $output->writeln(sprintf(
+        $output->writeln(\sprintf(
             'status=imported source=%s read=%d matched=%d written=%d skipped=%d elapsed_ms=%d dry_run=%s',
             $result->source,
             $result->readRows,
             $result->matchedRows,
             $result->writtenRows,
             $result->skippedRows,
-            (int) round($result->duration * 1000),
+            (int) \round($result->duration * 1000),
             $result->dryRun ? 'yes' : 'no',
         ));
 
@@ -113,7 +113,7 @@ HELP);
         if ($value === null) {
             return null;
         }
-        if (!is_string($value) || !ctype_digit($value) || (int) $value < 1) {
+        if (!\is_string($value) || !\ctype_digit($value) || (int) $value < 1) {
             throw new InvalidArgumentException("Option --{$name} must be a positive integer.");
         }
 

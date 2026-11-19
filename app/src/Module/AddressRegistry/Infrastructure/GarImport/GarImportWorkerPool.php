@@ -4,53 +4,232 @@ declare(strict_types=1);
 
 namespace App\Module\AddressRegistry\Infrastructure\GarImport;
 
+use Amp\Cancellation;
+use Amp\DeferredCancellation;
 use App\Module\AddressRegistry\Capability\ImportGar\GarImportFailed;
-use JsonException;
+use Closure;
 use Throwable;
 
 final readonly class GarImportWorkerPool
 {
     public function __construct(
-        private string $databaseDsn,
-        private string $consolePath,
         private GarImportWorkerPlan $plan,
+        private GarImportPipelinePlan $pipelinePlan,
+        private GarFilePhaseImporter $fileImporter,
+        private GarImportWorkerProcessPool $processPool,
+        private GarParallelFileImporter $parallelFileImporter,
+        private GarParallelRangeFileImporter $parallelRangeFileImporter,
+        private GarFusedRangeFileImporter $fusedRangeFileImporter,
     ) {}
 
-    /** @param list<GarXmlSourceFile> $files */
+    /**
+     * @param list<GarXmlSourceFile> $pipelineFiles
+     * @param list<GarXmlSourceFile> $files
+     */
     public function run(
         int $operationId,
         string $sourcePath,
         int $batchSize,
         int $workerCount,
+        bool $directCopy,
+        array $pipelineFiles,
+        ?int $pipelineWriters,
+        ?int $pipelineParsers,
+        bool $pipelineFusedRanges,
+        int $pipelineFileConcurrency,
+        int $pipelineBufferMiB,
+        int $pipelineFragmentMiB,
+        bool $pipelineTableAwareFiles,
         array $files,
     ): void {
         $interruptedSignal = null;
-        $previousAsyncSignals = pcntl_async_signals(true);
-        $previousInterruptHandler = pcntl_signal_get_handler(SIGINT);
-        $previousTerminateHandler = pcntl_signal_get_handler(SIGTERM);
-        $interrupt = static function (int $signal) use (&$interruptedSignal): void {
+        $stop = new DeferredCancellation();
+        $previousAsyncSignals = \pcntl_async_signals(true);
+        $previousInterruptHandler = \pcntl_signal_get_handler(SIGINT);
+        $previousTerminateHandler = \pcntl_signal_get_handler(SIGTERM);
+        $interrupt = static function (int $signal) use (&$interruptedSignal, $stop): void {
             $interruptedSignal = $signal;
+            if (!$stop->isCancelled()) {
+                $stop->cancel(new GarImportFailed("GAR import worker pool was interrupted by signal {$signal}."));
+            }
         };
-        pcntl_signal(SIGINT, $interrupt);
-        pcntl_signal(SIGTERM, $interrupt);
+        \pcntl_signal(SIGINT, $interrupt);
+        \pcntl_signal(SIGTERM, $interrupt);
 
         try {
             foreach ($this->plan->phases($files, $workerCount) as $assignments) {
                 if ($interruptedSignal !== null) {
                     throw $this->interrupted($interruptedSignal);
                 }
+                $phasePipelineFiles = $this->pipelinePlan->filesForPhase($assignments, $pipelineFiles);
+                if ($phasePipelineFiles !== []) {
+                    if ($pipelineWriters === null) {
+                        throw new GarImportFailed('GAR pipeline writer count was not configured.');
+                    }
+                    $this->runPipelinePhase(
+                        operationId: $operationId,
+                        sourcePath: $sourcePath,
+                        batchSize: $batchSize,
+                        directCopy: $directCopy,
+                        workerCount: $workerCount,
+                        pipelineFiles: $phasePipelineFiles,
+                        pipelineWriters: $pipelineWriters,
+                        pipelineParsers: $pipelineParsers,
+                        pipelineFusedRanges: $pipelineFusedRanges,
+                        pipelineFileConcurrency: $pipelineFileConcurrency,
+                        pipelineBufferMiB: $pipelineBufferMiB,
+                        pipelineFragmentMiB: $pipelineFragmentMiB,
+                        pipelineTableAwareFiles: $pipelineTableAwareFiles,
+                        assignments: $assignments,
+                        cancellation: $stop->getCancellation(),
+                    );
+                    continue;
+                }
                 $this->runPhase(
                     $operationId,
                     $sourcePath,
                     $batchSize,
+                    $directCopy,
                     $assignments,
-                    $interruptedSignal,
+                    $stop->getCancellation(),
                 );
             }
         } finally {
-            pcntl_signal(SIGINT, $previousInterruptHandler);
-            pcntl_signal(SIGTERM, $previousTerminateHandler);
-            pcntl_async_signals($previousAsyncSignals);
+            \pcntl_signal(SIGINT, $previousInterruptHandler);
+            \pcntl_signal(SIGTERM, $previousTerminateHandler);
+            \pcntl_async_signals($previousAsyncSignals);
+        }
+    }
+
+    /**
+     * @param list<GarXmlSourceFile> $pipelineFiles
+     * @param list<non-empty-list<GarXmlSourceFile>> $assignments
+     */
+    private function runPipelinePhase(
+        int $operationId,
+        string $sourcePath,
+        int $batchSize,
+        bool $directCopy,
+        int $workerCount,
+        array $pipelineFiles,
+        int $pipelineWriters,
+        ?int $pipelineParsers,
+        bool $pipelineFusedRanges,
+        int $pipelineFileConcurrency,
+        int $pipelineBufferMiB,
+        int $pipelineFragmentMiB,
+        bool $pipelineTableAwareFiles,
+        array $assignments,
+        Cancellation $cancellation,
+    ): void {
+        $remainingFiles = $this->pipelinePlan->remainingFiles($assignments, $pipelineFiles);
+        $ordinaryAssignments = $this->pipelinePlan->concurrentAssignments($remainingFiles, $workerCount);
+
+        /** @var list<GarImportWorkerProcess> $processes */
+        $processes = [];
+        try {
+            foreach ($ordinaryAssignments as $files) {
+                $cancellation->throwIfRequested();
+                $processes[] = $this->processPool->start(
+                    $operationId,
+                    $sourcePath,
+                    $batchSize,
+                    $directCopy,
+                    $files,
+                );
+            }
+            /** @var Closure(): positive-int $capacity */
+            $capacity = function () use (
+                &$processes,
+                $cancellation,
+                $workerCount,
+                $pipelineWriters,
+                $pipelineParsers,
+            ): int {
+                $cancellation->throwIfRequested();
+                $failures = $this->processPool->poll($processes);
+                if ($failures !== []) {
+                    throw new GarImportFailed('GAR import worker phase failed: ' . \implode(' | ', $failures));
+                }
+
+                $pipelineWorkers = $pipelineWriters + ($pipelineParsers ?? 0);
+
+                return $this->pipelinePlan->capacity($workerCount, $pipelineWorkers, \count($processes));
+            };
+            if (
+                $pipelineFusedRanges
+                && $pipelineParsers !== null
+                && $pipelineFileConcurrency > 1
+                && \count($pipelineFiles) > 1
+                && $remainingFiles === []
+            ) {
+                $fileGroups = $pipelineTableAwareFiles
+                    ? $this->pipelinePlan->tableGroups($pipelineFiles)
+                    : [$pipelineFiles];
+                foreach ($fileGroups as $fileGroup) {
+                    $this->fusedRangeFileImporter->importFiles(
+                        operationId: $operationId,
+                        files: $fileGroup,
+                        batchSize: $batchSize,
+                        maxParsers: $pipelineParsers,
+                        maxWriters: $pipelineWriters,
+                        maxFiles: $pipelineFileConcurrency,
+                        maxInFlightBytes: $pipelineBufferMiB * 1024 * 1024,
+                        maxFragmentBytes: $pipelineFragmentMiB * 1024 * 1024,
+                        capacity: $capacity,
+                    );
+                }
+            } else {
+                foreach ($pipelineFiles as $pipelineFile) {
+                    $cancellation->throwIfRequested();
+                    if ($pipelineParsers === null) {
+                        $this->parallelFileImporter->import(
+                            operationId: $operationId,
+                            file: $pipelineFile,
+                            batchSize: $batchSize,
+                            maxWriters: $pipelineWriters,
+                            capacity: $capacity,
+                        );
+                    } elseif ($pipelineFusedRanges) {
+                        $this->fusedRangeFileImporter->import(
+                            operationId: $operationId,
+                            file: $pipelineFile,
+                            batchSize: $batchSize,
+                            maxParsers: $pipelineParsers,
+                            maxWriters: $pipelineWriters,
+                            maxInFlightBytes: $pipelineBufferMiB * 1024 * 1024,
+                            maxFragmentBytes: $pipelineFragmentMiB * 1024 * 1024,
+                            capacity: $capacity,
+                        );
+                    } else {
+                        $this->parallelRangeFileImporter->import(
+                            operationId: $operationId,
+                            file: $pipelineFile,
+                            batchSize: $batchSize,
+                            maxParsers: $pipelineParsers,
+                            maxWriters: $pipelineWriters,
+                            capacity: $capacity,
+                        );
+                    }
+                }
+            }
+            $this->processPool->wait($processes, $cancellation);
+            if ($ordinaryAssignments === [] && $remainingFiles !== []) {
+                $phases = $this->plan->phases($remainingFiles, $workerCount);
+                foreach ($phases as $deferredAssignments) {
+                    $this->runPhase(
+                        $operationId,
+                        $sourcePath,
+                        $batchSize,
+                        $directCopy,
+                        $deferredAssignments,
+                        $cancellation,
+                    );
+                }
+            }
+        } catch (Throwable $error) {
+            $this->processPool->terminate($processes);
+            throw $error;
         }
     }
 
@@ -59,173 +238,22 @@ final readonly class GarImportWorkerPool
         int $operationId,
         string $sourcePath,
         int $batchSize,
+        bool $directCopy,
         array $assignments,
-        ?int &$interruptedSignal,
+        Cancellation $cancellation,
     ): void {
-        /** @var list<GarImportWorkerProcess> $processes */
-        $processes = [];
-
-        try {
-            foreach ($assignments as $files) {
-                if ($interruptedSignal !== null) {
-                    throw $this->interrupted($interruptedSignal);
-                }
-                $processes[] = $this->startProcess($operationId, $sourcePath, $batchSize, $files);
-            }
-        } catch (Throwable $error) {
-            $this->terminate($processes);
-            throw $error;
-        }
-
-        $failures = [];
-        try {
-            while ($processes !== []) {
-                if ($interruptedSignal !== null) {
-                    throw $this->interrupted($interruptedSignal);
-                }
-                $running = [];
-                foreach ($processes as $process) {
-                    $result = $process->poll();
-                    if ($result === null) {
-                        $running[] = $process;
-                        continue;
-                    }
-                    if ($result->exitCode !== 0) {
-                        $details = $result->standardError !== ''
-                            ? $result->standardError
-                            : $result->standardOutput;
-                        $failures[] = trim(sprintf(
-                            '%s exited with code %d. %s',
-                            $result->description,
-                            $result->exitCode,
-                            $details,
-                        ));
-                    }
-                }
-                $processes = $running;
-                if ($failures !== []) {
-                    throw new GarImportFailed('GAR import worker phase failed: ' . implode(' | ', $failures));
-                }
-                if ($processes !== []) {
-                    usleep(50_000);
-                }
-            }
-        } catch (Throwable $error) {
-            $this->terminate($processes);
-            throw $error;
-        }
-    }
-
-    /** @param list<GarImportWorkerProcess> $processes */
-    private function terminate(array $processes): void
-    {
-        foreach ($processes as $process) {
-            $process->terminate();
-        }
+        $this->fileImporter->import(
+            operationId: $operationId,
+            sourcePath: $sourcePath,
+            batchSize: $batchSize,
+            directCopy: $directCopy,
+            assignments: $assignments,
+            cancellation: $cancellation,
+        );
     }
 
     private function interrupted(int $signal): GarImportFailed
     {
         return new GarImportFailed("GAR import worker pool was interrupted by signal {$signal}.");
-    }
-
-    /**
-     * @param non-empty-list<GarXmlSourceFile> $files
-     * @throws JsonException
-     */
-    private function startProcess(
-        int $operationId,
-        string $sourcePath,
-        int $batchSize,
-        array $files,
-    ): GarImportWorkerProcess {
-        $payload = json_encode(array_map(
-            static fn(GarXmlSourceFile $file): array => [
-                'relative_path' => $file->relativePath,
-                'file_key' => $file->key,
-            ],
-            $files,
-        ), JSON_THROW_ON_ERROR);
-        $descriptors = [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ];
-        $pipes = [];
-        $process = proc_open(
-            [
-                PHP_BINARY,
-                $this->consolePath,
-                'gar:import:worker',
-                (string) $operationId,
-                $sourcePath,
-                '--batch-size=' . $batchSize,
-                '--no-interaction',
-                '--no-ansi',
-            ],
-            $descriptors,
-            $pipes,
-            dirname($this->consolePath, 2),
-            $this->environment(),
-        );
-        if (!is_resource($process)) {
-            throw new GarImportFailed('Unable to start a GAR import worker process.');
-        }
-        if (
-            !isset($pipes[0], $pipes[1], $pipes[2])
-            || !is_resource($pipes[0])
-            || !is_resource($pipes[1])
-            || !is_resource($pipes[2])
-        ) {
-            proc_terminate($process);
-            proc_close($process);
-            throw new GarImportFailed('Unable to open GAR import worker process pipes.');
-        }
-
-        try {
-            $this->writePayload($pipes[0], $payload);
-        } catch (Throwable $error) {
-            fclose($pipes[0]);
-            fclose($pipes[1]);
-            fclose($pipes[2]);
-            proc_terminate($process);
-            proc_close($process);
-            throw $error;
-        }
-        fclose($pipes[0]);
-
-        return new GarImportWorkerProcess(
-            process: $process,
-            standardOutput: $pipes[1],
-            standardError: $pipes[2],
-            description: sprintf(
-                'worker[%s%s]',
-                $files[0]->relativePath,
-                count($files) > 1 ? sprintf(' +%d files', count($files) - 1) : '',
-            ),
-        );
-    }
-
-    /** @param resource $stream */
-    private function writePayload($stream, string $payload): void
-    {
-        $offset = 0;
-        $length = strlen($payload);
-        while ($offset < $length) {
-            $written = fwrite($stream, substr($payload, $offset));
-            if (!is_int($written) || $written < 1) {
-                throw new GarImportFailed('Unable to send a file assignment to a GAR import worker.');
-            }
-            $offset += $written;
-        }
-    }
-
-    /** @return array<string, string> */
-    private function environment(): array
-    {
-        $environment = getenv();
-        $environment['DATABASE_DSN'] = $this->databaseDsn;
-
-        return $environment;
     }
 }

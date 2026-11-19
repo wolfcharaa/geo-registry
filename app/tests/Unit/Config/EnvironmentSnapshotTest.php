@@ -51,7 +51,7 @@ final class EnvironmentSnapshotTest
                 ->positiveInteger('DATABASE_POOL_SIZE', 10);
         } catch (InvalidArgumentException $exception) {
             Assert::same($exception->getMessage(), 'DATABASE_POOL_SIZE must be a positive integer.');
-            Assert::false(str_contains($exception->getMessage(), 'not-an-integer'));
+            Assert::false(\str_contains($exception->getMessage(), 'not-an-integer'));
 
             return;
         }

@@ -14,7 +14,7 @@ final readonly class HealthCheckDefinition
         public float $deadlineSeconds,
         public HealthCheckInterface $check,
     ) {
-        if (trim($this->name) === '') {
+        if (\trim($this->name) === '') {
             throw new InvalidArgumentException('Health check name must be a non-empty string.');
         }
         if ($this->deadlineSeconds <= 0) {

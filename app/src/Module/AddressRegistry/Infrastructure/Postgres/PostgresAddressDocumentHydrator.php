@@ -42,10 +42,10 @@ final readonly class PostgresAddressDocumentHydrator
     public function integer(array $row, string $field): int
     {
         $value = $row[$field] ?? null;
-        if (is_int($value)) {
+        if (\is_int($value)) {
             return $value;
         }
-        if (is_string($value) && preg_match('/^-?\d+$/D', $value) === 1) {
+        if (\is_string($value) && \preg_match('/^-?\d+$/D', $value) === 1) {
             return (int) $value;
         }
 
@@ -59,10 +59,10 @@ final readonly class PostgresAddressDocumentHydrator
         if ($value === null) {
             return null;
         }
-        if (is_int($value) || is_float($value)) {
+        if (\is_int($value) || \is_float($value)) {
             return (float) $value;
         }
-        if (is_string($value) && is_numeric($value)) {
+        if (\is_string($value) && \is_numeric($value)) {
             return (float) $value;
         }
 
@@ -81,7 +81,7 @@ final readonly class PostgresAddressDocumentHydrator
     private function string(array $row, string $field): string
     {
         $value = $row[$field] ?? null;
-        if (!is_string($value)) {
+        if (!\is_string($value)) {
             throw new RuntimeException("PostgreSQL field `{$field}` must be a string.");
         }
 
@@ -97,31 +97,31 @@ final readonly class PostgresAddressDocumentHydrator
     /** @return list<string> */
     private function stringList(mixed $value): array
     {
-        if (is_string($value)) {
-            $value = json_decode($value, true, flags: JSON_THROW_ON_ERROR);
+        if (\is_string($value)) {
+            $value = \json_decode($value, true, flags: JSON_THROW_ON_ERROR);
         }
-        if (!is_array($value)) {
+        if (!\is_array($value)) {
             return [];
         }
 
         $strings = [];
         $this->collectStrings($value, $strings);
 
-        return array_values($strings);
+        return \array_values($strings);
     }
 
     /** @param array<string, string> $strings */
     private function collectStrings(mixed $value, array &$strings): void
     {
-        if (is_string($value)) {
-            $value = trim($value);
+        if (\is_string($value)) {
+            $value = \trim($value);
             if ($value !== '') {
                 $strings['value:' . $value] = $value;
             }
 
             return;
         }
-        if (!is_array($value)) {
+        if (!\is_array($value)) {
             return;
         }
 

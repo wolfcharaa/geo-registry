@@ -27,9 +27,9 @@ final class MessageBusRegistryCheckCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $registry = $this->compiler->compile($this->source);
-        $output->writeln(sprintf(
+        $output->writeln(\sprintf(
             'bindings=%d source_hash=%s',
-            count($registry->compiled()->bindings()),
+            \count($registry->compiled()->bindings()),
             $registry->definition()->sourceHash,
         ));
 

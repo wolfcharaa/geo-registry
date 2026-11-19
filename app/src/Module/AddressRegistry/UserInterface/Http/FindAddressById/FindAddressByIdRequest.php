@@ -22,7 +22,7 @@ final readonly class FindAddressByIdRequest
 
     public function id(): string
     {
-        return is_string($this->query) ? trim($this->query) : '';
+        return \is_string($this->query) ? \trim($this->query) : '';
     }
 
     public function normalizedLimit(): int
@@ -30,15 +30,15 @@ final readonly class FindAddressByIdRequest
         $count = self::integer($this->count);
         $limit = self::integer($this->limit);
 
-        return max(1, min(20, $this->count !== 20 ? $count : $limit));
+        return \max(1, \min(20, $this->count !== 20 ? $count : $limit));
     }
 
     private static function integer(mixed $value): int
     {
-        if (is_int($value)) {
+        if (\is_int($value)) {
             return $value;
         }
-        if (is_string($value) && ctype_digit($value)) {
+        if (\is_string($value) && \ctype_digit($value)) {
             return (int) $value;
         }
 

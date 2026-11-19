@@ -4,21 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure;
 
-use function array_reverse;
-use function array_values;
-use function implode;
-use function is_scalar;
-use function mb_strtolower;
-use function preg_match;
-
 use const PREG_OFFSET_CAPTURE;
-
-use function preg_replace;
-use function preg_split;
-use function str_replace;
-use function strtr;
-use function substr;
-use function trim;
 
 final class OpenSearchAddressComponentParser
 {
@@ -36,7 +22,7 @@ final class OpenSearchAddressComponentParser
         ];
 
         foreach ($values as $value) {
-            if (!is_scalar($value)) {
+            if (!\is_scalar($value)) {
                 continue;
             }
 
@@ -50,10 +36,10 @@ final class OpenSearchAddressComponentParser
         }
 
         return [
-            'street_key' => array_values($sets['street_key']),
-            'house_key' => array_values($sets['house_key']),
-            'building_key' => array_values($sets['building_key']),
-            'structure_key' => array_values($sets['structure_key']),
+            'street_key' => \array_values($sets['street_key']),
+            'house_key' => \array_values($sets['house_key']),
+            'building_key' => \array_values($sets['building_key']),
+            'structure_key' => \array_values($sets['structure_key']),
         ];
     }
 
@@ -74,37 +60,37 @@ final class OpenSearchAddressComponentParser
 
     public function markerValueKey(string $value): ?string
     {
-        $value = mb_strtolower(strtr($value, ['ё' => 'е']), 'UTF-8');
-        $value = str_replace('-', '/', $value);
-        $value = (string) preg_replace('/\s+/u', '', $value);
-        $value = (string) preg_replace('/[^\p{L}\d\/]+/u', '', $value);
+        $value = \mb_strtolower(\strtr($value, ['ё' => 'е']), 'UTF-8');
+        $value = \str_replace('-', '/', $value);
+        $value = (string) \preg_replace('/\s+/u', '', $value);
+        $value = (string) \preg_replace('/[^\p{L}\d\/]+/u', '', $value);
 
         return $value !== '' ? $value : null;
     }
 
     private function normalizeText(string $value): string
     {
-        return trim((string) preg_replace('/\s+/u', ' ', $value));
+        return \trim((string) \preg_replace('/\s+/u', ' ', $value));
     }
 
     private function streetKey(string $value): ?string
     {
-        if (preg_match('/(?:^|[,\s])(?:д|дом)\.?\s*\d+(?:[\/-]\d+)?(?:[а-яa-z])?/iu', $value, $match, PREG_OFFSET_CAPTURE) !== 1) {
+        if (\preg_match('/(?:^|[,\s])(?:д|дом)\.?\s*\d+(?:[\/-]\d+)?(?:[а-яa-z])?/iu', $value, $match, PREG_OFFSET_CAPTURE) !== 1) {
             return null;
         }
 
-        return $this->trailingStreetKey(trim(substr($value, 0, $match[0][1])));
+        return $this->trailingStreetKey(\trim(\substr($value, 0, $match[0][1])));
     }
 
     private function trailingStreetKey(string $value): ?string
     {
-        $segments = preg_split('/,+/u', $value);
+        $segments = \preg_split('/,+/u', $value);
         if ($segments === false) {
             return null;
         }
 
-        foreach (array_reverse($segments) as $segment) {
-            $segment = trim($segment);
+        foreach (\array_reverse($segments) as $segment) {
+            $segment = \trim($segment);
             if ($segment === '') {
                 continue;
             }
@@ -120,7 +106,7 @@ final class OpenSearchAddressComponentParser
 
     private function markerKey(string $value, string $marker): ?string
     {
-        if (preg_match('/(?:^|[,\s])' . $marker . '\.?\s*(\d+(?:[\/-]\d+)?(?:[а-яa-z])?)/iu', $value, $match) !== 1) {
+        if (\preg_match('/(?:^|[,\s])' . $marker . '\.?\s*(\d+(?:[\/-]\d+)?(?:[а-яa-z])?)/iu', $value, $match) !== 1) {
             return null;
         }
 
@@ -129,11 +115,11 @@ final class OpenSearchAddressComponentParser
 
     private function streetSegmentKey(string $segment): ?string
     {
-        $value = mb_strtolower(strtr($segment, ['ё' => 'е']), 'UTF-8');
-        $value = str_replace(['пр-д', 'пр д', 'б-р'], ['проезд', 'проезд', 'бульвар'], $value);
-        $value = (string) preg_replace('/\b(\d+)[\s-]*(?:я|й|ая|ый|ой|ое|е)\b/iu', '$1', $value);
-        $value = (string) preg_replace('/[^\p{L}\d]+/u', ' ', $value);
-        $words = preg_split('/\s+/u', trim($value));
+        $value = \mb_strtolower(\strtr($segment, ['ё' => 'е']), 'UTF-8');
+        $value = \str_replace(['пр-д', 'пр д', 'б-р'], ['проезд', 'проезд', 'бульвар'], $value);
+        $value = (string) \preg_replace('/\b(\d+)[\s-]*(?:я|й|ая|ый|ой|ое|е)\b/iu', '$1', $value);
+        $value = (string) \preg_replace('/[^\p{L}\d]+/u', ' ', $value);
+        $words = \preg_split('/\s+/u', \trim($value));
         if ($words === false) {
             return null;
         }
@@ -176,14 +162,14 @@ final class OpenSearchAddressComponentParser
 
         $tokens = [];
         foreach ($words as $word) {
-            if ($word === '' || isset($skip[$word]) || preg_match('/^\p{L}$/u', $word) === 1) {
+            if ($word === '' || isset($skip[$word]) || \preg_match('/^\p{L}$/u', $word) === 1) {
                 continue;
             }
 
             $tokens[] = $word;
         }
 
-        $key = implode('', $tokens);
+        $key = \implode('', $tokens);
 
         return $key !== '' ? $key : null;
     }

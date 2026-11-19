@@ -4,13 +4,6 @@ declare(strict_types=1);
 
 namespace App\Module\AddressRegistry\Capability;
 
-use function in_array;
-use function mb_strtolower;
-use function preg_match;
-use function preg_replace;
-use function sprintf;
-use function trim;
-
 use UnexpectedValueException;
 
 final readonly class ProgressiveAddressSuggestion
@@ -33,7 +26,7 @@ final readonly class ProgressiveAddressSuggestion
             $level <= 1 => SuggestionStage::AdministrativeArea,
             $level <= 7 => SuggestionStage::Thoroughfare,
             $level === 8 => SuggestionStage::Search,
-            default => throw new UnexpectedValueException(sprintf(
+            default => throw new UnexpectedValueException(\sprintf(
                 'GAR suggestion level %d is not supported.',
                 $level,
             )),
@@ -43,7 +36,7 @@ final readonly class ProgressiveAddressSuggestion
 
     public function displayValue(): string
     {
-        return trim($this->typeName . ' ' . $this->name);
+        return \trim($this->typeName . ' ' . $this->name);
     }
 
     private function isFederalCity(): bool
@@ -52,11 +45,11 @@ final readonly class ProgressiveAddressSuggestion
             return false;
         }
 
-        if (in_array($this->normalized($this->name), ['москва', 'санкт-петербург', 'севастополь'], true)) {
+        if (\in_array($this->normalized($this->name), ['москва', 'санкт-петербург', 'севастополь'], true)) {
             return true;
         }
 
-        return preg_match(
+        return \preg_match(
             '/^(?:г\.?\s+|город\s+)?(?:москва|санкт-петербург|севастополь)(?:$|,)/u',
             $this->normalized($this->displayValue()),
         ) === 1;
@@ -64,6 +57,6 @@ final readonly class ProgressiveAddressSuggestion
 
     private function normalized(string $value): string
     {
-        return mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $value)));
+        return \mb_strtolower(\trim((string) \preg_replace('/\s+/u', ' ', $value)));
     }
 }

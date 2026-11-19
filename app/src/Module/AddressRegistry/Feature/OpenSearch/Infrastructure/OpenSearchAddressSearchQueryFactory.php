@@ -155,7 +155,7 @@ final class OpenSearchAddressSearchQueryFactory
             if ($components['structure_key'] !== null) {
                 $exactMust[] = ['term' => ['address_structure_key' => $components['structure_key']]];
             }
-            if (count($exactMust) > count($baseMust)) {
+            if (\count($exactMust) > \count($baseMust)) {
                 $functions[] = [
                     'filter' => ['bool' => ['must' => $exactMust]],
                     'weight' => 18000,

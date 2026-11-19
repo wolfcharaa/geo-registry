@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\AddressRegistry\Infrastructure\GarImport;
 
+use Amp\Cancellation;
 use App\Module\AddressRegistry\Capability\ImportGar\GarImportFailed;
 use Generator;
 use LibXMLError;
@@ -14,10 +15,14 @@ final class GarXmlRowReader
     /**
      * @return Generator<int, list<?string>>
      */
-    public function rows(GarXmlSourceFile $file, int $skipRows): Generator
-    {
-        $previousInternalErrors = libxml_use_internal_errors(true);
-        libxml_clear_errors();
+    public function rows(
+        GarXmlSourceFile $file,
+        int $skipRows,
+        ?Cancellation $cancellation = null,
+    ): Generator {
+        $cancellation?->throwIfRequested();
+        $previousInternalErrors = \libxml_use_internal_errors(true);
+        \libxml_clear_errors();
         $reader = null;
 
         try {
@@ -28,66 +33,36 @@ final class GarXmlRowReader
 
             $rowNumber = 0;
             while ($reader->read()) {
+                $cancellation?->throwIfRequested();
                 if ($reader->nodeType !== XMLReader::ELEMENT || $reader->depth !== 1) {
                     continue;
                 }
 
                 ++$rowNumber;
-                $identity = $reader->getAttribute($file->descriptor->identityAttribute());
-                if ($identity === null || $identity === '') {
-                    throw new GarImportFailed(sprintf(
-                        'GAR XML row %d in %s has no %s identity attribute.',
-                        $rowNumber,
-                        $file->relativePath,
-                        $file->descriptor->identityAttribute(),
-                    ));
-                }
                 if ($rowNumber <= $skipRows) {
+                    GarXmlRowDecoder::assertIdentity($reader, $file, $rowNumber);
                     continue;
                 }
 
-                $values = [];
-                foreach ($file->descriptor->attributes as $column => $attribute) {
-                    if (!is_string($column)) {
-                        throw new GarImportFailed('GAR XML descriptor contains a non-string stage column.');
-                    }
-                    $value = $file->descriptor->normalizeValue($column, $reader->getAttribute($attribute));
-                    $values[] = $column === 'path_arr' ? self::pathArray($value) : $value;
-                }
-
-                yield $rowNumber => $values;
+                yield $rowNumber => GarXmlRowDecoder::decode($reader, $file, $rowNumber);
             }
 
-            $error = self::firstParsingError(libxml_get_errors());
+            $error = self::firstParsingError(\libxml_get_errors());
             if ($error !== null) {
-                throw new GarImportFailed(sprintf(
+                throw new GarImportFailed(\sprintf(
                     'Invalid GAR XML in %s at line %d: %s',
                     $file->relativePath,
                     $error->line,
-                    trim($error->message),
+                    \trim($error->message),
                 ));
             }
         } finally {
             if ($reader instanceof XMLReader) {
                 $reader->close();
             }
-            libxml_clear_errors();
-            libxml_use_internal_errors($previousInternalErrors);
+            \libxml_clear_errors();
+            \libxml_use_internal_errors($previousInternalErrors);
         }
-    }
-
-    private static function pathArray(?string $path): string
-    {
-        if ($path === null) {
-            return '{}';
-        }
-
-        $parts = preg_split('/[^0-9]+/', $path, -1, PREG_SPLIT_NO_EMPTY);
-        if ($parts === false || $parts === []) {
-            return '{}';
-        }
-
-        return '{' . implode(',', $parts) . '}';
     }
 
     /** @param list<LibXMLError> $errors */

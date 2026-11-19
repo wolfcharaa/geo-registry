@@ -27,7 +27,7 @@ final class OpenSearchProjectionRebuildIntegrationTest
     {
         $dsn = IntegrationDatabase::dsn();
         $url = self::environment('INTEGRATION_OPENSEARCH_URL', 'http://127.0.0.1:59200');
-        $alias = 'geo-registry-rebuild-' . bin2hex(random_bytes(5));
+        $alias = 'geo-registry-rebuild-' . \bin2hex(\random_bytes(5));
         $pool = PostgresPoolFactory::create($dsn, 1);
         $openSearch = self::client($url);
         $createdIndexes = [];
@@ -43,7 +43,7 @@ final class OpenSearchProjectionRebuildIntegrationTest
                 '--no-ansi' => true,
             ]);
             Assert::same($exitCode, 0);
-            Assert::true(str_contains($output, 'status=completed'));
+            Assert::true(\str_contains($output, 'status=completed'));
 
             [$exitCode, $output] = self::runRebuild($dsn, $url, $alias);
             Assert::same($exitCode, 0);
@@ -54,9 +54,9 @@ final class OpenSearchProjectionRebuildIntegrationTest
 
             [$exitCode, $output] = self::runStatus($dsn, $url, $alias);
             Assert::same($exitCode, 0);
-            Assert::true(str_contains($output, "alias name={$alias} targets={$firstIndex}"));
-            Assert::true(str_contains($output, 'parity source=20 target=20 invalid_regions=0 status=ok'));
-            Assert::true(str_contains($output, 'inactive count=0 indexes=none'));
+            Assert::true(\str_contains($output, "alias name={$alias} targets={$firstIndex}"));
+            Assert::true(\str_contains($output, 'parity source=20 target=20 invalid_regions=0 status=ok'));
+            Assert::true(\str_contains($output, 'inactive count=0 indexes=none'));
 
             $levelRow = $pool->execute(<<<'SQL'
 SELECT level
@@ -65,7 +65,7 @@ WHERE object_id = :object_id AND hierarchy_type = 'adm'
 ORDER BY region_code
 LIMIT 1
 SQL, ['object_id' => 770004])->fetchRow();
-            $originalLevel = is_array($levelRow) ? (int) ($levelRow['level'] ?? 0) : 0;
+            $originalLevel = \is_array($levelRow) ? (int) ($levelRow['level'] ?? 0) : 0;
             $pool->execute(<<<'SQL'
 UPDATE address_search
 SET level = 40000
@@ -74,7 +74,7 @@ SQL, ['object_id' => 770004]);
 
             [$exitCode, $output] = self::runRebuild($dsn, $url, $alias);
             Assert::same($exitCode, 1);
-            Assert::true(str_contains($output, 'before alias switch'));
+            Assert::true(\str_contains($output, 'before alias switch'));
             $failedIndex = self::failedTarget($output);
             $createdIndexes[] = $failedIndex;
             Assert::same($openSearch->aliasTargets($alias), [$firstIndex]);
@@ -96,12 +96,12 @@ SQL, ['level' => $originalLevel, 'object_id' => 770004]);
 
             [$exitCode, $output] = self::runStatus($dsn, $url, $alias);
             Assert::same($exitCode, 0);
-            Assert::true(str_contains($output, "alias name={$alias} targets={$secondIndex}"));
+            Assert::true(\str_contains($output, "alias name={$alias} targets={$secondIndex}"));
             $inactiveIndexes = [$failedIndex, $firstIndex];
-            sort($inactiveIndexes);
-            Assert::true(str_contains(
+            \sort($inactiveIndexes);
+            Assert::true(\str_contains(
                 $output,
-                'inactive count=2 indexes=' . implode(',', $inactiveIndexes),
+                'inactive count=2 indexes=' . \implode(',', $inactiveIndexes),
             ));
 
             [$exitCode] = self::runCleanup($dsn, $url, $alias, $firstIndex, 'wrong-confirmation');
@@ -114,14 +114,14 @@ SQL, ['level' => $originalLevel, 'object_id' => 770004]);
 
             [$exitCode, $output] = self::runCleanup($dsn, $url, $alias, $firstIndex, $firstIndex);
             Assert::same($exitCode, 0);
-            Assert::true(str_contains($output, "status=deleted index={$firstIndex}"));
+            Assert::true(\str_contains($output, "status=deleted index={$firstIndex}"));
             Assert::false($openSearch->concreteIndexExists($firstIndex));
 
             [$exitCode] = self::runCleanup($dsn, $url, $alias, $failedIndex, $failedIndex);
             Assert::same($exitCode, 0);
             Assert::false($openSearch->concreteIndexExists($failedIndex));
         } finally {
-            foreach (array_unique($createdIndexes) as $index) {
+            foreach (\array_unique($createdIndexes) as $index) {
                 if ($openSearch->concreteIndexExists($index)) {
                     $openSearch->deleteIndex($index);
                 }
@@ -192,7 +192,7 @@ SQL, ['level' => $originalLevel, 'object_id' => 770004]);
 
     private static function completedTarget(string $output): string
     {
-        if (preg_match('/\btarget=([a-z0-9._-]+)/', $output, $matches) !== 1) {
+        if (\preg_match('/\btarget=([a-z0-9._-]+)/', $output, $matches) !== 1) {
             throw new LogicException("Completed OpenSearch target was not reported:\n{$output}");
         }
 
@@ -201,7 +201,7 @@ SQL, ['level' => $originalLevel, 'object_id' => 770004]);
 
     private static function failedTarget(string $output): string
     {
-        if (preg_match('/target `([a-z0-9._-]+)`/', $output, $matches) !== 1) {
+        if (\preg_match('/target `([a-z0-9._-]+)`/', $output, $matches) !== 1) {
             throw new LogicException("Failed OpenSearch target was not reported:\n{$output}");
         }
 
@@ -218,8 +218,8 @@ SQL, ['level' => $originalLevel, 'object_id' => 770004]);
 
     private static function environment(string $name, string $default): string
     {
-        $value = getenv($name);
+        $value = \getenv($name);
 
-        return is_string($value) && $value !== '' ? $value : $default;
+        return \is_string($value) && $value !== '' ? $value : $default;
     }
 }

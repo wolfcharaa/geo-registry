@@ -34,10 +34,10 @@ final class GarIntegrityCommandTest
         Assert::same($exitCode, 1);
         Assert::same($checker->regions, [50, 77]);
         Assert::true($checker->deep);
-        Assert::false(str_contains($output, 'valid check'));
-        Assert::true(str_contains($output, 'FAIL check="broken check" issues=2'));
-        Assert::true(str_contains($output, 'ERROR check="unavailable check" issues=unavailable'));
-        Assert::true(str_contains($output, 'failed=1 unavailable=1 status=failed'));
+        Assert::false(\str_contains($output, 'valid check'));
+        Assert::true(\str_contains($output, 'FAIL check="broken check" issues=2'));
+        Assert::true(\str_contains($output, 'ERROR check="unavailable check" issues=unavailable'));
+        Assert::true(\str_contains($output, 'failed=1 unavailable=1 status=failed'));
     }
 
     public function testItReturnsSuccessOnlyWhenEveryCheckPasses(): void
@@ -50,7 +50,7 @@ final class GarIntegrityCommandTest
         Assert::same($exitCode, 0);
         Assert::same($checker->regions, [50, 77]);
         Assert::false($checker->deep);
-        Assert::true(str_contains($output, 'summary checks=1 failed=0 unavailable=0 status=ok'));
+        Assert::true(\str_contains($output, 'summary checks=1 failed=0 unavailable=0 status=ok'));
     }
 
     /**

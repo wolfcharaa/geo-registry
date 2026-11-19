@@ -8,9 +8,6 @@ use App\Module\AddressRegistry\Capability\AddressHierarchy;
 use App\Module\AddressRegistry\Capability\SearchAddress\SearchAddressCriteria;
 use App\Module\AddressRegistry\Capability\SearchAddress\SearchProfile;
 use App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure\OpenSearchAddressSearchQueryFactory;
-
-use function is_array;
-
 use Testo\Assert;
 use Testo\Test;
 
@@ -87,7 +84,7 @@ final class OpenSearchAddressSearchQueryFactoryTest
     /** @return array<array-key, mixed> */
     private function array(mixed $value): array
     {
-        Assert::true(is_array($value));
+        Assert::true(\is_array($value));
 
         return $value;
     }

@@ -69,7 +69,7 @@ final readonly class SearchAddressAction
         return new Response(
             status: $status,
             headers: ['content-type' => 'application/json; charset=utf-8'],
-            body: json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            body: \json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
         );
     }
 }

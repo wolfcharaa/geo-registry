@@ -21,7 +21,7 @@ final class ApplicationWorkerRuntimeProviderTest
     public function testWorkerConsoleExposesTheOperationalCommandSurface(): void
     {
         $application = ApplicationFactory::create(new BootstrapResolver([
-            dirname(__DIR__, 4) . '/config/message_bus_worker.php',
+            \dirname(__DIR__, 4) . '/config/message_bus_worker.php',
         ]));
 
         foreach ([

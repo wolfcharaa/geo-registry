@@ -19,7 +19,7 @@ final class GarImportWorkerPlan
         foreach ($files as $file) {
             $filesByPriority[$file->descriptor->priority][] = $file;
         }
-        ksort($filesByPriority);
+        \ksort($filesByPriority);
 
         $phases = [];
         foreach ($filesByPriority as $phaseFiles) {
@@ -37,7 +37,7 @@ final class GarImportWorkerPlan
      */
     private function distribute(array $files, int $workerCount): array
     {
-        usort(
+        \usort(
             $files,
             static fn(GarXmlSourceFile $left, GarXmlSourceFile $right): int => [
                 -$left->size,
@@ -48,7 +48,7 @@ final class GarImportWorkerPlan
             ],
         );
 
-        $assignmentCount = min(max(1, $workerCount), count($files));
+        $assignmentCount = \min(\max(1, $workerCount), \count($files));
         /** @var non-empty-list<array{size: int, files: list<GarXmlSourceFile>}> $assignments */
         $assignments = [['size' => 0, 'files' => []]];
         for ($index = 1; $index < $assignmentCount; ++$index) {
@@ -75,7 +75,7 @@ final class GarImportWorkerPlan
 
         $distributed = [];
         foreach ($assignments as $assignment) {
-            usort(
+            \usort(
                 $assignment['files'],
                 static fn(GarXmlSourceFile $left, GarXmlSourceFile $right): int => [
                     $left->descriptor->key,

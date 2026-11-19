@@ -31,7 +31,7 @@ final class OpenSearchRequestFactoryTest
             (string) $request->getUri(),
             'https://opensearch.example:9200/_cluster/health?local=false&wait_for_status=yellow',
         );
-        Assert::same($request->getHeader('Authorization'), 'Basic ' . base64_encode('reader:secret'));
+        Assert::same($request->getHeader('Authorization'), 'Basic ' . \base64_encode('reader:secret'));
         Assert::same($request->getHeader('User-Agent'), 'test-service/1.0');
     }
 

@@ -106,7 +106,7 @@ final class ApplicationWorkerRuntimeIntegrationTest
 
         Assert::same([$result->handled, $result->succeeded], [0, 0]);
         Assert::same($harness->status($jobId), 'pending');
-        Assert::true(str_contains($harness->lastError($jobId), 'heartbeat expired'));
+        Assert::true(\str_contains($harness->lastError($jobId), 'heartbeat expired'));
         $harness->cancel($jobId);
     }
 
@@ -193,7 +193,7 @@ final readonly class WorkerLifecycleHarness
             ->query('SELECT id FROM message_bus__queue_jobs ORDER BY id DESC LIMIT 1')
             ->fetchRow();
         $id = $row['id'] ?? null;
-        if (!is_int($id) && !is_string($id)) {
+        if (!\is_int($id) && !\is_string($id)) {
             throw new RuntimeException('Enqueued queue job has no identifier.');
         }
 
@@ -323,8 +323,8 @@ SQL,
     private function stringField(array $row, string $field): string
     {
         $value = $row[$field] ?? null;
-        if (!is_string($value)) {
-            throw new RuntimeException(sprintf('PostgreSQL field `%s` is not a string.', $field));
+        if (!\is_string($value)) {
+            throw new RuntimeException(\sprintf('PostgreSQL field `%s` is not a string.', $field));
         }
 
         return $value;
@@ -409,12 +409,12 @@ final class WorkerLifecycleCodec implements MessageCodecInterface
     public function fromPayload(JsonValue $payload): WorkerLifecycleCommand
     {
         $data = $payload->value();
-        if (!is_array($data)) {
+        if (!\is_array($data)) {
             throw new RuntimeException('Worker lifecycle payload must be an object.');
         }
         $operationId = $data['operationId'] ?? null;
         $behavior = $data['behavior'] ?? null;
-        if (!is_string($operationId) || !is_string($behavior)) {
+        if (!\is_string($operationId) || !\is_string($behavior)) {
             throw new RuntimeException('Worker lifecycle payload fields must be strings.');
         }
 

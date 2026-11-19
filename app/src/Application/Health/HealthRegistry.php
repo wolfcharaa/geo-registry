@@ -37,7 +37,7 @@ final readonly class HealthRegistry
 
     public function readiness(): HealthReport
     {
-        $futures = array_map(
+        $futures = \array_map(
             $this->start(...),
             $this->checks,
         );
@@ -72,7 +72,7 @@ final readonly class HealthRegistry
         try {
             $definition->check->check(new TimeoutCancellation(
                 $definition->deadlineSeconds,
-                sprintf('Health check %s timed out.', $definition->name),
+                \sprintf('Health check %s timed out.', $definition->name),
             ));
 
             return new HealthComponentResult($definition->name, $definition->policy, true);

@@ -1,0 +1,15 @@
+{
+    "name": "geo-registry/xml-parser-benchmarks",
+    "description": "Isolated third-party dependencies for GAR XML parser comparisons",
+    "license": "MIT",
+    "type": "project",
+    "require": {
+        "php": "^8.4",
+        "benmorel/xml-streamer": "^0.6.0",
+        "prewk/xml-string-streamer": "^1.2.3",
+        "sabre/xml": "^4.1.0"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

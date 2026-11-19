@@ -20,8 +20,8 @@ final readonly class SuggestAdministrativeArea implements Query
         int $limit,
         public ?SuggestionContext $context,
     ) {
-        $normalized = preg_replace('/\s+/u', ' ', trim($query));
-        $this->query = $normalized ?? trim($query);
-        $this->limit = max(1, min(7, $limit));
+        $normalized = \preg_replace('/\s+/u', ' ', \trim($query));
+        $this->query = $normalized ?? \trim($query);
+        $this->limit = \max(1, \min(7, $limit));
     }
 }

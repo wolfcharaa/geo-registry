@@ -32,6 +32,6 @@ final readonly class SuggestAddressResult
 
     public function count(): int
     {
-        return count($this->progressiveSuggestions) + count($this->searchMatches);
+        return \count($this->progressiveSuggestions) + \count($this->searchMatches);
     }
 }

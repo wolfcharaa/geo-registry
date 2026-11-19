@@ -262,7 +262,7 @@ final class RuntimeConfigTest
     public function testHttpWorkerMemoryLimitMustFitIntoBytes(): void
     {
         HttpServerConfig::fromEnvironment(new EnvironmentSnapshot([
-            'APP_HTTP_WORKER_MAX_MEMORY_MB' => (string) (intdiv(PHP_INT_MAX, 1024 * 1024) + 1),
+            'APP_HTTP_WORKER_MAX_MEMORY_MB' => (string) (\intdiv(PHP_INT_MAX, 1024 * 1024) + 1),
         ]));
     }
 

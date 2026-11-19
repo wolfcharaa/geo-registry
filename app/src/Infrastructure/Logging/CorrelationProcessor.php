@@ -20,10 +20,10 @@ final readonly class CorrelationProcessor
         $correlation = $this->context->current()?->toArray() ?? [];
         $event = $record->context['event'] ?? 'log';
 
-        return $record->with(extra: array_merge(
+        return $record->with(extra: \array_merge(
             $record->extra,
             [
-                'event' => is_string($event) ? $event : 'log',
+                'event' => \is_string($event) ? $event : 'log',
                 'service' => $this->service,
                 'runtime' => $this->runtime,
             ],

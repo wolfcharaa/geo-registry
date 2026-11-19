@@ -63,7 +63,7 @@ HELP);
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        if (ini_set('memory_limit', $this->memoryLimit) === false) {
+        if (\ini_set('memory_limit', $this->memoryLimit) === false) {
             $output->writeln('<error>Unable to apply the configured OpenSearch reindex memory limit.</error>');
 
             return self::FAILURE;
@@ -81,14 +81,14 @@ HELP);
             return self::FAILURE;
         }
 
-        $output->writeln(sprintf(
+        $output->writeln(\sprintf(
             'status=completed target=%s source=%d indexed=%d target_documents=%d alias_switched=%s previous=%s elapsed_ms=%d',
             $result->targetIndex,
             $result->sourceDocuments,
             $result->indexedDocuments,
             $result->targetDocuments,
             $result->aliasSwitched ? 'yes' : 'no',
-            $result->previousIndexes === [] ? 'none' : implode(',', $result->previousIndexes),
+            $result->previousIndexes === [] ? 'none' : \implode(',', $result->previousIndexes),
             $result->elapsedMilliseconds,
         ));
 
@@ -98,7 +98,7 @@ HELP);
     private static function integerOption(InputInterface $input, string $name): int
     {
         $value = $input->getOption($name);
-        if (!is_string($value) || !ctype_digit($value)) {
+        if (!\is_string($value) || !\ctype_digit($value)) {
             throw new InvalidArgumentException("Option --{$name} must be a positive integer.");
         }
 

@@ -24,7 +24,7 @@ final readonly class PostgresAddressSearchRebuildAdapter implements RebuildAddre
         $lockAcquired = false;
         $operationId = null;
         $currentTask = null;
-        $startedAt = hrtime(true);
+        $startedAt = \hrtime(true);
         $elapsedRecorded = false;
 
         try {
@@ -67,7 +67,7 @@ final readonly class PostgresAddressSearchRebuildAdapter implements RebuildAddre
                 $store->createIndexes($operation->id, $operation->shadowTable);
                 $parity = $store->verify($operation->id, $operation->shadowTable);
                 if (!$parity->isValid()) {
-                    throw new AddressSearchRebuildFailed(sprintf(
+                    throw new AddressSearchRebuildFailed(\sprintf(
                         'address_search parity failed: rows=%d missing=%d duplicates=%d invalid_regions=%d.',
                         $parity->shadowRows,
                         $parity->missingRows,
@@ -114,18 +114,18 @@ final readonly class PostgresAddressSearchRebuildAdapter implements RebuildAddre
                     // Closing the dedicated CLI connection releases the session lock.
                 }
             }
-            pg_close($connection);
+            \pg_close($connection);
         }
     }
 
     private function connect(): Connection
     {
-        $connectionString = preg_replace('/(^|\s)db=/', '$1dbname=', $this->databaseDsn);
-        if (!is_string($connectionString)) {
+        $connectionString = \preg_replace('/(^|\s)db=/', '$1dbname=', $this->databaseDsn);
+        if (!\is_string($connectionString)) {
             throw new AddressSearchRebuildFailed('Unable to normalize PostgreSQL rebuild connection settings.');
         }
 
-        $connection = pg_connect($connectionString, PGSQL_CONNECT_FORCE_NEW);
+        $connection = \pg_connect($connectionString, PGSQL_CONNECT_FORCE_NEW);
         if (!$connection instanceof Connection) {
             throw new AddressSearchRebuildFailed('Unable to connect to PostgreSQL for address_search rebuild.');
         }
@@ -135,6 +135,6 @@ final readonly class PostgresAddressSearchRebuildAdapter implements RebuildAddre
 
     private static function elapsedMilliseconds(int|float $startedAt): int
     {
-        return max(0, (int) ((hrtime(true) - $startedAt) / 1_000_000));
+        return \max(0, (int) ((\hrtime(true) - $startedAt) / 1_000_000));
     }
 }

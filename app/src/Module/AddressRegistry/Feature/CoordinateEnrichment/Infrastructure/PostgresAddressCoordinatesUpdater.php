@@ -70,7 +70,7 @@ SQL;
 
         $updatedRows = $row['updated_rows'] ?? null;
         $objectExists = $row['object_exists'] ?? null;
-        if ((!is_int($updatedRows) && !is_string($updatedRows)) || !is_bool($objectExists)) {
+        if ((!\is_int($updatedRows) && !\is_string($updatedRows)) || !\is_bool($objectExists)) {
             throw new RuntimeException('PostgreSQL address coordinate update returned an invalid result.');
         }
 

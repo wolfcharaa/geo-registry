@@ -46,7 +46,7 @@ final readonly class SuggestAddressHandler
             ),
             SuggestionStage::Search => SuggestAddressResult::search(
                 $context->ask(new SearchAddress(
-                    query: trim($query->exact . ' ' . $query->suggest),
+                    query: \trim($query->exact . ' ' . $query->suggest),
                     hierarchy: $query->hierarchy,
                     profile: SearchProfile::Search,
                     limit: $query->count,

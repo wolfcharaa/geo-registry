@@ -12,7 +12,7 @@ final readonly class LoggingConfig
         public string $service,
         public LogFormat $format,
     ) {
-        if (trim($this->service) === '') {
+        if (\trim($this->service) === '') {
             throw new InvalidArgumentException('APP_NAME must be a non-empty string.');
         }
     }

@@ -13,13 +13,13 @@ final readonly class ConsoleConfig
         public string $version,
         public string $userAgent,
     ) {
-        if (trim($this->name) === '') {
+        if (\trim($this->name) === '') {
             throw new InvalidArgumentException('APP_NAME must be a non-empty string.');
         }
-        if (trim($this->version) === '') {
+        if (\trim($this->version) === '') {
             throw new InvalidArgumentException('APP_VERSION must be a non-empty string.');
         }
-        if (trim($this->userAgent) === '') {
+        if (\trim($this->userAgent) === '') {
             throw new InvalidArgumentException('APP_USER_AGENT must be a non-empty string.');
         }
     }

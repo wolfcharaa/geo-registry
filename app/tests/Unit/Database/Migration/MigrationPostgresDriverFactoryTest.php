@@ -28,6 +28,6 @@ final class MigrationPostgresDriverFactoryTest
         Assert::same($driver->getUsername(), 'app user');
         Assert::same($driver->getPassword(), 'local secret');
         Assert::same($driver->getCharset(), 'UTF8');
-        Assert::false(str_contains($driver->getDsn(), 'local secret'));
+        Assert::false(\str_contains($driver->getDsn(), 'local secret'));
     }
 }

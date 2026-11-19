@@ -41,7 +41,7 @@ final class ProcessRestartBackoff
 
     public function beforeStart(float $now): ProcessRestartBackoffDecision
     {
-        if (!is_finite($now) || $now < 0) {
+        if (!\is_finite($now) || $now < 0) {
             throw new InvalidArgumentException('Monotonic process start time must be finite and non-negative.');
         }
 
@@ -52,12 +52,12 @@ final class ProcessRestartBackoff
         }
 
         $windowStartedAt = $now - $this->windowSeconds;
-        $this->restartStartedAt = array_values(array_filter(
+        $this->restartStartedAt = \array_values(\array_filter(
             $this->restartStartedAt,
             static fn(float $startedAt): bool => $startedAt > $windowStartedAt,
         ));
         $this->restartStartedAt[] = $now;
-        $restartsInWindow = count($this->restartStartedAt);
+        $restartsInWindow = \count($this->restartStartedAt);
 
         if ($restartsInWindow <= $this->restartBurst) {
             return new ProcessRestartBackoffDecision(0, $restartsInWindow);
@@ -66,7 +66,7 @@ final class ProcessRestartBackoff
         $delay = $this->initialDelaySeconds;
         $doublings = $restartsInWindow - $this->restartBurst - 1;
         while ($doublings > 0 && $delay < $this->maximumDelaySeconds) {
-            $delay = min($this->maximumDelaySeconds, $delay * 2);
+            $delay = \min($this->maximumDelaySeconds, $delay * 2);
             --$doublings;
         }
 

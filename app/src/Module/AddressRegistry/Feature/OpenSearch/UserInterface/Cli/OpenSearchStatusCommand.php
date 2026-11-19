@@ -32,19 +32,19 @@ final class OpenSearchStatusCommand extends Command
             return self::FAILURE;
         }
 
-        $output->writeln(sprintf(
+        $output->writeln(\sprintf(
             'cluster status=%s timed_out=%s nodes=%d data_nodes=%d',
             $report->clusterStatus,
             $report->clusterTimedOut ? 'yes' : 'no',
             $report->nodes,
             $report->dataNodes,
         ));
-        $output->writeln(sprintf(
+        $output->writeln(\sprintf(
             'alias name=%s targets=%s',
             $report->alias,
-            $report->aliasTargets === [] ? 'none' : implode(',', $report->aliasTargets),
+            $report->aliasTargets === [] ? 'none' : \implode(',', $report->aliasTargets),
         ));
-        $output->writeln(sprintf(
+        $output->writeln(\sprintf(
             'parity source=%d target=%s invalid_regions=%d status=%s',
             $report->sourceDocuments,
             $report->targetDocuments === null ? 'unavailable' : (string) $report->targetDocuments,
@@ -53,10 +53,10 @@ final class OpenSearchStatusCommand extends Command
                 ? 'ok'
                 : 'failed',
         ));
-        $output->writeln(sprintf(
+        $output->writeln(\sprintf(
             'inactive count=%d indexes=%s',
-            count($report->inactiveIndexes),
-            $report->inactiveIndexes === [] ? 'none' : implode(',', $report->inactiveIndexes),
+            \count($report->inactiveIndexes),
+            $report->inactiveIndexes === [] ? 'none' : \implode(',', $report->inactiveIndexes),
         ));
         $output->writeln('summary status=' . ($report->isHealthy() ? 'ok' : 'failed'));
 

@@ -18,10 +18,10 @@ final readonly class SuggestAddressContextRequest
 
     public function normalizedParentId(): int
     {
-        if (is_int($this->parentId)) {
+        if (\is_int($this->parentId)) {
             return $this->parentId;
         }
-        if (is_string($this->parentId) && ctype_digit($this->parentId)) {
+        if (\is_string($this->parentId) && \ctype_digit($this->parentId)) {
             return (int) $this->parentId;
         }
 

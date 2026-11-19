@@ -38,7 +38,7 @@ final class M260902120000RelaxHierarchyCrossLinks implements RevertibleMigration
 
     public function down(MigrationBuilder $b): void
     {
-        foreach (array_keys(self::TABLES) as $table) {
+        foreach (\array_keys(self::TABLES) as $table) {
             $b->execute(
                 "ALTER TABLE {$table} ADD CONSTRAINT {$table}_object_id_fkey FOREIGN KEY (object_id) REFERENCES reestr_objects(id) ON DELETE CASCADE",
             );

@@ -14,7 +14,7 @@ final readonly class NominatimConfig
         public string $language,
     ) {
         self::assertHttpUrl($this->url, 'NOMINATIM_URL');
-        if (trim($this->language) === '') {
+        if (\trim($this->language) === '') {
             throw new InvalidArgumentException('NOMINATIM_LANGUAGE must be a non-empty string.');
         }
     }
@@ -30,12 +30,12 @@ final readonly class NominatimConfig
 
     private static function assertHttpUrl(string $url, string $name): void
     {
-        $parts = parse_url($url);
-        $scheme = is_array($parts) ? $parts['scheme'] ?? null : null;
-        $host = is_array($parts) ? $parts['host'] ?? null : null;
+        $parts = \parse_url($url);
+        $scheme = \is_array($parts) ? $parts['scheme'] ?? null : null;
+        $host = \is_array($parts) ? $parts['host'] ?? null : null;
 
-        if (!in_array($scheme, ['http', 'https'], true) || !is_string($host) || $host === '') {
-            throw new InvalidArgumentException(sprintf('%s must be an absolute HTTP(S) URL.', $name));
+        if (!\in_array($scheme, ['http', 'https'], true) || !\is_string($host) || $host === '') {
+            throw new InvalidArgumentException(\sprintf('%s must be an absolute HTTP(S) URL.', $name));
         }
     }
 }

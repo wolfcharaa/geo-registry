@@ -7,6 +7,11 @@ return (new PhpCsFixer\Config())
     ->setRules([
         '@PER-CS2.0' => true,
         'declare_strict_types' => true,
+        'native_function_invocation' => [
+            'include' => ['@internal'],
+            'scope' => 'namespaced',
+            'strict' => true,
+        ],
         'no_unused_imports' => true,
         'ordered_imports' => true,
     ])

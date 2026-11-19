@@ -21,7 +21,7 @@ final class M260902040000CreateGarSchema implements RevertibleMigrationInterface
 
         foreach ($this->columnComments() as $table => $columns) {
             foreach ($columns as $column => $comment) {
-                if (!is_string($table) || !is_string($column)) {
+                if (!\is_string($table) || !\is_string($column)) {
                     throw new LogicException('Migration comment identifiers must be strings.');
                 }
 
@@ -892,11 +892,11 @@ SQL,
 
     private function commentColumnSql(string $table, string $column, string $comment): string
     {
-        return sprintf(
+        return \sprintf(
             "COMMENT ON COLUMN %s.%s IS '%s'",
             $table,
             $column,
-            str_replace("'", "''", $comment),
+            \str_replace("'", "''", $comment),
         );
     }
 

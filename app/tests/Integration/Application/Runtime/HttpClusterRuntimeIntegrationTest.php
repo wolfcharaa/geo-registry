@@ -27,7 +27,7 @@ final class HttpClusterRuntimeIntegrationTest
     public function testTwoWorkersShareOneSocketAndStopCleanly(): void
     {
         $port = $this->freeTcpPort();
-        $root = dirname(__DIR__, 4);
+        $root = \dirname(__DIR__, 4);
         $process = Process::start(
             [PHP_BINARY, $root . '/bin/app', 'server:run'],
             $root,
@@ -60,16 +60,16 @@ final class HttpClusterRuntimeIntegrationTest
         $errors = $stderr->await();
 
         Assert::same($exitCode, 0, $errors);
-        Assert::same(substr_count($logs, '"message":"HTTP server started"'), 2, $logs);
-        Assert::same(substr_count($logs, '"message":"HTTP worker is online"'), 2, $logs);
-        Assert::true(str_contains($logs, '"event":"http.cluster.capacity.ready"'), $logs);
-        Assert::false(str_contains($logs, '"event":"http.cluster.capacity.degraded"'), $logs);
-        Assert::false(str_contains($logs, '"event":"http.worker.heartbeat.failed"'), $logs);
-        Assert::same(substr_count($logs, 'terminated cleanly'), 2, $logs);
-        Assert::true(str_contains($logs, '"event":"http.cluster.stopped"'), $logs);
+        Assert::same(\substr_count($logs, '"message":"HTTP server started"'), 2, $logs);
+        Assert::same(\substr_count($logs, '"message":"HTTP worker is online"'), 2, $logs);
+        Assert::true(\str_contains($logs, '"event":"http.cluster.capacity.ready"'), $logs);
+        Assert::false(\str_contains($logs, '"event":"http.cluster.capacity.degraded"'), $logs);
+        Assert::false(\str_contains($logs, '"event":"http.worker.heartbeat.failed"'), $logs);
+        Assert::same(\substr_count($logs, 'terminated cleanly'), 2, $logs);
+        Assert::true(\str_contains($logs, '"event":"http.cluster.stopped"'), $logs);
         Assert::same($loadExitCode, 0, $loadErrors);
-        $loadReport = json_decode($loadOutput, true, flags: JSON_THROW_ON_ERROR);
-        Assert::true(is_array($loadReport));
+        $loadReport = \json_decode($loadOutput, true, flags: JSON_THROW_ON_ERROR);
+        Assert::true(\is_array($loadReport));
         Assert::same($loadReport['status'] ?? null, 'ok');
         Assert::same($loadReport['attempts'] ?? null, 20);
     }
@@ -77,7 +77,7 @@ final class HttpClusterRuntimeIntegrationTest
     public function testWorkerIsReplacedAfterItsRequestBudgetIsExhausted(): void
     {
         $port = $this->freeTcpPort();
-        $root = dirname(__DIR__, 4);
+        $root = \dirname(__DIR__, 4);
         $process = Process::start(
             [PHP_BINARY, $root . '/bin/app', 'server:run'],
             $root,
@@ -113,16 +113,16 @@ final class HttpClusterRuntimeIntegrationTest
         $errors = $stderr->await();
 
         Assert::same($exitCode, 0, $errors);
-        Assert::true(str_contains($logs, '"event":"http.worker.recycle.requested"'), $logs);
-        Assert::true(str_contains($logs, '"event":"http.cluster.worker.restart.delayed"'), $logs);
-        Assert::true(substr_count($logs, '"message":"HTTP server started"') >= 3, $logs);
-        Assert::true(str_contains($logs, 'terminated cleanly, restarting'), $logs);
+        Assert::true(\str_contains($logs, '"event":"http.worker.recycle.requested"'), $logs);
+        Assert::true(\str_contains($logs, '"event":"http.cluster.worker.restart.delayed"'), $logs);
+        Assert::true(\substr_count($logs, '"message":"HTTP server started"') >= 3, $logs);
+        Assert::true(\str_contains($logs, 'terminated cleanly, restarting'), $logs);
     }
 
     public function testShutdownInterruptsAWorkerRestartBackoff(): void
     {
         $port = $this->freeTcpPort();
-        $root = dirname(__DIR__, 4);
+        $root = \dirname(__DIR__, 4);
         $process = Process::start(
             [PHP_BINARY, $root . '/bin/app', 'server:run'],
             $root,
@@ -150,10 +150,10 @@ final class HttpClusterRuntimeIntegrationTest
         try {
             $this->awaitLiveness($port);
             delay(0.2);
-            $shutdownStartedAt = microtime(true);
+            $shutdownStartedAt = \microtime(true);
             $process->signal(SIGTERM);
             $exitCode = $process->join(new TimeoutCancellation(3));
-            $shutdownDuration = microtime(true) - $shutdownStartedAt;
+            $shutdownDuration = \microtime(true) - $shutdownStartedAt;
         } finally {
             $process->kill();
         }
@@ -162,16 +162,16 @@ final class HttpClusterRuntimeIntegrationTest
         $errors = $stderr->await();
 
         Assert::same($exitCode, 0, $errors);
-        Assert::true(str_contains($logs, '"event":"http.cluster.worker.restart.delayed"'), $logs);
-        Assert::true(str_contains($logs, '"event":"http.cluster.capacity.degraded"'), $logs);
-        Assert::true($shutdownDuration < 2, sprintf('Shutdown took %.3f seconds.', $shutdownDuration));
-        Assert::true(str_contains($logs, '"event":"http.cluster.stopped"'), $logs);
+        Assert::true(\str_contains($logs, '"event":"http.cluster.worker.restart.delayed"'), $logs);
+        Assert::true(\str_contains($logs, '"event":"http.cluster.capacity.degraded"'), $logs);
+        Assert::true($shutdownDuration < 2, \sprintf('Shutdown took %.3f seconds.', $shutdownDuration));
+        Assert::true(\str_contains($logs, '"event":"http.cluster.stopped"'), $logs);
     }
 
     public function testStaleStoppedWorkerIsForceKilledAndReplaced(): void
     {
         $port = $this->freeTcpPort();
-        $root = dirname(__DIR__, 4);
+        $root = \dirname(__DIR__, 4);
         $process = Process::start(
             [PHP_BINARY, $root . '/bin/app', 'server:run'],
             $root,
@@ -200,7 +200,7 @@ final class HttpClusterRuntimeIntegrationTest
             $workerPids = $this->awaitWorkerProcesses($process->getPid(), 2);
             $stoppedWorkerPid = $workerPids[0]
                 ?? throw new RuntimeException('The HTTP worker fixture returned an empty process list.');
-            if (!posix_kill($stoppedWorkerPid, SIGSTOP)) {
+            if (!\posix_kill($stoppedWorkerPid, SIGSTOP)) {
                 throw new RuntimeException('Unable to stop an HTTP worker process for the stale-worker fixture.');
             }
 
@@ -214,7 +214,7 @@ final class HttpClusterRuntimeIntegrationTest
             $process->signal(SIGTERM);
         } finally {
             if ($stoppedWorkerPid !== null) {
-                @posix_kill($stoppedWorkerPid, SIGKILL);
+                @\posix_kill($stoppedWorkerPid, SIGKILL);
             }
             $process->kill();
         }
@@ -223,7 +223,7 @@ final class HttpClusterRuntimeIntegrationTest
         $errors = $stderr->await();
 
         if ($failure !== null) {
-            throw new RuntimeException(sprintf(
+            throw new RuntimeException(\sprintf(
                 "%s\nSupervisor logs:\n%s\nSupervisor errors:\n%s",
                 $failure->getMessage(),
                 $logs,
@@ -232,14 +232,14 @@ final class HttpClusterRuntimeIntegrationTest
         }
 
         Assert::same($exitCode, 0, $errors);
-        Assert::true(str_contains(
+        Assert::true(\str_contains(
             $logs,
             '"event":"http.cluster.worker.stale.termination_requested"',
         ), $logs);
-        Assert::true(str_contains($logs, '"event":"http.cluster.worker.stale.force_killed"'), $logs);
-        Assert::true(str_contains($logs, '"event":"http.cluster.capacity.degraded"'), $logs);
-        Assert::true(str_contains($logs, '"event":"http.cluster.capacity.restored"'), $logs);
-        Assert::true(substr_count($logs, '"message":"HTTP server started"') >= 3, $logs);
+        Assert::true(\str_contains($logs, '"event":"http.cluster.worker.stale.force_killed"'), $logs);
+        Assert::true(\str_contains($logs, '"event":"http.cluster.capacity.degraded"'), $logs);
+        Assert::true(\str_contains($logs, '"event":"http.cluster.capacity.restored"'), $logs);
+        Assert::true(\substr_count($logs, '"message":"HTTP server started"') >= 3, $logs);
     }
 
     private function awaitLiveness(int $port): void
@@ -247,7 +247,7 @@ final class HttpClusterRuntimeIntegrationTest
         $client = HttpClientBuilder::buildDefault();
         for ($attempt = 0; $attempt < 100; ++$attempt) {
             try {
-                $response = $client->request(new Request(sprintf(
+                $response = $client->request(new Request(\sprintf(
                     'http://127.0.0.1:%d/health/live',
                     $port,
                 )));
@@ -269,24 +269,24 @@ final class HttpClusterRuntimeIntegrationTest
     {
         $errorCode = 0;
         $errorMessage = '';
-        $server = stream_socket_server('tcp://127.0.0.1:0', $errorCode, $errorMessage);
+        $server = \stream_socket_server('tcp://127.0.0.1:0', $errorCode, $errorMessage);
         if ($server === false) {
-            throw new RuntimeException(sprintf('Unable to reserve a TCP port: %s', $errorMessage));
+            throw new RuntimeException(\sprintf('Unable to reserve a TCP port: %s', $errorMessage));
         }
 
         try {
-            $address = stream_socket_get_name($server, false);
+            $address = \stream_socket_get_name($server, false);
             if ($address === false) {
                 throw new RuntimeException('Unable to read the reserved TCP port.');
             }
 
-            if (preg_match('/:(\d+)$/', $address, $matches) !== 1) {
+            if (\preg_match('/:(\d+)$/', $address, $matches) !== 1) {
                 throw new RuntimeException('Unable to read the reserved TCP port.');
             }
 
             return (int) $matches[1];
         } finally {
-            fclose($server);
+            \fclose($server);
         }
     }
 
@@ -295,14 +295,14 @@ final class HttpClusterRuntimeIntegrationTest
     {
         for ($attempt = 0; $attempt < 100; ++$attempt) {
             $pids = $this->workerProcesses($supervisorPid);
-            if (count($pids) >= $minimumCount) {
+            if (\count($pids) >= $minimumCount) {
                 return $pids;
             }
 
             delay(0.05);
         }
 
-        throw new RuntimeException(sprintf(
+        throw new RuntimeException(\sprintf(
             'HTTP supervisor %d did not start %d child processes within five seconds.',
             $supervisorPid,
             $minimumCount,
@@ -313,14 +313,14 @@ final class HttpClusterRuntimeIntegrationTest
     {
         for ($attempt = 0; $attempt < 100; ++$attempt) {
             $pids = $this->workerProcesses($supervisorPid);
-            if (count($pids) >= 2 && !in_array($replacedPid, $pids, true)) {
+            if (\count($pids) >= 2 && !\in_array($replacedPid, $pids, true)) {
                 return;
             }
 
             delay(0.05);
         }
 
-        throw new RuntimeException(sprintf(
+        throw new RuntimeException(\sprintf(
             'Stale HTTP worker %d was not replaced within five seconds.',
             $replacedPid,
         ));
@@ -332,35 +332,35 @@ final class HttpClusterRuntimeIntegrationTest
         $descendants = [];
         $pending = [$supervisorPid];
         while ($pending !== []) {
-            $parentPid = array_shift($pending);
+            $parentPid = \array_shift($pending);
             foreach ($this->childProcesses($parentPid) as $childPid) {
                 $descendants[] = $childPid;
                 $pending[] = $childPid;
             }
         }
 
-        return array_values(array_filter($descendants, static function (int $pid): bool {
-            $commandName = @file_get_contents(sprintf('/proc/%d/comm', $pid));
+        return \array_values(\array_filter($descendants, static function (int $pid): bool {
+            $commandName = @\file_get_contents(\sprintf('/proc/%d/comm', $pid));
 
-            return is_string($commandName) && str_starts_with(trim($commandName), 'php');
+            return \is_string($commandName) && \str_starts_with(\trim($commandName), 'php');
         }));
     }
 
     /** @return list<positive-int> */
     private function childProcesses(int $parentPid): array
     {
-        $children = @file_get_contents(sprintf('/proc/%d/task/%d/children', $parentPid, $parentPid));
-        if (!is_string($children) || trim($children) === '') {
+        $children = @\file_get_contents(\sprintf('/proc/%d/task/%d/children', $parentPid, $parentPid));
+        if (!\is_string($children) || \trim($children) === '') {
             return [];
         }
 
-        $parts = preg_split('/\s+/', trim($children));
-        if (!is_array($parts)) {
+        $parts = \preg_split('/\s+/', \trim($children));
+        if (!\is_array($parts)) {
             return [];
         }
-        $pids = array_map('intval', $parts);
+        $pids = \array_map('intval', $parts);
 
-        return array_values(array_filter($pids, static fn(int $pid): bool => $pid > 0));
+        return \array_values(\array_filter($pids, static fn(int $pid): bool => $pid > 0));
     }
 
     /** @return array{int, string, string} */
@@ -371,7 +371,7 @@ final class HttpClusterRuntimeIntegrationTest
                 PHP_BINARY,
                 $root . '/bin/app',
                 'server:load-check',
-                sprintf('http://127.0.0.1:%d/health/live', $port),
+                \sprintf('http://127.0.0.1:%d/health/live', $port),
                 '--requests=20',
                 '--concurrency=4',
                 '--max-failures=0',

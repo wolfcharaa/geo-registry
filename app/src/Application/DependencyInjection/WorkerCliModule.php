@@ -26,7 +26,7 @@ final readonly class WorkerCliModule implements Module
         $bootstrapResolver = $dic->object(
             BootstrapResolver::class,
             static fn(): BootstrapResolver => new BootstrapResolver([
-                dirname(__DIR__, 3) . '/config/message_bus_worker.php',
+                \dirname(__DIR__, 3) . '/config/message_bus_worker.php',
             ]),
         );
 

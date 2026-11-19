@@ -33,8 +33,8 @@ final class HttpLoadCheckCommandTest
         ]);
 
         Assert::same($exitCode, Command::FAILURE);
-        $report = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        if (!is_array($report)) {
+        $report = \json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        if (!\is_array($report)) {
             throw new LogicException('Expected the command to return a JSON object.');
         }
         Assert::same($report['status'] ?? null, 'failed');
@@ -55,7 +55,7 @@ final class HttpLoadCheckCommandTest
         ]);
 
         Assert::same($exitCode, Command::INVALID);
-        Assert::true(str_contains($tester->getDisplay(), 'without embedded credentials or a fragment'));
+        Assert::true(\str_contains($tester->getDisplay(), 'without embedded credentials or a fragment'));
     }
 }
 

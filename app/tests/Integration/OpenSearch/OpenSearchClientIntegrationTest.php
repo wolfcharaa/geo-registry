@@ -32,10 +32,10 @@ final class OpenSearchClientIntegrationTest
             self::environment('INTEGRATION_OPENSEARCH_URL', 'http://127.0.0.1:59200'),
             'geo-registry-integration-test/0.1',
         );
-        $index = 'geo-registry-integration-' . bin2hex(random_bytes(6));
+        $index = 'geo-registry-integration-' . \bin2hex(\random_bytes(6));
 
         $health = $client->health();
-        Assert::true(in_array($health['status'] ?? null, ['green', 'yellow'], true));
+        Assert::true(\in_array($health['status'] ?? null, ['green', 'yellow'], true));
 
         $client->createIndex($index, OpenSearchAddressIndexDefinition::create());
 
@@ -62,7 +62,7 @@ final class OpenSearchClientIntegrationTest
                 regionCode: 77,
             ), new NullCancellation());
 
-            Assert::same(array_map(
+            Assert::same(\array_map(
                 static fn(SearchAddressMatch $match): int => $match->document->objectId,
                 $matches,
             ), [770005, 770006, 770007]);
@@ -84,7 +84,7 @@ final class OpenSearchClientIntegrationTest
                 regionCode: 77,
             ), new NullCancellation());
 
-            Assert::same(array_map(
+            Assert::same(\array_map(
                 static fn(SearchAddressMatch $unitMatch): int => $unitMatch->document->objectId,
                 $unitMatches,
             ), [770006]);
@@ -98,9 +98,9 @@ final class OpenSearchClientIntegrationTest
 
     private static function environment(string $name, string $default): string
     {
-        $value = getenv($name);
+        $value = \getenv($name);
 
-        return is_string($value) && $value !== '' ? $value : $default;
+        return \is_string($value) && $value !== '' ? $value : $default;
     }
 
     /** @return array<string, mixed> */
@@ -114,7 +114,7 @@ final class OpenSearchClientIntegrationTest
     ): array {
         return [
             'object_id' => $objectId,
-            'object_guid' => sprintf('00000000-0000-4000-8000-%012d', $objectId),
+            'object_guid' => \sprintf('00000000-0000-4000-8000-%012d', $objectId),
             'address' => "Регион {$region}, г. Тестоград, ул. Общая, д. {$house}{$suffix}",
             'hierarchy_type' => 'adm',
             'region_code' => $regionCode,

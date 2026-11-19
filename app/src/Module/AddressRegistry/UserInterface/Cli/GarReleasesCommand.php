@@ -51,15 +51,15 @@ final class GarReleasesCommand extends Command
             return self::FAILURE;
         }
 
-        $releases = array_slice($releases, 0, $limit);
+        $releases = \array_slice($releases, 0, $limit);
         if ($input->getOption('json') === true) {
             return self::writeJson($output, $releases);
         }
 
         $output->writeln('endpoint=' . ($url ?? $this->reader->endpoint($all)));
-        $output->writeln('releases=' . count($releases));
+        $output->writeln('releases=' . \count($releases));
         foreach ($releases as $release) {
-            $output->writeln(sprintf(
+            $output->writeln(\sprintf(
                 'release version=%d date=%s text="%s" full=%s delta=%s',
                 $release->versionId,
                 $release->date ?? 'unknown',
@@ -76,8 +76,8 @@ final class GarReleasesCommand extends Command
     private static function writeJson(OutputInterface $output, array $releases): int
     {
         try {
-            $output->writeln(json_encode(
-                array_map(
+            $output->writeln(\json_encode(
+                \array_map(
                     static fn(GarReleaseMetadata $release): array => $release->toArray(),
                     $releases,
                 ),
@@ -95,7 +95,7 @@ final class GarReleasesCommand extends Command
     private static function integer(InputInterface $input, string $name, int $minimum, int $maximum): int
     {
         $value = $input->getOption($name);
-        if (!is_string($value) || !ctype_digit($value) || (int) $value < $minimum || (int) $value > $maximum) {
+        if (!\is_string($value) || !\ctype_digit($value) || (int) $value < $minimum || (int) $value > $maximum) {
             throw new RuntimeException("Option --{$name} must be an integer from {$minimum} to {$maximum}.");
         }
 
@@ -108,16 +108,16 @@ final class GarReleasesCommand extends Command
         if ($value === null) {
             return null;
         }
-        if (!is_string($value) || trim($value) === '') {
+        if (!\is_string($value) || \trim($value) === '') {
             throw new RuntimeException("Option --{$name} must not be empty.");
         }
 
-        return trim($value);
+        return \trim($value);
     }
 
     private static function quoted(string $value): string
     {
-        return str_replace(
+        return \str_replace(
             ["\\", '"', "\r", "\n"],
             ["\\\\", '\\"', '\\r', '\\n'],
             $value,

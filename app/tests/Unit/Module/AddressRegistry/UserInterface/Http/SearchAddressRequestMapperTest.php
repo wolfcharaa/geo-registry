@@ -94,7 +94,7 @@ final class SearchAddressRequestMapperTest
         return new Request(
             new TestClient(),
             'GET',
-            Http::new('http://localhost/api/addresses/search?' . http_build_query($parameters)),
+            Http::new('http://localhost/api/addresses/search?' . \http_build_query($parameters)),
         );
     }
 }

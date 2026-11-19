@@ -36,13 +36,13 @@ final readonly class HttpGarReleaseMetadataReader implements GarReleaseMetadataR
             $this->request($url ?? $this->endpoint(false), $timeoutSeconds),
             'GetLastDownloadFileInfoResult',
         );
-        if (!is_array($payload)) {
+        if (!\is_array($payload)) {
             throw new RuntimeException('GAR latest metadata response must be a JSON object.');
         }
         if (!$this->looksLikeRelease($payload)) {
-            $items = array_values(array_filter($payload, 'is_array'));
+            $items = \array_values(\array_filter($payload, 'is_array'));
             $payload = $items[0] ?? null;
-            if (!is_array($payload)) {
+            if (!\is_array($payload)) {
                 throw new RuntimeException('GAR latest metadata response contains no release.');
             }
         }
@@ -56,18 +56,18 @@ final readonly class HttpGarReleaseMetadataReader implements GarReleaseMetadataR
             $this->request($url ?? $this->endpoint(true), $timeoutSeconds),
             'GetAllDownloadFileInfoResult',
         );
-        if (!is_array($payload)) {
+        if (!\is_array($payload)) {
             throw new RuntimeException('GAR metadata response must be a JSON object or list.');
         }
 
         $items = $this->looksLikeRelease($payload) ? [$payload] : $payload;
         $releases = [];
         foreach ($items as $item) {
-            if (is_array($item)) {
+            if (\is_array($item)) {
                 $releases[] = $this->map($item);
             }
         }
-        usort(
+        \usort(
             $releases,
             static fn(GarReleaseMetadata $left, GarReleaseMetadata $right): int =>
                 $right->versionId <=> $left->versionId,
@@ -96,18 +96,18 @@ final readonly class HttpGarReleaseMetadataReader implements GarReleaseMetadataR
             throw new RuntimeException('GAR metadata request failed.', previous: $error);
         }
         if ($response->getStatus() < 200 || $response->getStatus() >= 300) {
-            throw new RuntimeException(sprintf(
+            throw new RuntimeException(\sprintf(
                 'GAR metadata endpoint returned HTTP %d.',
                 $response->getStatus(),
             ));
         }
 
         try {
-            $payload = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+            $payload = \json_decode($body, true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException $error) {
             throw new RuntimeException('GAR metadata response is not valid JSON.', previous: $error);
         }
-        if ($payload !== null && !is_array($payload) && !is_scalar($payload)) {
+        if ($payload !== null && !\is_array($payload) && !\is_scalar($payload)) {
             throw new RuntimeException('GAR metadata response contains an unsupported JSON value.');
         }
 
@@ -116,7 +116,7 @@ final readonly class HttpGarReleaseMetadataReader implements GarReleaseMetadataR
 
     private function unwrap(mixed $payload, string $field): mixed
     {
-        return is_array($payload) && array_key_exists($field, $payload)
+        return \is_array($payload) && \array_key_exists($field, $payload)
             ? $payload[$field]
             : $payload;
     }
@@ -125,7 +125,7 @@ final readonly class HttpGarReleaseMetadataReader implements GarReleaseMetadataR
     private function map(array $item): GarReleaseMetadata
     {
         $version = self::scalar($item, 'VersionId', 'versionId');
-        if ($version === null || !ctype_digit($version)) {
+        if ($version === null || !\ctype_digit($version)) {
             throw new RuntimeException('GAR metadata release has no numeric VersionId.');
         }
 
@@ -167,10 +167,10 @@ final readonly class HttpGarReleaseMetadataReader implements GarReleaseMetadataR
     {
         foreach ($fields as $field) {
             $value = $item[$field] ?? null;
-            if (!is_scalar($value)) {
+            if (!\is_scalar($value)) {
                 continue;
             }
-            $value = trim((string) $value);
+            $value = \trim((string) $value);
             if ($value !== '') {
                 return $value;
             }
@@ -182,21 +182,21 @@ final readonly class HttpGarReleaseMetadataReader implements GarReleaseMetadataR
     private static function date(?string $value, ?string ...$urls): ?string
     {
         if ($value !== null) {
-            if (preg_match('/^\/Date\((\d+)(?:[+-]\d+)?\)\/$/D', trim($value), $matches) === 1) {
-                return (new DateTimeImmutable('@' . intdiv((int) $matches[1], 1000)))
+            if (\preg_match('/^\/Date\((\d+)(?:[+-]\d+)?\)\/$/D', \trim($value), $matches) === 1) {
+                return (new DateTimeImmutable('@' . \intdiv((int) $matches[1], 1000)))
                     ->setTimezone(new DateTimeZone('UTC'))
                     ->format('Y-m-d');
             }
-            if (preg_match('/\b(\d{4})[.-](\d{2})[.-](\d{2})\b/', $value, $matches) === 1) {
+            if (\preg_match('/\b(\d{4})[.-](\d{2})[.-](\d{2})\b/', $value, $matches) === 1) {
                 return "{$matches[1]}-{$matches[2]}-{$matches[3]}";
             }
-            if (preg_match('/\b(\d{2})[.-](\d{2})[.-](\d{4})\b/', $value, $matches) === 1) {
+            if (\preg_match('/\b(\d{2})[.-](\d{2})[.-](\d{4})\b/', $value, $matches) === 1) {
                 return "{$matches[3]}-{$matches[2]}-{$matches[1]}";
             }
         }
 
         foreach ($urls as $url) {
-            if ($url !== null && preg_match('/(\d{4})[._-](\d{2})[._-](\d{2})/', $url, $matches) === 1) {
+            if ($url !== null && \preg_match('/(\d{4})[._-](\d{2})[._-](\d{2})/', $url, $matches) === 1) {
                 return "{$matches[1]}-{$matches[2]}-{$matches[3]}";
             }
         }
@@ -206,10 +206,10 @@ final readonly class HttpGarReleaseMetadataReader implements GarReleaseMetadataR
 
     private static function assertUrl(string $url): void
     {
-        $parts = parse_url($url);
-        $scheme = is_array($parts) ? $parts['scheme'] ?? null : null;
-        $host = is_array($parts) ? $parts['host'] ?? null : null;
-        if (!in_array($scheme, ['http', 'https'], true) || !is_string($host) || $host === '') {
+        $parts = \parse_url($url);
+        $scheme = \is_array($parts) ? $parts['scheme'] ?? null : null;
+        $host = \is_array($parts) ? $parts['host'] ?? null : null;
+        if (!\in_array($scheme, ['http', 'https'], true) || !\is_string($host) || $host === '') {
             throw new RuntimeException('GAR metadata URL must be an absolute HTTP(S) URL.');
         }
     }

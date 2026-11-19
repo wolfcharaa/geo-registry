@@ -40,7 +40,7 @@ final class AddressCoordinateEnrichmentIntegrationTest
         $dsn = IntegrationDatabase::dsn();
         $database = PostgresPoolFactory::create($dsn, 1);
         $openSearch = self::openSearch();
-        $index = 'geo-registry-coordinates-' . bin2hex(random_bytes(6));
+        $index = 'geo-registry-coordinates-' . \bin2hex(\random_bytes(6));
 
         try {
             IntegrationDatabase::resetSchema($database);
@@ -116,7 +116,7 @@ INSERT INTO address_search (
 )
 SQL, [
                 'object_id' => $objectId,
-                'object_guid' => sprintf('00000000-0000-4000-8000-%012d', $objectId),
+                'object_guid' => \sprintf('00000000-0000-4000-8000-%012d', $objectId),
                 'address' => "Регион Альфа, Тестоград, Общая улица, {$objectId}",
                 'hierarchy' => $hierarchy,
             ]);
@@ -131,7 +131,7 @@ SQL, [
     ): void {
         $openSearch->indexDocument($index, "77:{$hierarchy}:{$objectId}", [
             'object_id' => $objectId,
-            'object_guid' => sprintf('00000000-0000-4000-8000-%012d', $objectId),
+            'object_guid' => \sprintf('00000000-0000-4000-8000-%012d', $objectId),
             'address' => "Регион Альфа, Тестоград, Общая улица, {$objectId}",
             'hierarchy_type' => $hierarchy,
             'region_code' => 77,
@@ -161,7 +161,7 @@ SQL, [
             $rows[] = $row;
         }
 
-        Assert::same(count($rows), 2);
+        Assert::same(\count($rows), 2);
         foreach ($rows as $row) {
             Assert::same((float) ($row['geo_lat'] ?? 0), $latitude);
             Assert::same((float) ($row['geo_lon'] ?? 0), $longitude);
@@ -180,17 +180,17 @@ SQL, [
     ): void {
         $response = $openSearch->search($index, ['term' => ['object_id' => $objectId]], 10);
         $hitContainer = $response['hits'] ?? null;
-        if (!is_array($hitContainer)) {
+        if (!\is_array($hitContainer)) {
             throw new RuntimeException('OpenSearch coordinate query returned no hit container.');
         }
         $hits = $hitContainer['hits'] ?? null;
-        if (!is_array($hits)) {
+        if (!\is_array($hits)) {
             throw new RuntimeException('OpenSearch coordinate query returned invalid hits.');
         }
 
-        Assert::same(count($hits), $expectedDocuments);
+        Assert::same(\count($hits), $expectedDocuments);
         foreach ($hits as $hit) {
-            if (!is_array($hit) || !is_array($hit['_source'] ?? null)) {
+            if (!\is_array($hit) || !\is_array($hit['_source'] ?? null)) {
                 throw new RuntimeException('OpenSearch coordinate hit has no source.');
             }
             Assert::same($hit['_source']['geo_lat'] ?? null, $latitude);
@@ -208,9 +208,9 @@ SQL, [
 
     private static function openSearchUrl(): string
     {
-        $url = getenv('INTEGRATION_OPENSEARCH_URL');
+        $url = \getenv('INTEGRATION_OPENSEARCH_URL');
 
-        return is_string($url) && $url !== '' ? $url : 'http://127.0.0.1:59200';
+        return \is_string($url) && $url !== '' ? $url : 'http://127.0.0.1:59200';
     }
 }
 
@@ -226,8 +226,8 @@ final readonly class AddressCoordinateEnrichmentModule implements Module
     /** @return Ref<AddressCoordinateEnrichmentHarness> */
     public function configure(Dic $dic): Ref
     {
-        $source = MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_registry.php');
-        $codecs = MessageCodecRegistryLoader::fromFile(dirname(__DIR__, 4) . '/config/message_bus_codecs.php');
+        $source = MessageBusRegistrySource::fromFile(\dirname(__DIR__, 4) . '/config/message_bus_registry.php');
+        $codecs = MessageCodecRegistryLoader::fromFile(\dirname(__DIR__, 4) . '/config/message_bus_codecs.php');
         $postgres = $dic
             ->object(
                 PostgresConnectionPool::class,

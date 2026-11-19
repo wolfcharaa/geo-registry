@@ -14,11 +14,12 @@ final readonly class RunGarImportWorker
         public string $sourcePath,
         public int $batchSize,
         public array $files,
+        public bool $directCopy = false,
     ) {
         if ($this->operationId < 1) {
             throw new InvalidArgumentException('GAR import worker operation id must be positive.');
         }
-        if (trim($this->sourcePath) === '') {
+        if (\trim($this->sourcePath) === '') {
             throw new InvalidArgumentException('GAR import worker source path must not be empty.');
         }
         if ($this->batchSize < 1 || $this->batchSize > 100_000) {

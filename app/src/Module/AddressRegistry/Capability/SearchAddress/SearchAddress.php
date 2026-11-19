@@ -20,8 +20,8 @@ final readonly class SearchAddress implements Query
         int $limit = 10,
         public ?int $regionCode = null,
     ) {
-        $normalized = preg_replace('/\s+/u', ' ', trim($query));
-        $this->query = $normalized ?? trim($query);
-        $this->limit = max(1, min(50, $limit));
+        $normalized = \preg_replace('/\s+/u', ' ', \trim($query));
+        $this->query = $normalized ?? \trim($query);
+        $this->limit = \max(1, \min(50, $limit));
     }
 }

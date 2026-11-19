@@ -36,42 +36,42 @@ final readonly class GarXmlFileDescriptor
         }
         self::assertIdentifier($this->table);
         foreach ($this->attributes as $column => $_attribute) {
-            if (!is_string($column)) {
+            if (!\is_string($column)) {
                 throw new InvalidArgumentException('GAR XML stage column must be a string.');
             }
             self::assertIdentifier($column);
         }
         $attributes = $this->attributes;
-        $identityAttribute = reset($attributes);
+        $identityAttribute = \reset($attributes);
         $this->identityAttribute = $identityAttribute;
 
         if (($this->targetColumns === null) !== ($this->selectExpressions === null)) {
             throw new InvalidArgumentException('Custom GAR merge columns and expressions must be configured together.');
         }
         if ($this->targetColumns !== null) {
-            if ($this->selectExpressions === null || count($this->targetColumns) !== count($this->selectExpressions)) {
+            if ($this->selectExpressions === null || \count($this->targetColumns) !== \count($this->selectExpressions)) {
                 throw new InvalidArgumentException('Custom GAR merge columns and expressions must have equal length.');
             }
         }
         foreach ($this->targetColumns ?? [] as $column) {
             self::assertIdentifier($column);
         }
-        foreach (array_keys($this->defaults) as $column) {
-            if (!array_key_exists($column, $this->attributes)) {
+        foreach (\array_keys($this->defaults) as $column) {
+            if (!\array_key_exists($column, $this->attributes)) {
                 throw new InvalidArgumentException("Unknown GAR default column: {$column}");
             }
         }
         foreach ($zeroAsNullColumns as $column) {
-            if (!array_key_exists($column, $this->attributes)) {
+            if (!\array_key_exists($column, $this->attributes)) {
                 throw new InvalidArgumentException("Unknown GAR zero-as-null column: {$column}");
             }
         }
-        $this->zeroAsNullColumns = array_fill_keys($zeroAsNullColumns, true);
+        $this->zeroAsNullColumns = \array_fill_keys($zeroAsNullColumns, true);
     }
 
     public function matches(string $filename): bool
     {
-        return preg_match($this->filenamePattern, $filename) === 1;
+        return \preg_match($this->filenamePattern, $filename) === 1;
     }
 
     /** @return list<string> */
@@ -99,13 +99,24 @@ final readonly class GarXmlFileDescriptor
         return $value === '0' && isset($this->zeroAsNullColumns[$column]) ? null : $value;
     }
 
+    /** @return list<string> */
+    public function targetColumns(): array
+    {
+        return $this->targetColumns ?? $this->stageColumns();
+    }
+
+    public function directCopyTarget(): string
+    {
+        return \sprintf('%s (%s)', $this->table, \implode(', ', $this->targetColumns()));
+    }
+
     public function mergeSql(string $stageTable): string
     {
         self::assertIdentifier($stageTable);
 
-        $targetColumns = $this->targetColumns ?? $this->stageColumns();
+        $targetColumns = $this->targetColumns();
         $selectExpressions = $this->selectExpressions
-            ?? array_map(static fn(string $column): string => "s.{$column}", $targetColumns);
+            ?? \array_map(static fn(string $column): string => "s.{$column}", $targetColumns);
         $updates = [];
         foreach ($targetColumns as $column) {
             if ($column !== 'id') {
@@ -115,13 +126,13 @@ final readonly class GarXmlFileDescriptor
 
         $conflict = $updates === []
             ? 'DO NOTHING'
-            : 'DO UPDATE SET ' . implode(', ', $updates);
+            : 'DO UPDATE SET ' . \implode(', ', $updates);
 
-        return sprintf(
+        return \sprintf(
             'INSERT INTO %s (%s) SELECT %s FROM %s s ON CONFLICT (id) %s',
             $this->table,
-            implode(', ', $targetColumns),
-            implode(', ', $selectExpressions),
+            \implode(', ', $targetColumns),
+            \implode(', ', $selectExpressions),
             $stageTable,
             $conflict,
         );
@@ -129,7 +140,7 @@ final readonly class GarXmlFileDescriptor
 
     private static function assertIdentifier(string $identifier): void
     {
-        if (preg_match('/^[a-z][a-z0-9_]*$/D', $identifier) !== 1) {
+        if (\preg_match('/^[a-z][a-z0-9_]*$/D', $identifier) !== 1) {
             throw new InvalidArgumentException("Unsafe SQL identifier: {$identifier}");
         }
     }

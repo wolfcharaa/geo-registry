@@ -37,7 +37,7 @@ final readonly class PdoConnectionFactory
         $this->append($parts, 'application_name', $config->getApplicationName());
         $this->append($parts, 'options', $config->getOptions());
 
-        return 'pgsql:' . implode(';', $parts);
+        return 'pgsql:' . \implode(';', $parts);
     }
 
     /** @param list<string> $parts */
@@ -50,7 +50,7 @@ final readonly class PdoConnectionFactory
 
     private function dsnValue(string $name, string $value): string
     {
-        if (str_contains($value, ';') || str_contains($value, "\n") || str_contains($value, "\r")) {
+        if (\str_contains($value, ';') || \str_contains($value, "\n") || \str_contains($value, "\r")) {
             throw new InvalidArgumentException("DATABASE_DSN parameter {$name} contains an unsupported delimiter.");
         }
 

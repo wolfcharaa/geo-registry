@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace App\Module\AddressRegistry\Feature\DataMos\Infrastructure;
 
-use function max;
-use function microtime;
-
 use PDO;
 
 final class DataMosAddressRegistryEnricher
@@ -18,7 +15,7 @@ final class DataMosAddressRegistryEnricher
 
     public function enrich(bool $insertMissing = true): DataMosAddressRegistryEnrichResult
     {
-        $startedAt = microtime(true);
+        $startedAt = \microtime(true);
         $updated = $this->updateExistingSearchRows();
         $updated += $this->inheritExistingSearchRows();
         $inserted = $insertMissing ? $this->insertMissingSearchRows() : 0;
@@ -26,7 +23,7 @@ final class DataMosAddressRegistryEnricher
         return new DataMosAddressRegistryEnrichResult(
             updatedSearchRows: $updated,
             insertedSearchRows: $inserted,
-            duration: microtime(true) - $startedAt,
+            duration: \microtime(true) - $startedAt,
         );
     }
 
@@ -423,6 +420,6 @@ SQL);
         $statement->bindValue(':region_code', $this->regionCode, \PDO::PARAM_INT);
         $statement->execute();
 
-        return max(0, $statement->rowCount());
+        return \max(0, $statement->rowCount());
     }
 }

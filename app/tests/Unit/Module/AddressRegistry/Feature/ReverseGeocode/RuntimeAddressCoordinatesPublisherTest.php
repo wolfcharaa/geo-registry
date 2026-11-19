@@ -41,7 +41,7 @@ final class RuntimeAddressCoordinatesPublisherTest
         $publisher->publishIfMissing(self::document(null, null), $location, $context);
         $publisher->publishIfMissing(self::document(55.75, 37.61), $location, $context);
 
-        Assert::same(count($context->events), 1);
+        Assert::same(\count($context->events), 1);
         $event = $context->events[0] ?? null;
         Assert::true($event instanceof AddressCoordinatesResolved);
         Assert::same($event->objectId, 770005);

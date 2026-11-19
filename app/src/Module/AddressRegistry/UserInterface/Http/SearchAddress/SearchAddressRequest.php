@@ -31,13 +31,13 @@ final readonly class SearchAddressRequest
 
     public function normalizedQuery(): string
     {
-        if (!is_string($this->query)) {
+        if (!\is_string($this->query)) {
             throw new LogicException('SearchAddressRequest must be validated before normalization.');
         }
 
-        $normalized = preg_replace('/\s+/u', ' ', trim($this->query));
+        $normalized = \preg_replace('/\s+/u', ' ', \trim($this->query));
 
-        return $normalized ?? trim($this->query);
+        return $normalized ?? \trim($this->query);
     }
 
     public function normalizedHierarchy(): AddressHierarchy
@@ -79,7 +79,7 @@ final readonly class SearchAddressRequest
 
     private function string(mixed $value): string
     {
-        if (!is_string($value)) {
+        if (!\is_string($value)) {
             throw new LogicException('SearchAddressRequest must be validated before normalization.');
         }
 
@@ -88,10 +88,10 @@ final readonly class SearchAddressRequest
 
     private function integer(mixed $value): int
     {
-        if (is_int($value)) {
+        if (\is_int($value)) {
             return $value;
         }
-        if (is_string($value) && ctype_digit($value)) {
+        if (\is_string($value) && \ctype_digit($value)) {
             return (int) $value;
         }
 

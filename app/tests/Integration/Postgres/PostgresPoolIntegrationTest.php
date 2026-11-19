@@ -55,8 +55,8 @@ final class PostgresPoolIntegrationTest
 
     private static function environment(string $name, string $default): string
     {
-        $value = getenv($name);
+        $value = \getenv($name);
 
-        return is_string($value) && $value !== '' ? $value : $default;
+        return \is_string($value) && $value !== '' ? $value : $default;
     }
 }

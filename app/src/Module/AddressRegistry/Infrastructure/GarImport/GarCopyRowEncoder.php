@@ -9,7 +9,7 @@ final class GarCopyRowEncoder
     /** @param list<?string> $values */
     public function encode(array $values): string
     {
-        return implode("\t", array_map(self::encodeValue(...), $values)) . "\n";
+        return \implode("\t", \array_map(self::encodeValue(...), $values)) . "\n";
     }
 
     private static function encodeValue(?string $value): string
@@ -18,7 +18,7 @@ final class GarCopyRowEncoder
             return '\\N';
         }
 
-        return strtr($value, [
+        return \strtr($value, [
             '\\' => '\\\\',
             "\t" => '\\t',
             "\n" => '\\n',

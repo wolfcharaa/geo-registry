@@ -62,8 +62,8 @@ final class HttpWorkerPoolState
             unset($this->workers[$workerId]);
         }
 
-        sort($removedWorkerIds);
-        $activeWorkers = count($this->workers);
+        \sort($removedWorkerIds);
+        $activeWorkers = \count($this->workers);
         $atCapacity = $activeWorkers >= $this->expectedWorkers;
         $transition = null;
 
@@ -89,12 +89,12 @@ final class HttpWorkerPoolState
 
     public function activeWorkers(): int
     {
-        return count($this->workers);
+        return \count($this->workers);
     }
 
     private function assertTime(float $now): void
     {
-        if (!is_finite($now) || $now < 0) {
+        if (!\is_finite($now) || $now < 0) {
             throw new InvalidArgumentException('Monotonic HTTP worker observation time must be finite and non-negative.');
         }
     }

@@ -12,7 +12,7 @@ final readonly class CleanupOpenSearchIndex
         public string $index,
         public string $confirmation,
     ) {
-        if (preg_match('/^[a-z0-9][a-z0-9._-]*$/D', $this->index) !== 1) {
+        if (\preg_match('/^[a-z0-9][a-z0-9._-]*$/D', $this->index) !== 1) {
             throw new InvalidArgumentException('OpenSearch cleanup index has an invalid name.');
         }
         if ($this->confirmation !== $this->index) {

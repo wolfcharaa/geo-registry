@@ -32,6 +32,6 @@ final readonly class ReverseGeocodeResult
 
     public function count(): int
     {
-        return count($this->matches) + ($this->fallbackLocation === null ? 0 : 1);
+        return \count($this->matches) + ($this->fallbackLocation === null ? 0 : 1);
     }
 }

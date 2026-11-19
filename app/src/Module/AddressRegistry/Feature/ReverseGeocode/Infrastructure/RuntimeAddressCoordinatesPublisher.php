@@ -47,7 +47,7 @@ final readonly class RuntimeAddressCoordinatesPublisher implements MissingAddres
             }
             $this->logger->warning('Runtime address coordinate update was not queued', [
                 'object_id' => $document->objectId,
-                'failure_count' => count($exception->result()->failures()),
+                'failure_count' => \count($exception->result()->failures()),
                 'exception_class' => $exception::class,
             ]);
         } catch (Throwable $exception) {

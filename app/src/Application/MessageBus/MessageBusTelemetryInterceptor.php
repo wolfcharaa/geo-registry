@@ -17,7 +17,7 @@ final readonly class MessageBusTelemetryInterceptor implements InterceptorInterf
     public function __invoke(MessageContextInterface $context, PipelineInterface $pipeline): mixed
     {
         $envelope = $context->envelope();
-        $startedAt = hrtime(true);
+        $startedAt = \hrtime(true);
         $metadata = [
             'message_class' => $envelope->message::class,
             'binding_id' => $envelope->bindingId,
@@ -51,6 +51,6 @@ final readonly class MessageBusTelemetryInterceptor implements InterceptorInterf
 
     private function durationMilliseconds(int|float $startedAt): float
     {
-        return round((hrtime(true) - $startedAt) / 1_000_000, 3);
+        return \round((\hrtime(true) - $startedAt) / 1_000_000, 3);
     }
 }

@@ -25,14 +25,14 @@ final readonly class NativeOpenSearchProjectionStatusInspector implements OpenSe
             $health = $this->openSearch->health();
             $targets = $this->openSearch->aliasTargets($this->alias);
             $manifest = $this->source->manifest();
-            $targetDocuments = count($targets) === 1
+            $targetDocuments = \count($targets) === 1
                 ? $this->openSearch->countDocuments($targets[0])
                 : null;
-            $inactiveIndexes = array_values(array_diff(
+            $inactiveIndexes = \array_values(\array_diff(
                 $this->openSearch->concreteIndexes($this->alias . '-v'),
                 $targets,
             ));
-            sort($inactiveIndexes);
+            \sort($inactiveIndexes);
 
             return new OpenSearchProjectionStatusReport(
                 alias: $this->alias,
@@ -60,7 +60,7 @@ final readonly class NativeOpenSearchProjectionStatusInspector implements OpenSe
     private static function status(array $health): string
     {
         $status = $health['status'] ?? null;
-        if (!in_array($status, ['green', 'yellow', 'red'], true)) {
+        if (!\in_array($status, ['green', 'yellow', 'red'], true)) {
             throw new OpenSearchProjectionFailed('OpenSearch returned an invalid cluster status.');
         }
 
@@ -71,7 +71,7 @@ final readonly class NativeOpenSearchProjectionStatusInspector implements OpenSe
     private static function boolean(array $values, string $field): bool
     {
         $value = $values[$field] ?? null;
-        if (!is_bool($value)) {
+        if (!\is_bool($value)) {
             throw new OpenSearchProjectionFailed("OpenSearch returned an invalid `{$field}` value.");
         }
 
@@ -82,7 +82,7 @@ final readonly class NativeOpenSearchProjectionStatusInspector implements OpenSe
     private static function integer(array $values, string $field): int
     {
         $value = $values[$field] ?? null;
-        if (!is_int($value) || $value < 0) {
+        if (!\is_int($value) || $value < 0) {
             throw new OpenSearchProjectionFailed("OpenSearch returned an invalid `{$field}` value.");
         }
 

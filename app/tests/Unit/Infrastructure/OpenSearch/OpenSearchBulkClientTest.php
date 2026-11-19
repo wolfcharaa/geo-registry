@@ -21,7 +21,7 @@ final class OpenSearchBulkClientTest
 {
     public function testItAcceptsOnlyACompleteSuccessfulBulkResponse(): void
     {
-        $http = new BulkResponseHttpClient(json_encode([
+        $http = new BulkResponseHttpClient(\json_encode([
             'errors' => false,
             'items' => [
                 ['index' => ['_id' => '77:adm:1', 'status' => 201]],
@@ -43,7 +43,7 @@ final class OpenSearchBulkClientTest
 
     public function testItSurfacesTheFirstItemFailureWithoutRetrying(): void
     {
-        $http = new BulkResponseHttpClient(json_encode([
+        $http = new BulkResponseHttpClient(\json_encode([
             'errors' => true,
             'items' => [[
                 'index' => [

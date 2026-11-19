@@ -53,6 +53,6 @@ final readonly class CorrelationEchoHandler implements RequestHandler
         $ids = $this->context->current()
             ?? throw new LogicException('Correlation context is missing inside the request handler.');
 
-        return new Response(body: sprintf('%s:%s', $ids->requestId, $ids->correlationId));
+        return new Response(body: \sprintf('%s:%s', $ids->requestId, $ids->correlationId));
     }
 }

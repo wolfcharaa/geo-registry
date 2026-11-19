@@ -5,6 +5,7 @@
 /config/release.postman_environment.json
 /app/.env
 /app/vendor/
+/app/benchmarks/xml-parsers/vendor/
 /app/var/
 /app/.php-cs-fixer.cache
 /.agents/

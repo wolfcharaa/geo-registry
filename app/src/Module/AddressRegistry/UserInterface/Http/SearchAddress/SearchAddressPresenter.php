@@ -20,9 +20,9 @@ final readonly class SearchAddressPresenter
     {
         return [
             'success' => true,
-            'count' => count($result->matches),
+            'count' => \count($result->matches),
             'query' => $query,
-            'suggestions' => array_map($this->suggestion(...), $result->matches),
+            'suggestions' => \array_map($this->suggestion(...), $result->matches),
             'meta' => ['endpoint' => 'search'],
         ];
     }

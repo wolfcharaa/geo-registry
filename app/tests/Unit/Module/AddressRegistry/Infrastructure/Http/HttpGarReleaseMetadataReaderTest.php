@@ -18,7 +18,7 @@ final class HttpGarReleaseMetadataReaderTest
 {
     public function testItMapsAndSortsTheOfficialWrappedMetadataShape(): void
     {
-        $http = new GarMetadataResponseHttpClient(json_encode([
+        $http = new GarMetadataResponseHttpClient(\json_encode([
             'GetAllDownloadFileInfoResult' => [
                 [
                     'VersionId' => 10,
@@ -40,7 +40,7 @@ final class HttpGarReleaseMetadataReaderTest
 
         $releases = $reader->all(null, 5);
 
-        Assert::same(count($releases), 2);
+        Assert::same(\count($releases), 2);
         $first = $releases[0] ?? null;
         $second = $releases[1] ?? null;
         Assert::notNull($first);

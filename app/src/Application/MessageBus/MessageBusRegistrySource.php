@@ -26,12 +26,12 @@ final readonly class MessageBusRegistrySource
         array $services,
         public FlowRegistry $flows = new FlowRegistry(),
     ) {
-        if (count($classes) !== count(array_unique($classes))) {
+        if (\count($classes) !== \count(\array_unique($classes))) {
             throw new InvalidArgumentException('MessageBus registry classes must not contain duplicates.');
         }
 
-        sort($classes, SORT_STRING);
-        ksort($services, SORT_STRING);
+        \sort($classes, SORT_STRING);
+        \ksort($services, SORT_STRING);
         $this->classes = $classes;
         $this->services = $services;
     }
@@ -52,20 +52,20 @@ final readonly class MessageBusRegistrySource
 
     public static function fromFile(string $file): self
     {
-        if (!is_file($file)) {
-            throw new RuntimeException(sprintf('MessageBus registry source was not found: %s', $file));
+        if (!\is_file($file)) {
+            throw new RuntimeException(\sprintf('MessageBus registry source was not found: %s', $file));
         }
 
         $source = require $file;
 
         return $source instanceof self
             ? $source
-            : throw new RuntimeException(sprintf('MessageBus registry source must return %s.', self::class));
+            : throw new RuntimeException(\sprintf('MessageBus registry source must return %s.', self::class));
     }
 
     public function sourceHash(): string
     {
-        return hash('sha256', json_encode([
+        return \hash('sha256', \json_encode([
             'classes' => $this->classes,
             'flows' => $this->flows->toArray(),
             'services' => $this->services,
@@ -83,8 +83,8 @@ final readonly class MessageBusRegistrySource
         }
 
         $classes = $this->classes;
-        if ($implementation !== null && !in_array($implementation, $services, true)) {
-            $classes = array_values(array_filter(
+        if ($implementation !== null && !\in_array($implementation, $services, true)) {
+            $classes = \array_values(\array_filter(
                 $classes,
                 static fn(string $class): bool => $class !== $implementation,
             ));

@@ -16,12 +16,12 @@ final readonly class HttpLoadCheckOptions
         public int $expectedStatus,
         public int $maxBodyBytes,
     ) {
-        $parts = parse_url($this->url);
+        $parts = \parse_url($this->url);
         if (
-            filter_var($this->url, FILTER_VALIDATE_URL) === false
-            || !is_array($parts)
+            \filter_var($this->url, FILTER_VALIDATE_URL) === false
+            || !\is_array($parts)
             || !isset($parts['host'], $parts['scheme'])
-            || !in_array(strtolower($parts['scheme']), ['http', 'https'], true)
+            || !\in_array(\strtolower($parts['scheme']), ['http', 'https'], true)
             || isset($parts['user'])
             || isset($parts['pass'])
             || isset($parts['fragment'])
@@ -38,7 +38,7 @@ final readonly class HttpLoadCheckOptions
                 'Option --concurrency must be between 1 and 1024 and not exceed --requests.',
             );
         }
-        if (!is_finite($this->timeoutSeconds) || $this->timeoutSeconds <= 0 || $this->timeoutSeconds > 300) {
+        if (!\is_finite($this->timeoutSeconds) || $this->timeoutSeconds <= 0 || $this->timeoutSeconds > 300) {
             throw new InvalidArgumentException('Option --timeout must be greater than 0 and at most 300 seconds.');
         }
         if ($this->expectedStatus < 100 || $this->expectedStatus > 599) {

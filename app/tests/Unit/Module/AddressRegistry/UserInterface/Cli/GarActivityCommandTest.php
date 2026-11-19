@@ -36,13 +36,31 @@ final class GarActivityCommandTest
                 type: 'gar_import',
                 operationId: 7,
                 status: 'running',
-                phase: null,
+                phase: 'import',
                 stepsCompleted: 2,
                 stepsTotal: 3,
                 rowsRead: 100,
                 rowsWritten: 90,
                 updatedAt: '2026-11-07 10:00:00+03',
+                progressAge: '00:00:02',
                 error: null,
+                mode: 'initial-load',
+                writeMode: 'direct-copy',
+                attempt: 2,
+                batchSize: 50000,
+                pipelineState: 'waiting-for-gap',
+                pipelineFile: '77/AS_HOUSES_PARAMS.XML',
+                pipelineWriters: 3,
+                pipelineBatches: 10,
+                pipelineBytes: 2000,
+                pipelinePeakInFlightBatches: 3,
+                pipelinePeakInFlightBytes: 900,
+                pipelinePendingRanges: 2,
+                pipelinePendingRows: 20,
+                pipelineProgressAge: '00:00:01',
+                deferForeignKeys: true,
+                foreignKeysCompleted: 10,
+                foreignKeysTotal: 34,
             )],
             workers: [new WorkerInstanceActivity(
                 instanceId: 'worker-1',
@@ -70,11 +88,17 @@ final class GarActivityCommandTest
 
         Assert::same($exitCode, 0);
         Assert::same($reader->limit, 5);
-        Assert::true(str_contains($output, 'postgres_activity count=1'));
-        Assert::true(str_contains($output, 'operation type=gar_import id=7 status=running'));
-        Assert::true(str_contains($output, 'worker instance=worker-1'));
-        Assert::true(str_contains($output, 'binding=gar.address_coordinates.update status=pending jobs=4'));
-        Assert::false(str_contains($output, 'parser_logs'));
+        Assert::true(\str_contains($output, 'postgres_activity count=1'));
+        Assert::true(\str_contains(
+            $output,
+            'operation type=gar_import id=7 status=running mode=initial-load phase=import '
+                . 'write=direct-copy attempt=2 batch_size=50000',
+        ));
+        Assert::true(\str_contains($output, 'operation_pipeline id=7 state=waiting-for-gap'));
+        Assert::true(\str_contains($output, 'operation_foreign_keys id=7 mode=deferred completed=10/34'));
+        Assert::true(\str_contains($output, 'worker instance=worker-1'));
+        Assert::true(\str_contains($output, 'binding=gar.address_coordinates.update status=pending jobs=4'));
+        Assert::false(\str_contains($output, 'parser_logs'));
     }
 
     public function testItRejectsAnUnsafeLimitBeforeReadingPostgres(): void
@@ -87,7 +111,7 @@ final class GarActivityCommandTest
 
         Assert::same($exitCode, 2);
         Assert::same($reader->limit, null);
-        Assert::true(str_contains($output, 'Option --limit must be an integer from 1 to 100.'));
+        Assert::true(\str_contains($output, 'Option --limit must be an integer from 1 to 100.'));
     }
 
     /**

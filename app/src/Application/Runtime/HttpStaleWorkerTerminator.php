@@ -30,11 +30,11 @@ final class HttpStaleWorkerTerminator
         ?Closure $sendSignal = null,
         ?Closure $processIdentity = null,
     ) {
-        if ($this->graceSeconds <= 0 || !is_finite($this->graceSeconds)) {
+        if ($this->graceSeconds <= 0 || !\is_finite($this->graceSeconds)) {
             throw new InvalidArgumentException('HTTP stale worker termination grace must be finite and positive.');
         }
 
-        $this->sendSignal = $sendSignal ?? static fn(int $pid, int $signal): bool => posix_kill($pid, $signal);
+        $this->sendSignal = $sendSignal ?? static fn(int $pid, int $signal): bool => \posix_kill($pid, $signal);
         $this->processIdentity = $processIdentity ?? self::readProcessIdentity(...);
     }
 
@@ -116,25 +116,25 @@ final class HttpStaleWorkerTerminator
 
     public function pendingTerminations(): int
     {
-        return count($this->forceKillWatchers);
+        return \count($this->forceKillWatchers);
     }
 
     private static function readProcessIdentity(int $pid): ?string
     {
-        $stat = @file_get_contents(sprintf('/proc/%d/stat', $pid));
-        if (!is_string($stat)) {
+        $stat = @\file_get_contents(\sprintf('/proc/%d/stat', $pid));
+        if (!\is_string($stat)) {
             return null;
         }
 
-        $commandEnd = strrpos($stat, ')');
+        $commandEnd = \strrpos($stat, ')');
         if ($commandEnd === false) {
             return null;
         }
 
-        $fields = preg_split('/\s+/', trim(substr($stat, $commandEnd + 1)));
-        $startedAtClockTick = is_array($fields) ? ($fields[19] ?? null) : null;
+        $fields = \preg_split('/\s+/', \trim(\substr($stat, $commandEnd + 1)));
+        $startedAtClockTick = \is_array($fields) ? ($fields[19] ?? null) : null;
 
-        return is_string($startedAtClockTick) && ctype_digit($startedAtClockTick)
+        return \is_string($startedAtClockTick) && \ctype_digit($startedAtClockTick)
             ? $startedAtClockTick
             : null;
     }

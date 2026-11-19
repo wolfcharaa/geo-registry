@@ -50,11 +50,11 @@ HELP);
             return self::FAILURE;
         }
 
-        $output->writeln(sprintf(
+        $output->writeln(\sprintf(
             'status=enriched updated=%d inserted=%d elapsed_ms=%d',
             $result->updatedSearchRows,
             $result->insertedSearchRows,
-            (int) round($result->duration * 1000),
+            (int) \round($result->duration * 1000),
         ));
 
         return self::SUCCESS;

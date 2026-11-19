@@ -70,36 +70,36 @@ final readonly class DataMosSnapshotDownloader
             throw new RuntimeException('Data.Mos row limit must be positive.');
         }
 
-        $destination = trim($destination);
-        if ($destination === '' || (!str_ends_with($destination, '.jsonl') && !str_ends_with($destination, '.jsonl.gz'))) {
+        $destination = \trim($destination);
+        if ($destination === '' || (!\str_ends_with($destination, '.jsonl') && !\str_ends_with($destination, '.jsonl.gz'))) {
             throw new RuntimeException('Data.Mos destination must end with .jsonl or .jsonl.gz.');
         }
-        if (is_link($destination)) {
+        if (\is_link($destination)) {
             throw new RuntimeException('Data.Mos destination must not be a symbolic link.');
         }
         $manifestPath = $destination . '.manifest.json';
-        if (!$force && (file_exists($destination) || file_exists($manifestPath))) {
+        if (!$force && (\file_exists($destination) || \file_exists($manifestPath))) {
             throw new RuntimeException('Data.Mos destination or manifest already exists; pass --force to replace both.');
         }
 
-        $directory = dirname($destination);
-        if (!is_dir($directory) && !mkdir($directory, 0770, true) && !is_dir($directory)) {
+        $directory = \dirname($destination);
+        if (!\is_dir($directory) && !\mkdir($directory, 0770, true) && !\is_dir($directory)) {
             throw new RuntimeException("Unable to create Data.Mos destination directory: {$directory}");
         }
-        if (!is_writable($directory)) {
+        if (!\is_writable($directory)) {
             throw new RuntimeException("Data.Mos destination directory is not writable: {$directory}");
         }
 
         $metadata = $this->inspect($apiKey, $datasetId, $timeoutSeconds);
-        $processId = getmypid();
+        $processId = \getmypid();
         if ($processId === false) {
             throw new RuntimeException('Unable to determine the Data.Mos downloader process ID.');
         }
-        $suffix = sprintf('.part.%d.%s', $processId, bin2hex(random_bytes(6)));
+        $suffix = \sprintf('.part.%d.%s', $processId, \bin2hex(\random_bytes(6)));
         $temporaryPath = $destination . $suffix;
         $temporaryManifestPath = $manifestPath . $suffix;
-        $streamPath = str_ends_with($destination, '.gz') ? 'compress.zlib://' . $temporaryPath : $temporaryPath;
-        $stream = fopen($streamPath, 'wb');
+        $streamPath = \str_ends_with($destination, '.gz') ? 'compress.zlib://' . $temporaryPath : $temporaryPath;
+        $stream = \fopen($streamPath, 'wb');
         if ($stream === false) {
             throw new RuntimeException("Unable to create Data.Mos snapshot: {$destination}");
         }
@@ -109,7 +109,7 @@ final readonly class DataMosSnapshotDownloader
             while ($limit === null || $downloadedRows < $limit) {
                 $requestedRows = $limit === null
                     ? $pageSize
-                    : min($pageSize, $limit - $downloadedRows);
+                    : \min($pageSize, $limit - $downloadedRows);
                 $query = [
                     '$top' => $requestedRows,
                     '$skip' => $downloadedRows,
@@ -128,8 +128,8 @@ final readonly class DataMosSnapshotDownloader
                 }
 
                 foreach ($rows as $row) {
-                    $line = json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
-                    if (fwrite($stream, $line) !== strlen($line)) {
+                    $line = \json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
+                    if (\fwrite($stream, $line) !== \strlen($line)) {
                         throw new RuntimeException('Unable to write the complete Data.Mos snapshot row.');
                     }
                     ++$downloadedRows;
@@ -146,27 +146,27 @@ final readonly class DataMosSnapshotDownloader
                 }
             }
             if ($limit === null && $downloadedRows !== $metadata->rows) {
-                throw new RuntimeException(sprintf(
+                throw new RuntimeException(\sprintf(
                     'Official Data.Mos snapshot is incomplete: downloaded %d of %d rows.',
                     $downloadedRows,
                     $metadata->rows,
                 ));
             }
         } catch (Throwable $error) {
-            fclose($stream);
-            @unlink($temporaryPath);
-            @unlink($temporaryManifestPath);
+            \fclose($stream);
+            @\unlink($temporaryPath);
+            @\unlink($temporaryManifestPath);
             throw $error;
         }
-        if (!fclose($stream)) {
-            @unlink($temporaryPath);
+        if (!\fclose($stream)) {
+            @\unlink($temporaryPath);
             throw new RuntimeException('Unable to finalize the Data.Mos snapshot stream.');
         }
 
-        $bytes = filesize($temporaryPath);
-        $sha256 = hash_file('sha256', $temporaryPath);
-        if (!is_int($bytes) || $bytes < 1 || !is_string($sha256)) {
-            @unlink($temporaryPath);
+        $bytes = \filesize($temporaryPath);
+        $sha256 = \hash_file('sha256', $temporaryPath);
+        if (!\is_int($bytes) || $bytes < 1 || !\is_string($sha256)) {
+            @\unlink($temporaryPath);
             throw new RuntimeException('Unable to calculate Data.Mos snapshot metadata.');
         }
         $manifest = [
@@ -179,28 +179,28 @@ final readonly class DataMosSnapshotDownloader
             'advertised_rows' => $metadata->rows,
             'downloaded_rows' => $downloadedRows,
             'limited' => $limit !== null,
-            'file' => basename($destination),
+            'file' => \basename($destination),
             'bytes' => $bytes,
             'sha256' => $sha256,
         ];
-        $manifestJson = json_encode(
+        $manifestJson = \json_encode(
             $manifest,
             JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
         ) . "\n";
-        if (file_put_contents($temporaryManifestPath, $manifestJson, LOCK_EX) !== strlen($manifestJson)) {
-            @unlink($temporaryPath);
-            @unlink($temporaryManifestPath);
+        if (\file_put_contents($temporaryManifestPath, $manifestJson, LOCK_EX) !== \strlen($manifestJson)) {
+            @\unlink($temporaryPath);
+            @\unlink($temporaryManifestPath);
             throw new RuntimeException('Unable to write the complete Data.Mos snapshot manifest.');
         }
 
-        if (!rename($temporaryPath, $destination)) {
-            @unlink($temporaryPath);
-            @unlink($temporaryManifestPath);
+        if (!\rename($temporaryPath, $destination)) {
+            @\unlink($temporaryPath);
+            @\unlink($temporaryManifestPath);
             throw new RuntimeException('Unable to publish the Data.Mos snapshot atomically.');
         }
-        if (!rename($temporaryManifestPath, $manifestPath)) {
-            @unlink($destination);
-            @unlink($temporaryManifestPath);
+        if (!\rename($temporaryManifestPath, $manifestPath)) {
+            @\unlink($destination);
+            @\unlink($temporaryManifestPath);
             throw new RuntimeException('Unable to publish the Data.Mos snapshot manifest atomically.');
         }
 
@@ -221,7 +221,7 @@ final readonly class DataMosSnapshotDownloader
     private function requestJson(string $endpoint, string $apiKey, array $query, int $timeoutSeconds): array|bool|float|int|string|null
     {
         $query['api_key'] = $apiKey;
-        $request = new Request(self::BASE_URL . '/' . $endpoint . '?' . http_build_query($query));
+        $request = new Request(self::BASE_URL . '/' . $endpoint . '?' . \http_build_query($query));
         $request->setHeader('Accept', 'application/json');
         $request->setHeader('User-Agent', $this->userAgent);
         $request->setBodySizeLimit(self::MAX_RESPONSE_BYTES);
@@ -233,15 +233,15 @@ final readonly class DataMosSnapshotDownloader
             throw new RuntimeException('Official Data.Mos API request failed.', previous: $error);
         }
         if ($response->getStatus() < 200 || $response->getStatus() >= 300) {
-            throw new RuntimeException(sprintf('Official Data.Mos API returned HTTP %d.', $response->getStatus()));
+            throw new RuntimeException(\sprintf('Official Data.Mos API returned HTTP %d.', $response->getStatus()));
         }
 
         try {
-            $payload = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+            $payload = \json_decode($body, true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException $error) {
             throw new RuntimeException('Official Data.Mos API returned invalid JSON.', previous: $error);
         }
-        if ($payload !== null && !is_array($payload) && !is_scalar($payload)) {
+        if ($payload !== null && !\is_array($payload) && !\is_scalar($payload)) {
             throw new RuntimeException('Official Data.Mos API returned an unsupported JSON value.');
         }
 
@@ -251,20 +251,20 @@ final readonly class DataMosSnapshotDownloader
     /** @return array<string, mixed> */
     private function firstObject(mixed $payload): array
     {
-        if (!is_array($payload)) {
+        if (!\is_array($payload)) {
             return [];
         }
-        if (array_is_list($payload)) {
+        if (\array_is_list($payload)) {
             $payload = $payload[0] ?? [];
         }
 
-        if (!is_array($payload)) {
+        if (!\is_array($payload)) {
             return [];
         }
 
         $object = [];
         foreach ($payload as $key => $value) {
-            if (is_string($key)) {
+            if (\is_string($key)) {
                 $object[$key] = $value;
             }
         }
@@ -274,7 +274,7 @@ final readonly class DataMosSnapshotDownloader
 
     private function count(mixed $payload): int
     {
-        if (is_int($payload) || (is_string($payload) && ctype_digit($payload))) {
+        if (\is_int($payload) || (\is_string($payload) && \ctype_digit($payload))) {
             return (int) $payload;
         }
         $object = $this->firstObject($payload);
@@ -289,18 +289,18 @@ final readonly class DataMosSnapshotDownloader
     /** @return list<array<string, mixed>> */
     private function rows(mixed $payload): array
     {
-        if (!is_array($payload) || !array_is_list($payload)) {
+        if (!\is_array($payload) || !\array_is_list($payload)) {
             throw new RuntimeException('Official Data.Mos rows response must be a JSON list.');
         }
 
         $rows = [];
         foreach ($payload as $row) {
-            if (!is_array($row) || array_is_list($row)) {
+            if (!\is_array($row) || \array_is_list($row)) {
                 throw new RuntimeException('Official Data.Mos rows response contains an invalid row.');
             }
             $record = [];
             foreach ($row as $key => $value) {
-                if (is_string($key)) {
+                if (\is_string($key)) {
                     $record[$key] = $value;
                 }
             }
@@ -315,7 +315,7 @@ final readonly class DataMosSnapshotDownloader
     {
         foreach ($keys as $key) {
             $value = $object[$key] ?? null;
-            if (is_int($value) || (is_string($value) && ctype_digit($value))) {
+            if (\is_int($value) || (\is_string($value) && \ctype_digit($value))) {
                 return (int) $value;
             }
         }
@@ -325,7 +325,7 @@ final readonly class DataMosSnapshotDownloader
 
     private static function assertSettings(string $apiKey, int $datasetId, int $timeoutSeconds): void
     {
-        if (trim($apiKey) === '') {
+        if (\trim($apiKey) === '') {
             throw new RuntimeException('DATAMOS_API_KEY is required for the official Data.Mos API.');
         }
         if ($datasetId < 1) {

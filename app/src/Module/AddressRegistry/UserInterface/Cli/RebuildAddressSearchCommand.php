@@ -61,7 +61,7 @@ HELP);
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $batchSize = $input->getOption('batch-size');
-        if (!is_string($batchSize) || !ctype_digit($batchSize)) {
+        if (!\is_string($batchSize) || !\ctype_digit($batchSize)) {
             $output->writeln('<error>Option --batch-size must be a positive integer.</error>');
 
             return self::INVALID;
@@ -79,7 +79,7 @@ HELP);
             return self::FAILURE;
         }
 
-        $output->writeln(sprintf(
+        $output->writeln(\sprintf(
             'status=%s operation=%d tasks=%d/%d scanned=%d written=%d rows=%d elapsed_ms=%d resumed=%s',
             $result->status,
             $result->operationId,

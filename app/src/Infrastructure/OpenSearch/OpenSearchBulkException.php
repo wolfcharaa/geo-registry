@@ -13,7 +13,7 @@ final class OpenSearchBulkException extends OpenSearchException
         public readonly ?string $errorType,
         public readonly ?string $errorReason,
     ) {
-        parent::__construct(sprintf(
+        parent::__construct(\sprintf(
             'OpenSearch bulk request failed for %d item(s); first failure: id=%s status=%s type=%s reason=%s.',
             $failedItems,
             $documentId ?? 'unknown',

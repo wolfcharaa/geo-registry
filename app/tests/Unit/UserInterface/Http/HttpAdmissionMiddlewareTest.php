@@ -37,7 +37,7 @@ final class HttpAdmissionMiddlewareTest
         $rejectedHandler = new CountingAdmissionHandler();
         $rejected = $middleware->handleRequest(self::request('/second'), $rejectedHandler);
         /** @var array<string, mixed> $payload */
-        $payload = json_decode(buffer($rejected->getBody()), true, flags: JSON_THROW_ON_ERROR);
+        $payload = \json_decode(buffer($rejected->getBody()), true, flags: JSON_THROW_ON_ERROR);
 
         Assert::same($rejected->getStatus(), HttpStatus::SERVICE_UNAVAILABLE);
         Assert::same($rejected->getHeader('Retry-After'), '1');

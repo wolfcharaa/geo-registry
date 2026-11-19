@@ -157,13 +157,13 @@ JSON, unavailable: true);
     /** @return array<array-key, mixed> */
     private function payload(Response $response): array
     {
-        return $this->array(json_decode(buffer($response->getBody()), true, flags: JSON_THROW_ON_ERROR));
+        return $this->array(\json_decode(buffer($response->getBody()), true, flags: JSON_THROW_ON_ERROR));
     }
 
     /** @return array<array-key, mixed> */
     private function array(mixed $value): array
     {
-        if (!is_array($value)) {
+        if (!\is_array($value)) {
             throw new \LogicException('Expected a JSON object or list.');
         }
 
@@ -197,7 +197,7 @@ final readonly class ContractSuggestAddressModule implements Module
                 ->arg('reader', $reader)
                 ->canBeScoped(),
         ];
-        $classes = array_keys($services);
+        $classes = \array_keys($services);
         $serviceClasses = [];
         foreach ($classes as $class) {
             $serviceClasses[$class] = $class;
@@ -281,7 +281,7 @@ final readonly class ContractSuggestionPort implements
     ): ProgressiveAddressSuggestion {
         return new ProgressiveAddressSuggestion(
             objectId: $objectId,
-            objectGuid: sprintf('00000000-0000-4000-8000-%012d', $objectId),
+            objectGuid: \sprintf('00000000-0000-4000-8000-%012d', $objectId),
             name: $name,
             typeName: $typeName,
             hierarchy: $hierarchy,

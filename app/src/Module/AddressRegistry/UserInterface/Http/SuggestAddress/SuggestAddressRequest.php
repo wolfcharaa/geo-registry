@@ -57,10 +57,10 @@ final readonly class SuggestAddressRequest
 
     public function normalizedCount(): int
     {
-        if (is_int($this->count)) {
+        if (\is_int($this->count)) {
             return $this->count;
         }
-        if (is_string($this->count) && ctype_digit($this->count)) {
+        if (\is_string($this->count) && \ctype_digit($this->count)) {
             return (int) $this->count;
         }
 
@@ -94,7 +94,7 @@ final readonly class SuggestAddressRequest
 
     private function string(mixed $value): string
     {
-        if (!is_string($value)) {
+        if (!\is_string($value)) {
             throw new LogicException('SuggestAddressRequest must be validated before normalization.');
         }
 
@@ -103,8 +103,8 @@ final readonly class SuggestAddressRequest
 
     private static function normalize(string $value): string
     {
-        $normalized = preg_replace('/\s+/u', ' ', trim($value));
+        $normalized = \preg_replace('/\s+/u', ' ', \trim($value));
 
-        return $normalized ?? trim($value);
+        return $normalized ?? \trim($value);
     }
 }

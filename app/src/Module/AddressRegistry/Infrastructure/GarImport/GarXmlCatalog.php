@@ -21,27 +21,26 @@ final class GarXmlCatalog
 
     /**
      * @param list<int> $regions
-     * @return list<GarXmlSourceFile>
      */
-    public function files(string $sourcePath, array $regions = []): array
+    public function manifest(string $sourcePath, array $regions = []): GarXmlManifest
     {
-        $source = realpath($sourcePath);
-        if ($source === false) {
-            throw new GarImportFailed("GAR import source does not exist: {$sourcePath}");
-        }
+        $source = $this->canonicalSourcePath($sourcePath);
 
-        if (is_file($source)) {
+        if (\is_file($source)) {
             if ($regions !== []) {
                 throw new GarImportFailed('GAR --regions filtering requires a release directory, not a single XML file.');
             }
-            $descriptor = $this->descriptorFor(basename($source));
+            $descriptor = $this->descriptorFor(\basename($source));
             if ($descriptor === null) {
                 throw new GarImportFailed('The specified XML file is not supported by the GAR catalog.');
             }
 
-            return [$this->sourceFile($source, basename($source), $descriptor)];
+            return new GarXmlManifest(
+                $source,
+                [$this->sourceFile($source, \basename($source), $descriptor)],
+            );
         }
-        if (!is_dir($source)) {
+        if (!\is_dir($source)) {
             throw new GarImportFailed('GAR import source must be an XML file or a directory.');
         }
 
@@ -62,35 +61,35 @@ final class GarXmlCatalog
             if ($path === false) {
                 throw new GarImportFailed("Unable to resolve GAR XML file: {$item->getPathname()}");
             }
-            $relativePath = str_replace('\\', '/', substr($path, strlen($source) + 1));
+            $relativePath = \str_replace('\\', '/', \substr($path, \strlen($source) + 1));
             if (!$this->matchesRegions($relativePath, $regions)) {
                 continue;
             }
             $region = $this->regionForPath($relativePath);
-            if ($region !== null && in_array($region, $regions, true)) {
+            if ($region !== null && \in_array($region, $regions, true)) {
                 $matchedRegions[$region] = true;
             }
             $files[] = $this->sourceFile($path, $relativePath, $descriptor);
         }
 
         if ($regions !== []) {
-            $missingRegions = array_values(array_filter(
+            $missingRegions = \array_values(\array_filter(
                 $regions,
                 static fn(int $region): bool => !isset($matchedRegions[$region]),
             ));
             if ($missingRegions !== []) {
                 throw new GarImportFailed(
-                    'GAR import source has no supported XML files for regions ' . implode(',', $missingRegions) . '.',
+                    'GAR import source has no supported XML files for regions ' . \implode(',', $missingRegions) . '.',
                 );
             }
         }
 
         if ($files === []) {
-            $suffix = $regions === [] ? '' : ' for regions ' . implode(',', $regions);
+            $suffix = $regions === [] ? '' : ' for regions ' . \implode(',', $regions);
             throw new GarImportFailed("GAR import source does not contain supported XML files{$suffix}.");
         }
 
-        usort(
+        \usort(
             $files,
             static fn(GarXmlSourceFile $left, GarXmlSourceFile $right): int => [
                 $left->descriptor->priority,
@@ -101,7 +100,7 @@ final class GarXmlCatalog
             ],
         );
 
-        return $files;
+        return new GarXmlManifest($source, $files);
     }
 
     /** @param list<int> $regions */
@@ -116,14 +115,14 @@ final class GarXmlCatalog
             return true;
         }
 
-        return in_array($region, $regions, true);
+        return \in_array($region, $regions, true);
     }
 
     private function regionForPath(string $relativePath): ?int
     {
-        $directories = explode('/', dirname($relativePath));
+        $directories = \explode('/', \dirname($relativePath));
         foreach ($directories as $directory) {
-            if (preg_match('/^[0-9]{1,2}$/D', $directory) !== 1) {
+            if (\preg_match('/^[0-9]{1,2}$/D', $directory) !== 1) {
                 continue;
             }
             $region = (int) $directory;
@@ -135,9 +134,9 @@ final class GarXmlCatalog
         return null;
     }
 
-    public function canonicalSourcePath(string $sourcePath): string
+    private function canonicalSourcePath(string $sourcePath): string
     {
-        $source = realpath($sourcePath);
+        $source = \realpath($sourcePath);
         if ($source === false) {
             throw new GarImportFailed("GAR import source does not exist: {$sourcePath}");
         }
@@ -145,54 +144,18 @@ final class GarXmlCatalog
         return $source;
     }
 
-    public function file(string $sourcePath, string $relativePath): GarXmlSourceFile
+    /** @return list<string> */
+    public function tables(): array
     {
-        $source = $this->canonicalSourcePath($sourcePath);
-        $normalizedRelativePath = str_replace('\\', '/', $relativePath);
-        if (
-            $normalizedRelativePath === ''
-            || str_starts_with($normalizedRelativePath, '/')
-            || str_contains($normalizedRelativePath, "\0")
-        ) {
-            throw new GarImportFailed('GAR import worker received an invalid relative XML path.');
-        }
-
-        if (is_file($source)) {
-            if ($normalizedRelativePath !== basename($source)) {
-                throw new GarImportFailed("GAR XML file is outside the import source: {$relativePath}");
-            }
-            $path = $source;
-        } else {
-            $candidate = realpath($source . DIRECTORY_SEPARATOR . $normalizedRelativePath);
-            if (
-                $candidate === false
-                || !is_file($candidate)
-                || !str_starts_with($candidate, $source . DIRECTORY_SEPARATOR)
-            ) {
-                throw new GarImportFailed("GAR XML file is outside the import source: {$relativePath}");
-            }
-            $path = $candidate;
-            $resolvedRelativePath = str_replace('\\', '/', substr($path, strlen($source) + 1));
-            if ($resolvedRelativePath !== $normalizedRelativePath) {
-                throw new GarImportFailed("GAR XML relative path is not canonical: {$relativePath}");
+        $tables = [];
+        foreach ($this->descriptors as $descriptor) {
+            if (!\in_array($descriptor->table, $tables, true)) {
+                $tables[] = $descriptor->table;
             }
         }
+        \sort($tables);
 
-        $descriptor = $this->descriptorFor(basename($path));
-        if ($descriptor === null) {
-            throw new GarImportFailed("GAR XML file is not supported by the catalog: {$relativePath}");
-        }
-
-        return $this->sourceFile($path, $normalizedRelativePath, $descriptor);
-    }
-
-    /** @param list<GarXmlSourceFile> $files */
-    public function manifestHash(array $files): string
-    {
-        return hash('sha256', implode("\n", array_map(
-            static fn(GarXmlSourceFile $file): string => $file->key,
-            $files,
-        )));
+        return $tables;
     }
 
     private function descriptorFor(string $filename): ?GarXmlFileDescriptor
@@ -208,9 +171,9 @@ final class GarXmlCatalog
 
     private function sourceFile(string $path, string $relativePath, GarXmlFileDescriptor $descriptor): GarXmlSourceFile
     {
-        $size = filesize($path);
-        $modifiedAt = filemtime($path);
-        if (!is_int($size) || !is_int($modifiedAt)) {
+        $size = \filesize($path);
+        $modifiedAt = \filemtime($path);
+        if (!\is_int($size) || !\is_int($modifiedAt)) {
             throw new GarImportFailed("Unable to read GAR XML metadata: {$relativePath}");
         }
 
@@ -219,7 +182,7 @@ final class GarXmlCatalog
             relativePath: $relativePath,
             size: $size,
             modifiedAt: $modifiedAt,
-            key: hash('sha256', implode('|', [
+            key: \hash('sha256', \implode('|', [
                 $descriptor->key,
                 $relativePath,
                 (string) $size,

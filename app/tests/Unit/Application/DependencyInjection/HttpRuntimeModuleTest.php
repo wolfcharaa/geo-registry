@@ -21,8 +21,8 @@ final class HttpRuntimeModuleTest
         $runtimeClass = Dic::run(
             new HttpRuntimeModule(
                 new EnvironmentSnapshot([]),
-                MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_http.php'),
-                MessageCodecRegistryLoader::fromFile(dirname(__DIR__, 4) . '/config/message_bus_codecs.php'),
+                MessageBusRegistrySource::fromFile(\dirname(__DIR__, 4) . '/config/message_bus_http.php'),
+                MessageCodecRegistryLoader::fromFile(\dirname(__DIR__, 4) . '/config/message_bus_codecs.php'),
             ),
             static fn(HttpRuntime $runtime): string => $runtime::class,
         );
@@ -35,8 +35,8 @@ final class HttpRuntimeModuleTest
         $runtimeClass = Dic::run(
             new HttpRuntimeModule(
                 new EnvironmentSnapshot(['OPENSEARCH_SEARCH_ENABLED' => 'true']),
-                MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_http.php'),
-                MessageCodecRegistryLoader::fromFile(dirname(__DIR__, 4) . '/config/message_bus_codecs.php'),
+                MessageBusRegistrySource::fromFile(\dirname(__DIR__, 4) . '/config/message_bus_http.php'),
+                MessageCodecRegistryLoader::fromFile(\dirname(__DIR__, 4) . '/config/message_bus_codecs.php'),
             ),
             static fn(HttpRuntime $runtime): string => $runtime::class,
         );
@@ -49,8 +49,8 @@ final class HttpRuntimeModuleTest
         $runtimeClass = Dic::run(
             new HttpRuntimeModule(
                 new EnvironmentSnapshot(['ADDRESS_SEARCH_CACHE_ENABLED' => 'true']),
-                MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_http.php'),
-                MessageCodecRegistryLoader::fromFile(dirname(__DIR__, 4) . '/config/message_bus_codecs.php'),
+                MessageBusRegistrySource::fromFile(\dirname(__DIR__, 4) . '/config/message_bus_http.php'),
+                MessageCodecRegistryLoader::fromFile(\dirname(__DIR__, 4) . '/config/message_bus_codecs.php'),
             ),
             static fn(HttpRuntime $runtime): string => $runtime::class,
         );
@@ -66,8 +66,8 @@ final class HttpRuntimeModuleTest
                     'NOMINATIM_ENABLED' => 'false',
                     'OPENSEARCH_ENABLED' => 'false',
                 ]),
-                MessageBusRegistrySource::fromFile(dirname(__DIR__, 4) . '/config/message_bus_http.php'),
-                MessageCodecRegistryLoader::fromFile(dirname(__DIR__, 4) . '/config/message_bus_codecs.php'),
+                MessageBusRegistrySource::fromFile(\dirname(__DIR__, 4) . '/config/message_bus_http.php'),
+                MessageCodecRegistryLoader::fromFile(\dirname(__DIR__, 4) . '/config/message_bus_codecs.php'),
             ),
             static fn(HttpRuntime $runtime): string => $runtime::class,
         );

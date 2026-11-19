@@ -98,7 +98,7 @@ final readonly class CliRuntimeModule implements Module
             ->args([
                 'config' => $dic->value($httpConfig),
                 'logger' => $clusterLogger,
-                'entrypoint' => $dic->value(dirname(__DIR__, 3) . '/bin/app'),
+                'entrypoint' => $dic->value(\dirname(__DIR__, 3) . '/bin/app'),
             ]);
         $dic
             ->object(RunHttpServerCommand::class)

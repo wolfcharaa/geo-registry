@@ -29,7 +29,7 @@ final readonly class CachedSearchAddressDecorator implements SearchAddressPort
 
     private function key(SearchAddressCriteria $criteria): string
     {
-        $identity = json_encode([
+        $identity = \json_encode([
             'query' => $criteria->query,
             'hierarchy' => $criteria->hierarchy->value,
             'profile' => $criteria->profile->value,
@@ -37,6 +37,6 @@ final readonly class CachedSearchAddressDecorator implements SearchAddressPort
             'region_code' => $criteria->regionCode,
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
 
-        return self::KEY_VERSION . ':' . $this->namespace . ':' . hash('sha256', $identity);
+        return self::KEY_VERSION . ':' . $this->namespace . ':' . \hash('sha256', $identity);
     }
 }

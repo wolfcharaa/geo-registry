@@ -30,8 +30,8 @@ final readonly class HttpClusterRuntime
 
     public function run(): void
     {
-        if (!is_file($this->entrypoint)) {
-            throw new RuntimeException(sprintf('HTTP worker entrypoint does not exist: %s', $this->entrypoint));
+        if (!\is_file($this->entrypoint)) {
+            throw new RuntimeException(\sprintf('HTTP worker entrypoint does not exist: %s', $this->entrypoint));
         }
 
         $hub = new LocalIpcHub();
@@ -66,7 +66,7 @@ final readonly class HttpClusterRuntime
 
         $this->logger->info('Starting HTTP worker cluster', [
             'event' => 'http.cluster.starting',
-            'pid' => getmypid(),
+            'pid' => \getmypid(),
             'workers' => $this->config->workers,
             'restart_burst' => $this->config->workerRestartBurst,
             'restart_window_seconds' => $this->config->workerRestartWindowSeconds,
@@ -108,7 +108,7 @@ final readonly class HttpClusterRuntime
                 $this->logger->debug('Received HTTP worker message', [
                     'event' => 'http.cluster.message.received',
                     'worker_id' => $message->getWorker()->getId(),
-                    'message_type' => get_debug_type($data),
+                    'message_type' => \get_debug_type($data),
                 ]);
             }
         } finally {
@@ -123,7 +123,7 @@ final readonly class HttpClusterRuntime
             $watcher->stop(new TimeoutCancellation($this->config->shutdownTimeoutSeconds));
             $this->logger->info('HTTP worker cluster stopped', [
                 'event' => 'http.cluster.stopped',
-                'pid' => getmypid(),
+                'pid' => \getmypid(),
             ]);
         }
     }
@@ -198,7 +198,7 @@ final readonly class HttpClusterRuntime
 
     private static function isProcessAlive(int $pid): bool
     {
-        return posix_kill($pid, 0);
+        return \posix_kill($pid, 0);
     }
 
     /**
@@ -228,10 +228,10 @@ final readonly class HttpClusterRuntime
                         $watcher->stop(new TimeoutCancellation($this->config->shutdownTimeoutSeconds));
                     },
                 );
-                EventLoop::unreference($watcherIds[array_key_last($watcherIds)]);
+                EventLoop::unreference($watcherIds[\array_key_last($watcherIds)]);
             }
 
-            $restartSignal = defined('SIGUSR1') ? SIGUSR1 : 10;
+            $restartSignal = \defined('SIGUSR1') ? SIGUSR1 : 10;
             $watcherIds[] = EventLoop::onSignal(
                 $restartSignal,
                 function (string $watcherId, int $signalNumber) use ($watcher): void {
@@ -247,7 +247,7 @@ final readonly class HttpClusterRuntime
                     }
                 },
             );
-            EventLoop::unreference($watcherIds[array_key_last($watcherIds)]);
+            EventLoop::unreference($watcherIds[\array_key_last($watcherIds)]);
         } catch (UnsupportedFeatureException) {
             foreach ($watcherIds as $watcherId) {
                 EventLoop::cancel($watcherId);

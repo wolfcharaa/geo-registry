@@ -20,7 +20,7 @@ final readonly class EnvironmentSnapshot
 
     public static function capture(): self
     {
-        return new self(getenv());
+        return new self(\getenv());
     }
 
     public function string(string $name, string $default): string
@@ -31,7 +31,7 @@ final readonly class EnvironmentSnapshot
     public function requiredString(string $name): string
     {
         return $this->optionalString($name)
-            ?? throw new InvalidArgumentException(sprintf('%s must be a non-empty string.', $name));
+            ?? throw new InvalidArgumentException(\sprintf('%s must be a non-empty string.', $name));
     }
 
     public function optionalString(string $name): ?string
@@ -41,7 +41,7 @@ final readonly class EnvironmentSnapshot
             return null;
         }
 
-        $value = trim($value);
+        $value = \trim($value);
 
         return $value !== '' ? $value : null;
     }
@@ -50,7 +50,7 @@ final readonly class EnvironmentSnapshot
     public function positiveInteger(string $name, int $default): int
     {
         if ($default < 1) {
-            throw new InvalidArgumentException(sprintf('Default value for %s must be a positive integer.', $name));
+            throw new InvalidArgumentException(\sprintf('Default value for %s must be a positive integer.', $name));
         }
 
         $value = $this->optionalString($name);
@@ -58,9 +58,9 @@ final readonly class EnvironmentSnapshot
             return $default;
         }
 
-        $integer = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $integer = \filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($integer === false) {
-            throw new InvalidArgumentException(sprintf('%s must be a positive integer.', $name));
+            throw new InvalidArgumentException(\sprintf('%s must be a positive integer.', $name));
         }
 
         return $integer;
@@ -70,7 +70,7 @@ final readonly class EnvironmentSnapshot
     public function nonNegativeInteger(string $name, int $default): int
     {
         if ($default < 0) {
-            throw new InvalidArgumentException(sprintf('Default value for %s must be a non-negative integer.', $name));
+            throw new InvalidArgumentException(\sprintf('Default value for %s must be a non-negative integer.', $name));
         }
 
         $value = $this->optionalString($name);
@@ -78,9 +78,9 @@ final readonly class EnvironmentSnapshot
             return $default;
         }
 
-        $integer = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+        $integer = \filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
         if ($integer === false) {
-            throw new InvalidArgumentException(sprintf('%s must be a non-negative integer.', $name));
+            throw new InvalidArgumentException(\sprintf('%s must be a non-negative integer.', $name));
         }
 
         return $integer;
@@ -93,9 +93,9 @@ final readonly class EnvironmentSnapshot
             return $default;
         }
 
-        $float = filter_var($value, FILTER_VALIDATE_FLOAT);
+        $float = \filter_var($value, FILTER_VALIDATE_FLOAT);
         if ($float === false || $float <= 0) {
-            throw new InvalidArgumentException(sprintf('%s must be greater than zero.', $name));
+            throw new InvalidArgumentException(\sprintf('%s must be greater than zero.', $name));
         }
 
         return $float;
@@ -108,10 +108,10 @@ final readonly class EnvironmentSnapshot
             return $default;
         }
 
-        return match (strtolower($value)) {
+        return match (\strtolower($value)) {
             '1', 'true', 'yes', 'on' => true,
             '0', 'false', 'no', 'off' => false,
-            default => throw new InvalidArgumentException(sprintf('%s must be a boolean.', $name)),
+            default => throw new InvalidArgumentException(\sprintf('%s must be a boolean.', $name)),
         };
     }
 
@@ -120,10 +120,10 @@ final readonly class EnvironmentSnapshot
     {
         $redacted = [];
         foreach ($this->values as $name => $value) {
-            if (!is_string($name)) {
+            if (!\is_string($name)) {
                 throw new LogicException('Environment variable names must be strings.');
             }
-            $redacted[$name] = preg_match('/(?:CREDENTIAL|DSN|KEY|PASSWORD|SECRET|TOKEN)/i', $name) === 1
+            $redacted[$name] = \preg_match('/(?:CREDENTIAL|DSN|KEY|PASSWORD|SECRET|TOKEN)/i', $name) === 1
                 ? '[redacted]'
                 : $value;
         }

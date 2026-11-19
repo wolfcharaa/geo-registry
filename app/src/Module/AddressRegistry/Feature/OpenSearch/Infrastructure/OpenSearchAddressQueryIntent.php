@@ -4,11 +4,6 @@ declare(strict_types=1);
 
 namespace App\Module\AddressRegistry\Feature\OpenSearch\Infrastructure;
 
-use function count;
-use function preg_match;
-use function preg_split;
-use function trim;
-
 final class OpenSearchAddressQueryIntent
 {
     public function __construct(
@@ -33,7 +28,7 @@ final class OpenSearchAddressQueryIntent
 
     private function houseNumber(string $query): ?string
     {
-        if (preg_match(
+        if (\preg_match(
             '/(?:^|[,\s])(?:д|дом)\.?\s*(\d+(?:[\/-]\d+)?(?:[а-яa-z])?)(?=$|[, ]|\s+(?:к|корп|корпус|стр|строение|соор|сооружение|вл|владение|помещ|помещение)\.?)/iu',
             $query,
             $match,
@@ -41,12 +36,12 @@ final class OpenSearchAddressQueryIntent
             return $match[1];
         }
 
-        $words = preg_split('/\s+/u', trim($query));
-        if ($words === false || count($words) < 2) {
+        $words = \preg_split('/\s+/u', \trim($query));
+        if ($words === false || \count($words) < 2) {
             return null;
         }
 
-        if (preg_match('/(?:^|[,\s])(\d+(?:[\/-]\d+)?(?:[а-яa-z])?)\s*$/iu', $query, $match) === 1) {
+        if (\preg_match('/(?:^|[,\s])(\d+(?:[\/-]\d+)?(?:[а-яa-z])?)\s*$/iu', $query, $match) === 1) {
             return $match[1];
         }
 
@@ -55,6 +50,6 @@ final class OpenSearchAddressQueryIntent
 
     private function containsUnitMarker(string $query): bool
     {
-        return preg_match('/(?:^|[,\s])(?:кв|квартира|пом|помещ|помещение|комн|комната|офис)\.?/iu', $query) === 1;
+        return \preg_match('/(?:^|[,\s])(?:кв|квартира|пом|помещ|помещение|комн|комната|офис)\.?/iu', $query) === 1;
     }
 }

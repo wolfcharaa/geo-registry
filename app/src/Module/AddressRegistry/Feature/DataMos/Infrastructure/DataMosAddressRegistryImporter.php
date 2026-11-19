@@ -4,46 +4,13 @@ declare(strict_types=1);
 
 namespace App\Module\AddressRegistry\Feature\DataMos\Infrastructure;
 
-use function array_is_list;
-use function array_key_exists;
-use function count;
-use function fclose;
-use function fgets;
-use function file_get_contents;
-use function fopen;
-use function hash;
-use function http_build_query;
-use function in_array;
-use function is_array;
-use function is_file;
-use function is_numeric;
-use function is_string;
-use function json_decode;
-use function json_encode;
-
 use const JSON_THROW_ON_ERROR;
 use const JSON_UNESCAPED_UNICODE;
 
 use JsonException;
-
-use function max;
-use function microtime;
-
 use PDO;
 use PDOStatement;
-
-use function preg_match;
-use function rtrim;
-
 use RuntimeException;
-
-use function sprintf;
-use function str_contains;
-use function str_ends_with;
-use function str_starts_with;
-use function stream_context_create;
-use function strtolower;
-use function trim;
 
 final class DataMosAddressRegistryImporter
 {
@@ -65,15 +32,15 @@ final class DataMosAddressRegistryImporter
         bool $requireManifest = false,
         ?callable $progress = null,
     ): DataMosAddressRegistryImportResult {
-        $source = trim($source);
+        $source = \trim($source);
         if ($source === '') {
             throw new RuntimeException('Data.Mos source is required.');
         }
         $this->validateSource($source, $requireManifest);
 
-        $batchSize = max(1, $batchSize);
-        $pageSize = max(1, $pageSize);
-        $startedAt = microtime(true);
+        $batchSize = \max(1, $batchSize);
+        $pageSize = \max(1, $pageSize);
+        $startedAt = \microtime(true);
         $readRows = 0;
         $writtenRows = 0;
         $skippedRows = 0;
@@ -96,11 +63,11 @@ final class DataMosAddressRegistryImporter
             }
 
             $batch[] = $row;
-            if (count($batch) < $batchSize) {
+            if (\count($batch) < $batchSize) {
                 continue;
             }
 
-            $writtenRows += $dryRun ? count($batch) : $this->writeBatch($batch);
+            $writtenRows += $dryRun ? \count($batch) : $this->writeBatch($batch);
             $batch = [];
 
             if ($progress !== null) {
@@ -109,7 +76,7 @@ final class DataMosAddressRegistryImporter
         }
 
         if ($batch !== []) {
-            $writtenRows += $dryRun ? count($batch) : $this->writeBatch($batch);
+            $writtenRows += $dryRun ? \count($batch) : $this->writeBatch($batch);
             if ($progress !== null) {
                 $progress($readRows, $writtenRows, $skippedRows, 'batch');
             }
@@ -120,7 +87,7 @@ final class DataMosAddressRegistryImporter
             readRows: $readRows,
             writtenRows: $writtenRows,
             skippedRows: $skippedRows,
-            duration: microtime(true) - $startedAt,
+            duration: \microtime(true) - $startedAt,
             dryRun: $dryRun,
         );
     }
@@ -130,36 +97,36 @@ final class DataMosAddressRegistryImporter
      */
     private function items(string $source, int $pageSize): iterable
     {
-        if (str_starts_with($source, 'http://') || str_starts_with($source, 'https://')) {
+        if (\str_starts_with($source, 'http://') || \str_starts_with($source, 'https://')) {
             yield from $this->apiItems($source, $pageSize);
 
             return;
         }
 
-        if (!is_file($source)) {
-            throw new RuntimeException(sprintf('Data.Mos source file not found: %s', $source));
+        if (!\is_file($source)) {
+            throw new RuntimeException(\sprintf('Data.Mos source file not found: %s', $source));
         }
 
-        $lowerSource = strtolower($source);
+        $lowerSource = \strtolower($source);
 
-        if (str_ends_with($lowerSource, '.bson') || str_ends_with($lowerSource, '.bson.gz')) {
+        if (\str_ends_with($lowerSource, '.bson') || \str_ends_with($lowerSource, '.bson.gz')) {
             yield from $this->bsonDocuments->read($source);
 
             return;
         }
 
         if (
-            str_ends_with($lowerSource, '.jsonl')
-            || str_ends_with($lowerSource, '.ndjson')
-            || str_ends_with($lowerSource, '.jsonl.gz')
-            || str_ends_with($lowerSource, '.ndjson.gz')
+            \str_ends_with($lowerSource, '.jsonl')
+            || \str_ends_with($lowerSource, '.ndjson')
+            || \str_ends_with($lowerSource, '.jsonl.gz')
+            || \str_ends_with($lowerSource, '.ndjson.gz')
         ) {
             yield from $this->jsonLines($source);
 
             return;
         }
 
-        if (str_ends_with($lowerSource, '.zip')) {
+        if (\str_ends_with($lowerSource, '.zip')) {
             throw new RuntimeException(
                 'Data.Mos zip package must be extracted first. Import data.bson.gz from the package.',
             );
@@ -170,7 +137,7 @@ final class DataMosAddressRegistryImporter
 
     private function validateSource(string $source, bool $requireManifest): void
     {
-        if (str_starts_with($source, 'http://') || str_starts_with($source, 'https://')) {
+        if (\str_starts_with($source, 'http://') || \str_starts_with($source, 'https://')) {
             if ($requireManifest) {
                 throw new RuntimeException('Data.Mos --require-manifest accepts only a local snapshot file.');
             }
@@ -178,18 +145,18 @@ final class DataMosAddressRegistryImporter
             return;
         }
 
-        if (!is_file($source)) {
-            throw new RuntimeException(sprintf('Data.Mos source file not found: %s', $source));
+        if (!\is_file($source)) {
+            throw new RuntimeException(\sprintf('Data.Mos source file not found: %s', $source));
         }
 
-        if (str_ends_with(strtolower($source), '.zip')) {
+        if (\str_ends_with(\strtolower($source), '.zip')) {
             throw new RuntimeException(
                 'Data.Mos zip package must be extracted first. Import data.bson.gz from the package.',
             );
         }
 
         $manifestPath = $source . '.manifest.json';
-        if (!is_file($manifestPath)) {
+        if (!\is_file($manifestPath)) {
             if ($requireManifest) {
                 throw new RuntimeException("Data.Mos snapshot manifest not found: {$manifestPath}");
             }
@@ -202,28 +169,28 @@ final class DataMosAddressRegistryImporter
 
     private function verifySnapshotManifest(string $source, string $manifestPath): void
     {
-        $contents = file_get_contents($manifestPath);
+        $contents = \file_get_contents($manifestPath);
         if ($contents === false) {
             throw new RuntimeException("Unable to read Data.Mos snapshot manifest: {$manifestPath}");
         }
         try {
-            $manifest = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+            $manifest = \json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException $error) {
             throw new RuntimeException('Data.Mos snapshot manifest is not valid JSON.', previous: $error);
         }
-        if (!is_array($manifest) || array_is_list($manifest)) {
+        if (!\is_array($manifest) || \array_is_list($manifest)) {
             throw new RuntimeException('Data.Mos snapshot manifest must be a JSON object.');
         }
         if (($manifest['format'] ?? null) !== 'geo-registry-datamos-snapshot-v1') {
             throw new RuntimeException('Data.Mos snapshot manifest format is not supported.');
         }
-        if (($manifest['file'] ?? null) !== basename($source)) {
+        if (($manifest['file'] ?? null) !== \basename($source)) {
             throw new RuntimeException('Data.Mos snapshot filename does not match its manifest.');
         }
 
-        $bytes = filesize($source);
-        $sha256 = hash_file('sha256', $source);
-        if (!is_int($bytes) || !is_string($sha256)) {
+        $bytes = \filesize($source);
+        $sha256 = \hash_file('sha256', $source);
+        if (!\is_int($bytes) || !\is_string($sha256)) {
             throw new RuntimeException('Unable to calculate Data.Mos snapshot checksum.');
         }
         if (($manifest['bytes'] ?? null) !== $bytes || ($manifest['sha256'] ?? null) !== $sha256) {
@@ -252,7 +219,7 @@ final class DataMosAddressRegistryImporter
                 yield $item;
             }
 
-            $total = is_array($payload['_meta'] ?? null) && is_numeric($payload['_meta']['total'] ?? null)
+            $total = \is_array($payload['_meta'] ?? null) && \is_numeric($payload['_meta']['total'] ?? null)
                 ? (int) $payload['_meta']['total']
                 : null;
 
@@ -260,7 +227,7 @@ final class DataMosAddressRegistryImporter
                 return;
             }
 
-            if (count($items) < $pageSize) {
+            if (\count($items) < $pageSize) {
                 return;
             }
 
@@ -273,27 +240,27 @@ final class DataMosAddressRegistryImporter
      */
     private function jsonLines(string $path): iterable
     {
-        $streamPath = str_ends_with(strtolower($path), '.gz') ? 'compress.zlib://' . $path : $path;
-        $handle = fopen($streamPath, 'rb');
+        $streamPath = \str_ends_with(\strtolower($path), '.gz') ? 'compress.zlib://' . $path : $path;
+        $handle = \fopen($streamPath, 'rb');
         if ($handle === false) {
-            throw new RuntimeException(sprintf('Unable to open Data.Mos JSONL file: %s', $path));
+            throw new RuntimeException(\sprintf('Unable to open Data.Mos JSONL file: %s', $path));
         }
 
         try {
-            while (($line = fgets($handle)) !== false) {
-                $line = trim($line);
+            while (($line = \fgets($handle)) !== false) {
+                $line = \trim($line);
                 if ($line === '') {
                     continue;
                 }
 
-                $decoded = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
-                if (is_array($decoded)) {
+                $decoded = \json_decode($line, true, 512, JSON_THROW_ON_ERROR);
+                if (\is_array($decoded)) {
                     /** @var array<string, mixed> $decoded */
                     yield $decoded;
                 }
             }
         } finally {
-            fclose($handle);
+            \fclose($handle);
         }
     }
 
@@ -302,18 +269,18 @@ final class DataMosAddressRegistryImporter
      */
     private function jsonFile(string $path): iterable
     {
-        $contents = file_get_contents($path);
+        $contents = \file_get_contents($path);
         if ($contents === false) {
-            throw new RuntimeException(sprintf('Unable to read Data.Mos JSON file: %s', $path));
+            throw new RuntimeException(\sprintf('Unable to read Data.Mos JSON file: %s', $path));
         }
 
         try {
-            $decoded = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+            $decoded = \json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException $e) {
-            throw new RuntimeException(sprintf('Invalid Data.Mos JSON file %s: %s', $path, $e->getMessage()), 0, $e);
+            throw new RuntimeException(\sprintf('Invalid Data.Mos JSON file %s: %s', $path, $e->getMessage()), 0, $e);
         }
-        if (!is_array($decoded)) {
-            throw new RuntimeException(sprintf('Data.Mos JSON file %s must contain an object or array.', $path));
+        if (!\is_array($decoded)) {
+            throw new RuntimeException(\sprintf('Data.Mos JSON file %s must contain an object or array.', $path));
         }
 
         foreach ($this->itemsFromPayload($decoded) as $item) {
@@ -324,7 +291,7 @@ final class DataMosAddressRegistryImporter
     /** @return array<int|string, mixed> */
     private function fetchJson(string $url): array
     {
-        $contents = @file_get_contents($url, false, stream_context_create([
+        $contents = @\file_get_contents($url, false, \stream_context_create([
             'http' => [
                 'header' => "Accept: application/json\r\nUser-Agent: geo-registry-datamos-import/1.0\r\n",
                 'ignore_errors' => true,
@@ -332,16 +299,16 @@ final class DataMosAddressRegistryImporter
             ],
         ]));
         if ($contents === false) {
-            throw new RuntimeException(sprintf('Unable to fetch Data.Mos URL: %s', $url));
+            throw new RuntimeException(\sprintf('Unable to fetch Data.Mos URL: %s', $url));
         }
 
         try {
-            $decoded = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+            $decoded = \json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException $e) {
-            throw new RuntimeException(sprintf('Data.Mos URL returned invalid JSON: %s', $e->getMessage()), 0, $e);
+            throw new RuntimeException(\sprintf('Data.Mos URL returned invalid JSON: %s', $e->getMessage()), 0, $e);
         }
 
-        if (!is_array($decoded)) {
+        if (!\is_array($decoded)) {
             throw new RuntimeException('Data.Mos URL must return a JSON object or array.');
         }
 
@@ -354,12 +321,12 @@ final class DataMosAddressRegistryImporter
      */
     private function itemsFromPayload(array $payload): array
     {
-        if (array_is_list($payload)) {
+        if (\array_is_list($payload)) {
             return $this->onlyArrayItems($payload);
         }
 
         foreach (['_items', 'items', 'Items', 'rows', 'Rows', 'features', 'Features', 'data', 'Data'] as $key) {
-            if (is_array($payload[$key] ?? null)) {
+            if (\is_array($payload[$key] ?? null)) {
                 return $this->onlyArrayItems($payload[$key]);
             }
         }
@@ -375,7 +342,7 @@ final class DataMosAddressRegistryImporter
     {
         $result = [];
         foreach ($items as $item) {
-            if (!is_array($item)) {
+            if (!\is_array($item)) {
                 continue;
             }
 
@@ -454,7 +421,7 @@ final class DataMosAddressRegistryImporter
             'geo_lon' => $geoLon,
             'geo_data' => $this->jsonField($item, 'geoData'),
             'geodata_center' => $this->jsonField($item, 'geodata_center'),
-            'raw_payload' => json_encode($rawItem, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            'raw_payload' => \json_encode($rawItem, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
         ];
     }
 
@@ -464,10 +431,10 @@ final class DataMosAddressRegistryImporter
      */
     private function unwrapItem(array $item): array
     {
-        if (is_array($item['Cells'] ?? null)) {
+        if (\is_array($item['Cells'] ?? null)) {
             $cells = $this->stringKeyedArray($item['Cells']);
             foreach (['_id', 'global_id'] as $field) {
-                if (array_key_exists($field, $item) && !array_key_exists($field, $cells)) {
+                if (\array_key_exists($field, $item) && !\array_key_exists($field, $cells)) {
                     $cells[$field] = $item[$field];
                 }
             }
@@ -475,15 +442,15 @@ final class DataMosAddressRegistryImporter
             return $this->stringKeyedArray($cells);
         }
 
-        if (is_array($item['properties'] ?? null)) {
+        if (\is_array($item['properties'] ?? null)) {
             $properties = $this->stringKeyedArray($item['properties']);
             foreach (['_id', 'global_id'] as $field) {
-                if (array_key_exists($field, $item) && !array_key_exists($field, $properties)) {
+                if (\array_key_exists($field, $item) && !\array_key_exists($field, $properties)) {
                     $properties[$field] = $item[$field];
                 }
             }
 
-            if (is_array($item['geometry'] ?? null) && !array_key_exists('geometry', $properties)) {
+            if (\is_array($item['geometry'] ?? null) && !\array_key_exists('geometry', $properties)) {
                 $properties['geometry'] = $item['geometry'];
             }
 
@@ -501,7 +468,7 @@ final class DataMosAddressRegistryImporter
     {
         $result = [];
         foreach ($values as $key => $value) {
-            if (is_string($key)) {
+            if (\is_string($key)) {
                 $result[$key] = $value;
             }
         }
@@ -523,7 +490,7 @@ final class DataMosAddressRegistryImporter
             }
         }
 
-        if (is_array($rawItem['geometry'] ?? null)) {
+        if (\is_array($rawItem['geometry'] ?? null)) {
             $point = $this->pointFromValue($rawItem['geometry']);
             if ($point !== null) {
                 return $point;
@@ -538,28 +505,28 @@ final class DataMosAddressRegistryImporter
      */
     private function pointFromValue(mixed $value): ?array
     {
-        if (!is_array($value)) {
+        if (!\is_array($value)) {
             return null;
         }
 
         $rawType = $value['type'] ?? '';
-        if (!is_scalar($rawType)) {
+        if (!\is_scalar($rawType)) {
             return null;
         }
 
-        $type = strtolower(trim((string) $rawType));
-        if (!in_array($type, ['', 'point'], true)) {
+        $type = \strtolower(\trim((string) $rawType));
+        if (!\in_array($type, ['', 'point'], true)) {
             return null;
         }
 
         $coordinates = $value['coordinates'] ?? null;
-        if (!is_array($coordinates) || count($coordinates) < 2) {
+        if (!\is_array($coordinates) || \count($coordinates) < 2) {
             return null;
         }
 
         $lon = $coordinates[0] ?? null;
         $lat = $coordinates[1] ?? null;
-        if (!is_numeric($lon) || !is_numeric($lat)) {
+        if (!\is_numeric($lon) || !\is_numeric($lat)) {
             return null;
         }
 
@@ -578,11 +545,11 @@ final class DataMosAddressRegistryImporter
     private function stringField(array $item, string $name): string
     {
         $value = $this->field($item, $name);
-        if ($value === null || !is_scalar($value)) {
+        if ($value === null || !\is_scalar($value)) {
             return '';
         }
 
-        return trim((string) $value);
+        return \trim((string) $value);
     }
 
     /**
@@ -591,7 +558,7 @@ final class DataMosAddressRegistryImporter
     private function intField(array $item, string $name): ?int
     {
         $value = $this->field($item, $name);
-        if ($value === null || $value === '' || !is_numeric($value)) {
+        if ($value === null || $value === '' || !\is_numeric($value)) {
             return null;
         }
 
@@ -608,8 +575,8 @@ final class DataMosAddressRegistryImporter
             return null;
         }
 
-        return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $value) === 1
-            ? strtolower($value)
+        return \preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $value) === 1
+            ? \strtolower($value)
             : null;
     }
 
@@ -623,15 +590,15 @@ final class DataMosAddressRegistryImporter
             return null;
         }
 
-        if (is_bool($value)) {
+        if (\is_bool($value)) {
             return $value;
         }
 
-        if (!is_scalar($value)) {
+        if (!\is_scalar($value)) {
             return null;
         }
 
-        $value = strtolower(trim((string) $value));
+        $value = \strtolower(\trim((string) $value));
 
         return match ($value) {
             '1', 'true', 'yes', 'y', 'да' => true,
@@ -650,7 +617,7 @@ final class DataMosAddressRegistryImporter
             $value = [];
         }
 
-        return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        return \json_encode($value, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     }
 
     /**
@@ -658,13 +625,13 @@ final class DataMosAddressRegistryImporter
      */
     private function field(array $item, string $name): mixed
     {
-        if (array_key_exists($name, $item)) {
+        if (\array_key_exists($name, $item)) {
             return $item[$name];
         }
 
-        $lower = strtolower($name);
+        $lower = \strtolower($name);
         foreach ($item as $key => $value) {
-            if (is_string($key) && strtolower($key) === $lower) {
+            if (\is_string($key) && \strtolower($key) === $lower) {
                 return $value;
             }
         }
@@ -699,9 +666,9 @@ final class DataMosAddressRegistryImporter
             return 'fias:' . $nFias;
         }
 
-        return 'hash:' . hash(
+        return 'hash:' . \hash(
             'sha256',
-            $address . '|' . json_encode($item, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            $address . '|' . \json_encode($item, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
         );
     }
 
@@ -710,9 +677,9 @@ final class DataMosAddressRegistryImporter
      */
     private function urlWithQuery(string $url, array $query): string
     {
-        $separator = str_contains($url, '?') ? '&' : '?';
+        $separator = \str_contains($url, '?') ? '&' : '?';
 
-        return rtrim($url, '?&') . $separator . http_build_query($query);
+        return \rtrim($url, '?&') . $separator . \http_build_query($query);
     }
 
     /**
@@ -737,7 +704,7 @@ final class DataMosAddressRegistryImporter
             throw $e;
         }
 
-        return count($rows);
+        return \count($rows);
     }
 
     private function insertStatement(PDO $pdo): PDOStatement
@@ -900,12 +867,12 @@ SQL);
                 continue;
             }
 
-            if (is_bool($value)) {
+            if (\is_bool($value)) {
                 $statement->bindValue($parameter, $value, PDO::PARAM_BOOL);
                 continue;
             }
 
-            if (is_int($value)) {
+            if (\is_int($value)) {
                 $statement->bindValue($parameter, $value, PDO::PARAM_INT);
                 continue;
             }

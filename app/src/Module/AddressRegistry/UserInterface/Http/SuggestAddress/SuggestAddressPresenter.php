@@ -29,8 +29,8 @@ final readonly class SuggestAddressPresenter
             'count' => $result->count(),
             'query' => $query,
             'suggestions' => [
-                ...array_map(self::progressive(...), $result->progressiveSuggestions),
-                ...array_map($this->document(...), $result->searchMatches),
+                ...\array_map(self::progressive(...), $result->progressiveSuggestions),
+                ...\array_map($this->document(...), $result->searchMatches),
             ],
             'meta' => [
                 'endpoint' => 'suggest',

@@ -4,29 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Contract;
 
-use function array_is_list;
-use function array_key_exists;
-use function array_keys;
-use function array_merge;
-use function count;
-use function file_get_contents;
-use function implode;
-use function is_array;
-use function is_string;
-use function json_decode;
-use function parse_url;
-use function preg_match;
-
 use RuntimeException;
-
-use function sort;
-use function str_contains;
-use function str_replace;
-use function str_starts_with;
-use function strtoupper;
-use function substr;
-use function substr_count;
-
 use Symfony\Component\Yaml\Yaml;
 use Testo\Assert;
 use Testo\Test;
@@ -73,7 +51,7 @@ final class HttpContractArtifactsTest
             }
 
             $operationKey = self::operationKey($operationId);
-            Assert::true(array_key_exists($operationKey, $operations));
+            Assert::true(\array_key_exists($operationKey, $operations));
             $operation = $operations[$operationKey];
             Assert::same($request['method'], $operation['method']);
             Assert::same($request['path'], $operation['path']);
@@ -84,10 +62,10 @@ final class HttpContractArtifactsTest
 
         Assert::same($diagnostics, 1);
 
-        $operationIds = array_keys($operations);
-        $coveredOperationIds = array_keys($coverage);
-        sort($operationIds);
-        sort($coveredOperationIds);
+        $operationIds = \array_keys($operations);
+        $coveredOperationIds = \array_keys($coverage);
+        \sort($operationIds);
+        \sort($coveredOperationIds);
         Assert::same($coveredOperationIds, $operationIds);
 
         foreach ($operations as $operation) {
@@ -104,16 +82,16 @@ final class HttpContractArtifactsTest
 
         foreach ($requests as $request) {
             foreach ($request['responses'] as $response) {
-                if (!is_array($response)) {
+                if (!\is_array($response)) {
                     throw new RuntimeException('Postman response must be an object.');
                 }
 
                 $body = $response['body'] ?? null;
-                if (!is_string($body) || $body === '') {
+                if (!\is_string($body) || $body === '') {
                     continue;
                 }
 
-                json_decode($body, true, flags: JSON_THROW_ON_ERROR);
+                \json_decode($body, true, flags: JSON_THROW_ON_ERROR);
                 ++$savedResponses;
             }
         }
@@ -127,7 +105,7 @@ final class HttpContractArtifactsTest
 
             $key = self::stringField($variable, 'key');
             $environmentValues[$key] = self::stringField($variable, 'value');
-            Assert::false((bool) preg_match('/(?:password|secret|token|authorization|api[_-]?key)/i', $key));
+            Assert::false((bool) \preg_match('/(?:password|secret|token|authorization|api[_-]?key)/i', $key));
         }
 
         Assert::same($environmentValues['baseUrl'] ?? null, 'http://127.0.0.1:8080');
@@ -137,7 +115,7 @@ final class HttpContractArtifactsTest
         Assert::same($environmentValues['suggestThoroughfare'] ?? null, 'Общая');
         Assert::same($environmentValues['releaseStrict'] ?? null, 'false');
 
-        $artifacts = implode("\n", [
+        $artifacts = \implode("\n", [
             self::read(self::OPENAPI),
             self::read(self::COLLECTION),
             self::read(self::ENVIRONMENT),
@@ -155,19 +133,19 @@ final class HttpContractArtifactsTest
             '37.6173',
             '127.0.0.1:8899',
         ] as $forbiddenValue) {
-            Assert::false(str_contains($artifacts, $forbiddenValue));
+            Assert::false(\str_contains($artifacts, $forbiddenValue));
         }
     }
 
     public function testReleaseCollectionHasStrictAssertions(): void
     {
         $collection = self::read(self::COLLECTION);
-        Assert::same(substr_count($collection, "pm.variables.get('releaseStrict') === 'true'"), 9);
-        Assert::true(str_contains($collection, "suggestion.data.search_backend === 'opensearch'"));
-        Assert::true(str_contains($collection, "suggestion.data.fias_id === pm.variables.get('addressId')"));
-        Assert::true(str_contains($collection, '{{suggestCity}}'));
-        Assert::true(str_contains($collection, '{{suggestDistrict}}'));
-        Assert::true(str_contains($collection, '{{suggestThoroughfare}}'));
+        Assert::same(\substr_count($collection, "pm.variables.get('releaseStrict') === 'true'"), 9);
+        Assert::true(\str_contains($collection, "suggestion.data.search_backend === 'opensearch'"));
+        Assert::true(\str_contains($collection, "suggestion.data.fias_id === pm.variables.get('addressId')"));
+        Assert::true(\str_contains($collection, '{{suggestCity}}'));
+        Assert::true(\str_contains($collection, '{{suggestDistrict}}'));
+        Assert::true(\str_contains($collection, '{{suggestThoroughfare}}'));
     }
 
     /** @return array<array-key, mixed> */
@@ -193,7 +171,7 @@ final class HttpContractArtifactsTest
         $operations = [];
 
         foreach (self::arrayField($openApi, 'paths') as $path => $pathItem) {
-            if (!is_string($path)) {
+            if (!\is_string($path)) {
                 throw new RuntimeException('Every OpenAPI path item must be an object.');
             }
             $pathItem = self::object($pathItem, 'OpenAPI path item');
@@ -207,7 +185,7 @@ final class HttpContractArtifactsTest
 
                 $operationId = self::identifierField($operation, 'operationId');
                 $operationKey = self::operationKey($operationId);
-                if (array_key_exists($operationKey, $operations)) {
+                if (\array_key_exists($operationKey, $operations)) {
                     throw new RuntimeException('Duplicate OpenAPI operationId: ' . $operationId);
                 }
 
@@ -217,7 +195,7 @@ final class HttpContractArtifactsTest
 
                 $operations[$operationKey] = [
                     'operationId' => $operationId,
-                    'method' => strtoupper($method),
+                    'method' => \strtoupper($method),
                     'path' => $path,
                     'postmanFolder' => self::stringField($operation, 'x-postman-folder'),
                     'postmanRequest' => self::stringField($operation, 'x-postman-request'),
@@ -225,7 +203,7 @@ final class HttpContractArtifactsTest
             }
         }
 
-        Assert::same(count($operations), 7);
+        Assert::same(\count($operations), 7);
 
         return $operations;
     }
@@ -267,8 +245,8 @@ final class HttpContractArtifactsTest
 
             $name = self::stringField($item, 'name');
             $children = $item['item'] ?? null;
-            if (is_array($children)) {
-                $requests = array_merge(
+            if (\is_array($children)) {
+                $requests = \array_merge(
                     $requests,
                     self::requests(self::list($children, 'Postman child items'), [...$parents, $name]),
                 );
@@ -277,16 +255,16 @@ final class HttpContractArtifactsTest
 
             $request = self::arrayField($item, 'request');
             $url = self::stringField($request, 'url');
-            $path = parse_url(str_replace('{{baseUrl}}', 'http://contract.local', $url), PHP_URL_PATH);
-            if (!is_string($path)) {
+            $path = \parse_url(\str_replace('{{baseUrl}}', 'http://contract.local', $url), PHP_URL_PATH);
+            if (!\is_string($path)) {
                 throw new RuntimeException('Postman request URL must have a path.');
             }
 
             $requests[] = [
-                'folder' => implode(' / ', $parents),
+                'folder' => \implode(' / ', $parents),
                 'name' => $name,
                 'description' => self::stringField($item, 'description'),
-                'method' => strtoupper(self::stringField($request, 'method')),
+                'method' => \strtoupper(self::stringField($request, 'method')),
                 'path' => $path,
                 'responses' => self::listField($item, 'response'),
             ];
@@ -298,7 +276,7 @@ final class HttpContractArtifactsTest
     private static function operationIdFromDescription(string $description): ?string
     {
         $matches = [];
-        if (preg_match('/^OpenAPI operationId: ([A-Za-z][A-Za-z0-9]*)/m', $description, $matches) !== 1) {
+        if (\preg_match('/^OpenAPI operationId: ([A-Za-z][A-Za-z0-9]*)/m', $description, $matches) !== 1) {
             return null;
         }
 
@@ -313,14 +291,14 @@ final class HttpContractArtifactsTest
     /** @param array<array-key, mixed> $schemas */
     private static function assertSchemaReferencesExist(mixed $value, array $schemas): void
     {
-        if (!is_array($value)) {
+        if (!\is_array($value)) {
             return;
         }
 
         foreach ($value as $key => $child) {
-            if ($key === '$ref' && is_string($child) && str_starts_with($child, '#/components/schemas/')) {
-                $schema = substr($child, 21);
-                Assert::true($schema !== '' && array_key_exists($schema, $schemas));
+            if ($key === '$ref' && \is_string($child) && \str_starts_with($child, '#/components/schemas/')) {
+                $schema = \substr($child, 21);
+                Assert::true($schema !== '' && \array_key_exists($schema, $schemas));
                 continue;
             }
 
@@ -331,7 +309,7 @@ final class HttpContractArtifactsTest
     /** @return array<array-key, mixed> */
     private static function jsonObject(string $path): array
     {
-        $value = json_decode(self::read($path), true, flags: JSON_THROW_ON_ERROR);
+        $value = \json_decode(self::read($path), true, flags: JSON_THROW_ON_ERROR);
 
         return self::object($value, $path);
     }
@@ -340,7 +318,7 @@ final class HttpContractArtifactsTest
     private static function stringField(array $value, string $field): string
     {
         $result = $value[$field] ?? null;
-        if (!is_string($result) || $result === '') {
+        if (!\is_string($result) || $result === '') {
             throw new RuntimeException('Expected non-empty string field: ' . $field);
         }
 
@@ -351,7 +329,7 @@ final class HttpContractArtifactsTest
     private static function identifierField(array $value, string $field): string
     {
         $result = self::stringField($value, $field);
-        if (preg_match('/^[A-Za-z][A-Za-z0-9]*$/D', $result) !== 1) {
+        if (\preg_match('/^[A-Za-z][A-Za-z0-9]*$/D', $result) !== 1) {
             throw new RuntimeException('Expected identifier field: ' . $field);
         }
 
@@ -383,7 +361,7 @@ final class HttpContractArtifactsTest
     /** @return array<array-key, mixed> */
     private static function object(mixed $value, string $context): array
     {
-        if (!is_array($value) || ($value !== [] && array_is_list($value))) {
+        if (!\is_array($value) || ($value !== [] && \array_is_list($value))) {
             throw new RuntimeException('Expected object: ' . $context);
         }
 
@@ -393,7 +371,7 @@ final class HttpContractArtifactsTest
     /** @return list<mixed> */
     private static function list(mixed $value, string $context): array
     {
-        if (!is_array($value) || !array_is_list($value)) {
+        if (!\is_array($value) || !\array_is_list($value)) {
             throw new RuntimeException('Expected list: ' . $context);
         }
 
@@ -402,8 +380,8 @@ final class HttpContractArtifactsTest
 
     private static function read(string $path): string
     {
-        $contents = file_get_contents($path);
-        if (!is_string($contents)) {
+        $contents = \file_get_contents($path);
+        if (!\is_string($contents)) {
             throw new RuntimeException('Unable to read: ' . $path);
         }
 

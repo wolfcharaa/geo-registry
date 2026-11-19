@@ -101,7 +101,7 @@ final readonly class HttpRuntimeModule implements Module
                 static fn(): PostgresConnectionPool => PostgresPoolFactory::create(
                     $postgresConfig->dsn,
                     $postgresConfig->poolSize,
-                    max(1, (int) floor($httpConfig->timeoutSeconds * 1000)),
+                    \max(1, (int) \floor($httpConfig->timeoutSeconds * 1000)),
                 ),
             )
             ->disposer(static fn(PostgresConnectionPool $pool) => $pool->close());

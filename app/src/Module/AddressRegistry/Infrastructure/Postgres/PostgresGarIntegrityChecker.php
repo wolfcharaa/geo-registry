@@ -25,7 +25,7 @@ final readonly class PostgresGarIntegrityChecker implements GarIntegrityChecker
         $definitions = [...$this->quickChecks($regions), ...($deep ? $this->deepChecks($regions) : [])];
         /** @var list<GarIntegrityCheckResult> $results */
         $results = [];
-        foreach (array_chunk($definitions, $deep ? self::DEEP_CONCURRENCY : 1) as $chunk) {
+        foreach (\array_chunk($definitions, $deep ? self::DEEP_CONCURRENCY : 1) as $chunk) {
             /** @var list<Future<GarIntegrityCheckResult>> $futures */
             $futures = [];
             foreach ($chunk as $definition) {
@@ -76,6 +76,48 @@ SELECT count(*)::bigint AS issues
 FROM gar_import_files files
 JOIN latest ON latest.id = files.operation_id
 WHERE files.status <> 'completed'
+SQL,
+            ],
+            [
+                'name' => 'latest GAR import has no pipeline range backlog',
+                'sql' => <<<'SQL'
+WITH latest AS (
+    SELECT id FROM gar_import_operations ORDER BY id DESC LIMIT 1
+)
+SELECT count(*)::bigint AS issues
+FROM gar_import_file_batches batch
+JOIN latest ON latest.id = batch.operation_id
+SQL,
+            ],
+            [
+                'name' => 'latest GAR import has no foreign-key snapshot backlog',
+                'sql' => <<<'SQL'
+WITH latest AS (
+    SELECT id FROM gar_import_operations ORDER BY id DESC LIMIT 1
+)
+SELECT count(*)::bigint AS issues
+FROM gar_import_foreign_key_snapshots snapshot
+JOIN latest ON latest.id = snapshot.operation_id
+SQL,
+            ],
+            [
+                'name' => 'canonical GAR foreign keys are validated',
+                'sql' => <<<'SQL'
+SELECT count(*)::bigint AS issues
+FROM pg_constraint constraint_row
+JOIN pg_class table_class ON table_class.oid = constraint_row.conrelid
+JOIN pg_namespace namespace ON namespace.oid = table_class.relnamespace
+WHERE namespace.nspname = 'public'
+  AND table_class.relname IN (
+      'address_object_divisions', 'address_object_types', 'address_objects',
+      'administrative_reestr_hierarchy', 'apartment_types', 'apartments',
+      'car_places', 'change_history', 'house_addr_types', 'house_types', 'houses',
+      'municipal_reestr_hierarchy', 'normative_doc_kinds', 'normative_doc_types',
+      'normative_docs', 'object_levels', 'object_params', 'operation_types',
+      'param_types', 'reestr_objects', 'room_types', 'rooms', 'steads'
+  )
+  AND constraint_row.contype = 'f'
+  AND NOT constraint_row.convalidated
 SQL,
             ],
             [
@@ -171,7 +213,7 @@ SQL,
      */
     private function deepChecks(array $regions): array
     {
-        $regionList = implode(', ', $regions);
+        $regionList = \implode(', ', $regions);
 
         return [
             [
@@ -293,10 +335,10 @@ SQL,
         try {
             $row = $this->postgres->query($definition['sql'])->fetchRow();
             $issues = $row['issues'] ?? null;
-            if (is_string($issues) && ctype_digit($issues)) {
+            if (\is_string($issues) && \ctype_digit($issues)) {
                 $issues = (int) $issues;
             }
-            if (!is_int($issues) || $issues < 0) {
+            if (!\is_int($issues) || $issues < 0) {
                 throw new RuntimeException('PostgreSQL returned an invalid GAR integrity result.');
             }
 
@@ -309,7 +351,7 @@ SQL,
     /** @param non-empty-list<int> $regions */
     private static function regionValues(array $regions): string
     {
-        return implode(', ', array_map(
+        return \implode(', ', \array_map(
             static fn(int $region): string => "({$region}::smallint)",
             $regions,
         ));

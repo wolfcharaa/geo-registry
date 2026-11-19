@@ -25,11 +25,11 @@ final readonly class NominatimClient
         $payload = $this->get('/search', [
             'addressdetails' => 1,
             'format' => 'jsonv2',
-            'limit' => max(1, min(50, $limit)),
+            'limit' => \max(1, \min(50, $limit)),
             'q' => $query,
         ], $cancellation);
 
-        if (!array_is_list($payload)) {
+        if (!\array_is_list($payload)) {
             throw new RuntimeException('Nominatim returned an unexpected search response.');
         }
 
@@ -48,7 +48,7 @@ final readonly class NominatimClient
             'zoom' => 18,
         ], $cancellation);
 
-        if (array_is_list($payload)) {
+        if (\array_is_list($payload)) {
             throw new RuntimeException('Nominatim returned an unexpected reverse response.');
         }
 
@@ -61,7 +61,7 @@ final readonly class NominatimClient
     {
         $payload = $this->get('/status', ['format' => 'json'], $cancellation);
 
-        if (array_is_list($payload) || ($payload['status'] ?? null) !== 0) {
+        if (\array_is_list($payload) || ($payload['status'] ?? null) !== 0) {
             throw new RuntimeException('Nominatim is not ready.');
         }
 
@@ -76,7 +76,7 @@ final readonly class NominatimClient
      */
     private function get(string $path, array $query, ?Cancellation $cancellation = null): array
     {
-        $url = rtrim($this->baseUrl, '/') . $path . '?' . http_build_query($query, encoding_type: PHP_QUERY_RFC3986);
+        $url = \rtrim($this->baseUrl, '/') . $path . '?' . \http_build_query($query, encoding_type: PHP_QUERY_RFC3986);
         $request = new Request($url);
         $request->setHeader('Accept', 'application/json');
         $request->setHeader('Accept-Language', $this->language);
@@ -84,11 +84,11 @@ final readonly class NominatimClient
 
         $response = $this->httpClient->request($request, $cancellation);
         if ($response->getStatus() < 200 || $response->getStatus() >= 300) {
-            throw new RuntimeException(sprintf('Nominatim returned HTTP %d.', $response->getStatus()));
+            throw new RuntimeException(\sprintf('Nominatim returned HTTP %d.', $response->getStatus()));
         }
 
-        $payload = json_decode($response->getBody()->buffer(), true, 512, JSON_THROW_ON_ERROR);
-        if (!is_array($payload)) {
+        $payload = \json_decode($response->getBody()->buffer(), true, 512, JSON_THROW_ON_ERROR);
+        if (!\is_array($payload)) {
             throw new RuntimeException('Nominatim returned a non-object JSON response.');
         }
 

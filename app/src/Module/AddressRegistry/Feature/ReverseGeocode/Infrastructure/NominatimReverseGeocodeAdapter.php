@@ -38,19 +38,19 @@ final readonly class NominatimReverseGeocodeAdapter implements ReverseGeocodePor
     /** @param array<string, mixed> $payload */
     private static function location(array $payload): ?ReverseGeocodeLocation
     {
-        if (is_string($payload['error'] ?? null)) {
+        if (\is_string($payload['error'] ?? null)) {
             return null;
         }
 
         $displayName = $payload['display_name'] ?? null;
         $latitude = self::coordinate($payload['lat'] ?? null, -90, 90);
         $longitude = self::coordinate($payload['lon'] ?? null, -180, 180);
-        if (!is_string($displayName) || trim($displayName) === '' || $latitude === null || $longitude === null) {
+        if (!\is_string($displayName) || \trim($displayName) === '' || $latitude === null || $longitude === null) {
             throw new ReverseGeocodeUnavailable();
         }
 
         return new ReverseGeocodeLocation(
-            displayName: trim($displayName),
+            displayName: \trim($displayName),
             latitude: $latitude,
             longitude: $longitude,
             sourceType: self::sourceType($payload['osm_type'] ?? null),
@@ -61,7 +61,7 @@ final readonly class NominatimReverseGeocodeAdapter implements ReverseGeocodePor
 
     private static function address(mixed $value): ?ReverseGeocodeAddress
     {
-        if (!is_array($value)) {
+        if (!\is_array($value)) {
             return null;
         }
 
@@ -81,7 +81,7 @@ final readonly class NominatimReverseGeocodeAdapter implements ReverseGeocodePor
         }
 
         $parts = [];
-        if ($state !== null && ($locality === null || mb_strtolower($state) !== mb_strtolower($locality))) {
+        if ($state !== null && ($locality === null || \mb_strtolower($state) !== \mb_strtolower($locality))) {
             $parts[] = $state;
         }
         if ($locality !== null) {
@@ -91,7 +91,7 @@ final readonly class NominatimReverseGeocodeAdapter implements ReverseGeocodePor
         $parts[] = 'д ' . self::normalizeHouseNumber($houseNumber);
 
         return new ReverseGeocodeAddress(
-            query: implode(' ', $parts),
+            query: \implode(' ', $parts),
             route: $route,
             houseNumber: $houseNumber,
         );
@@ -99,29 +99,29 @@ final readonly class NominatimReverseGeocodeAdapter implements ReverseGeocodePor
 
     private static function string(mixed $value): ?string
     {
-        if (!is_string($value) || trim($value) === '') {
+        if (!\is_string($value) || \trim($value) === '') {
             return null;
         }
 
-        return trim($value);
+        return \trim($value);
     }
 
     private static function normalizeHouseNumber(string $houseNumber): string
     {
-        $houseNumber = (string) preg_replace('/([а-яА-Яa-zA-Z])(\d)/u', '$1 $2', $houseNumber);
+        $houseNumber = (string) \preg_replace('/([а-яА-Яa-zA-Z])(\d)/u', '$1 $2', $houseNumber);
 
-        return (string) preg_replace('/(\d)([а-яА-Яa-zA-Z])/u', '$1 $2', $houseNumber);
+        return (string) \preg_replace('/(\d)([а-яА-Яa-zA-Z])/u', '$1 $2', $houseNumber);
     }
 
     private static function coordinate(mixed $value, float $minimum, float $maximum): ?float
     {
-        if ((!is_int($value) && !is_float($value) && !is_string($value)) || !is_numeric($value)) {
+        if ((!\is_int($value) && !\is_float($value) && !\is_string($value)) || !\is_numeric($value)) {
             return null;
         }
 
         $coordinate = (float) $value;
 
-        return is_finite($coordinate) && $coordinate >= $minimum && $coordinate <= $maximum
+        return \is_finite($coordinate) && $coordinate >= $minimum && $coordinate <= $maximum
             ? $coordinate
             : null;
     }
@@ -131,11 +131,11 @@ final readonly class NominatimReverseGeocodeAdapter implements ReverseGeocodePor
         if ($value === null) {
             return null;
         }
-        if (!is_string($value) || trim($value) === '') {
+        if (!\is_string($value) || \trim($value) === '') {
             throw new ReverseGeocodeUnavailable();
         }
 
-        return trim($value);
+        return \trim($value);
     }
 
     private static function sourceId(mixed $value): ?int
@@ -143,10 +143,10 @@ final readonly class NominatimReverseGeocodeAdapter implements ReverseGeocodePor
         if ($value === null) {
             return null;
         }
-        if (is_int($value) && $value > 0) {
+        if (\is_int($value) && $value > 0) {
             return $value;
         }
-        if (is_string($value) && ctype_digit($value) && (int) $value > 0) {
+        if (\is_string($value) && \ctype_digit($value) && (int) $value > 0) {
             return (int) $value;
         }
 

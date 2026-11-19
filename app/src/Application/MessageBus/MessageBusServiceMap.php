@@ -21,7 +21,7 @@ final readonly class MessageBusServiceMap
 
     private function __construct(MessageBusRegistrySource $source, CompiledMessageRegistry $registry)
     {
-        $this->types = array_replace([
+        $this->types = \array_replace([
             DefaultMessageContextFactory::class => DefaultMessageContextFactory::class,
             QueueExecutionStrategy::class => QueueExecutionStrategy::class,
             SequentialExecutionStrategy::class => SequentialExecutionStrategy::class,
@@ -41,7 +41,7 @@ final readonly class MessageBusServiceMap
     {
         foreach ($overrides as $id => $_service) {
             if (!isset($this->types[$id])) {
-                throw new InvalidArgumentException(sprintf(
+                throw new InvalidArgumentException(\sprintf(
                     'MessageBus service override `%s` is not declared in the application registry.',
                     $id,
                 ));
@@ -78,13 +78,13 @@ final readonly class MessageBusServiceMap
     /** @param ServiceReference<object> $reference */
     private function validateServiceType(ServiceReference $reference): void
     {
-        $serviceType = $this->types[$reference->id] ?? throw new InvalidArgumentException(sprintf(
+        $serviceType = $this->types[$reference->id] ?? throw new InvalidArgumentException(\sprintf(
             'MessageBus service `%s` with type `%s` is not declared in the application registry.',
             $reference->id,
             $reference->type,
         ));
-        if (!is_a($serviceType, $reference->type, true)) {
-            throw new InvalidArgumentException(sprintf(
+        if (!\is_a($serviceType, $reference->type, true)) {
+            throw new InvalidArgumentException(\sprintf(
                 'MessageBus service `%s` must implement `%s`; `%s` declared.',
                 $reference->id,
                 $reference->type,
